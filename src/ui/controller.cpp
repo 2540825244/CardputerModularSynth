@@ -81,11 +81,19 @@ void UiController::tilt(float) {}
 bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {
     undo_.push(patch_, coalesceKey);
     fn(patch_, ctx);
-    // A keyed edit changes values only: the caller pushes them with setParam/setOutAmount.
-    if (!coalesceKey) engine_.apply(patch_);
+    engine_.apply(patch_);
     s_.dirty = true;
     s_.lastEditMs = now_;
     if (coalesceKey) coalescedEdit_ = true;
+    return true;
+}
+
+bool UiController::editValue(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {
+    undo_.push(patch_, coalesceKey);
+    fn(patch_, ctx);
+    s_.dirty = true;
+    s_.lastEditMs = now_;
+    coalescedEdit_ = true;
     return true;
 }
 

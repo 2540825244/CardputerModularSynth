@@ -586,6 +586,31 @@ void test_carry_duplicate_refused() {
     TEST_ASSERT_EQUAL_STRING("ALREADY PATCHED", f.ui.state().toast);
 }
 
+void test_cable_edit_reaches_engine() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.place(TOut, 1, 0);
+    float buf[kBlock];
+    auto peak = [&]() {
+        float p = 0.f;
+        for (int b = 0; b < 20; b++) {
+            f.eng.processBlock(buf);
+            for (int i = 0; i < kBlock; i++) p = buf[i] > p ? buf[i] : (-buf[i] > p ? -buf[i] : p);
+        }
+        return p;
+    };
+    TEST_ASSERT_EQUAL_FLOAT(0.f, peak());
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);  // OSC.out
+    f.side(Side::Esc);
+    f.tap(1, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 2);  // OUT.in
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    TEST_ASSERT_TRUE(peak() > 0.01f);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -624,5 +649,6 @@ int main() {
     RUN_TEST(test_carry_source_undone);
     RUN_TEST(test_open_module_undone);
     RUN_TEST(test_carry_duplicate_refused);
+    RUN_TEST(test_cable_edit_reaches_engine);
     return UNITY_END();
 }

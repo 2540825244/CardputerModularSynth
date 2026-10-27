@@ -73,7 +73,7 @@ bool setValue(UiController& ui, const ModuleRec& m, CellRef c, float v) {
     const ParamSpec& spec = amount ? kAmountSpec : m.type->params[c.index];
     v = paramClamp(spec, v);
     ValueEdit e{m.id, c.index, amount, v};
-    ui.edit(doSetValue, &e, paramKey(m.id, c.index, amount));
+    ui.editValue(doSetValue, &e, paramKey(m.id, c.index, amount));
     if (amount) ui.engine().setOutAmount(m.id, c.index, v);
     else ui.engine().setParam(m.id, c.index, v);
     return true;
