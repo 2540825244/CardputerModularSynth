@@ -1,6 +1,7 @@
 # Cardputer Modular — Design
 
-Status: draft from the brainstorm session of 2026-10-27, awaiting the owner's approval.
+Status: approved by the owner on 2026-10-27. Written in the brainstorm session of the same day.
+Implementation plan for v1: [`docs/superpowers/plans/2026-10-27-v1-firmware.md`](../plans/2026-10-27-v1-firmware.md).
 Hardware facts: [`docs/hardware-spec.md`](../../hardware-spec.md).
 Look: [`docs/design/`](../../design/) has the mockup page (`mockups.html`) and screenshots `01`–`05`.
 

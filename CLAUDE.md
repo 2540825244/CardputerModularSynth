@@ -12,21 +12,12 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
   Screenshots `01`–`05` plus `mockups.html`.
 
 ## Next step (as of 2026-10-27)
-The design was written and refined with the owner in the brainstorm session, but **the owner hasn't
-formally approved it yet**.
-1. Ask the owner whether they've read the design and approve it, or want changes.
-   Update the doc if they do.
-2. Once approved, write the implementation plan with the `superpowers:writing-plans` skill,
-   scoped to the **v1 release** (design §8.1): KEYS, OSC, VCF, VCA, ENV, LFO, DLY, OUT modules,
-   carry-the-cable patching, SD save/load, separate speaker/line volume. Keep the module system
-   expandable for §8.2.
-3. Plan early tasks to **check the hardware unknowns on the real device**. The owner flashes and
-   listens; Claude can't hear the output:
-   - I2S/ES8311 at 48 kHz with no MCLK
-   - whether `HP_DET` is readable from a GPIO
-   - keyboard ghosting with modifier + key
-   - M5Unified/M5Cardputer support for the Adv
-   - free RAM in practice
+The owner approved the design on 2026-10-27. The v1 implementation plan is
+`docs/superpowers/plans/2026-10-27-v1-firmware.md` (22 tasks). It also decides the spec's §12 open
+items as [Claude's call] (see the table at its top).
+1. If not done yet: the owner reviews the plan and picks an execution method (subagent-driven or native).
+2. Execute it task by task. Tasks 2, 18, 19, 20 and 21 are **owner checkpoints**: the owner flashes and
+   reports back (Claude can't hear the output or press keys). Stop and wait at each one.
 
 ## Constraints to remember
 - PlatformIO + Arduino core. `pio` isn't on PATH: use `~/.platformio/penv/bin/pio`.
