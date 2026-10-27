@@ -880,6 +880,41 @@ void test_tilt_ignores_pins_and_patch_view() {
     TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
 }
 
+void test_tilt_deadband() {
+    Fx f;
+    openVcf(f);
+    const ModuleRec* m = gPatch.findAt(0, 0);
+    f.ui.tick(f.ui.state().lastEditMs + 2000);  // flush the placement autosave
+    gUndo = UndoStack();
+    f.hold(0, 1);
+    f.ui.tilt(0.9f);
+    f.ui.tilt(-1.f);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+    TEST_ASSERT_FALSE(f.ui.state().dirty);
+    f.ui.tilt(5.f);
+    TEST_ASSERT_TRUE(m->params[0] != 1200.f);
+    f.ui.tilt(0.5f);  // once moved, small values still apply
+    f.up(0, 1);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+}
+
+void test_no_autosave_mid_tilt() {
+    Fx f;
+    openVcf(f);
+    f.hold(0, 1);
+    f.ui.tilt(20.f);
+    const uint32_t t0 = f.ui.state().lastEditMs;
+    f.ui.tick(t0 + 5000);
+    TEST_ASSERT_EQUAL(0, gStore.writes);
+    TEST_ASSERT_TRUE(f.ui.state().dirty);
+    f.up(0, 1);  // the debounce restarts at the release
+    f.ui.tick(f.ui.state().lastEditMs + 1999);
+    TEST_ASSERT_EQUAL(0, gStore.writes);
+    f.ui.tick(f.ui.state().lastEditMs + 2000);
+    TEST_ASSERT_EQUAL(1, gStore.writes);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -934,5 +969,7 @@ int main() {
     RUN_TEST(test_load_resets_ui_state);
     RUN_TEST(test_tilt_edit);
     RUN_TEST(test_tilt_ignores_pins_and_patch_view);
+    RUN_TEST(test_tilt_deadband);
+    RUN_TEST(test_no_autosave_mid_tilt);
     return UNITY_END();
 }

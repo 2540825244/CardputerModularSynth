@@ -21,6 +21,7 @@ class UiController {
     void endTilt();
     bool tiltActive() const { return tilt_.active; }
     int tiltCell() const { return tilt_.cell; }
+    uint32_t tiltGeneration() const { return tiltGen_; }  // bumps on every beginTilt
     const UiState& state() const { return s_; }
 
     // Shared edit helpers, used by every view file.
@@ -70,7 +71,9 @@ class UiController {
         uint8_t idx;
         int cell;
         float startNorm;
+        bool moved;  // left the +-1 degree deadband
     } tilt_ = {};
+    uint32_t tiltGen_ = 0;
     uint32_t now_ = 0;
     bool autosaveBackoff_ = false, autosaveWarned_ = false;
     uint32_t autosaveRetryMs_ = 0;

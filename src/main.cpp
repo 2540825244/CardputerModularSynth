@@ -28,7 +28,8 @@ static void printHeap(const char* tag) {
 static void uiTask(void*) {
     if (audioI2sError() == 0) codecBegin();
     uint32_t lastStatus = 0, lastDraw = 0;
-    bool steadyPrinted = false, tiltWasActive = false;
+    bool steadyPrinted = false;
+    uint32_t lastTiltGen = 0;
     float rollAtStart = 0.f;
     KeyPos pressed[16];
     KeyEvent ev[16];
@@ -40,13 +41,15 @@ static void uiTask(void*) {
         for (int i = 0; i < ne; i++) gUi.handle(ev[i], now);
         if (gUi.tiltActive()) {
             const float roll = tiltRollDegrees();
-            if (!tiltWasActive) rollAtStart = roll;
+            if (gUi.tiltGeneration() != lastTiltGen) {
+                lastTiltGen = gUi.tiltGeneration();
+                rollAtStart = roll;
+            }
             float d = roll - rollAtStart;
             if (d > 180.f) d -= 360.f;
             if (d < -180.f) d += 360.f;
             gUi.tilt(d);
         }
-        tiltWasActive = gUi.tiltActive();
         gUi.tick(now);
         if (now - lastDraw >= 33) {  // <= 30 fps, core 0 only
             lastDraw = now;

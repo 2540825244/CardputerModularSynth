@@ -1,4 +1,5 @@
 #include "controller.h"
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -81,7 +82,9 @@ void UiController::validate() {
 
 void UiController::tick(uint32_t nowMs) {
     if (s_.toast[0] && (int32_t)(nowMs - s_.toastUntilMs) >= 0) s_.toast[0] = 0;
+    now_ = nowMs;
     engine_.collect();
+    if (tilt_.active) return;  // no autosave mid-gesture
     if (!s_.dirty || (int32_t)(nowMs - s_.lastEditMs) < 2000) return;
     if (autosaveBackoff_ && (int32_t)(nowMs - autosaveRetryMs_) < 0) return;
     if (storage_.available() && storage_.write(slotPath(0).c_str(), patchToJson(patch_))) {
@@ -157,12 +160,14 @@ void doTilt(Patch& p, void* c) {
 void UiController::beginTilt(uint16_t id, uint8_t idx, int cell) {
     const ModuleRec* m = patch_.find(id);
     if (!m || idx >= m->type->numParams) return;
-    tilt_ = {true, id, idx, cell, paramToNorm(m->type->params[idx], m->params[idx])};
+    tilt_ = {true, id, idx, cell, paramToNorm(m->type->params[idx], m->params[idx]), false};
+    tiltGen_++;
 }
 
 void UiController::endTilt() {
     if (!tilt_.active) return;
     tilt_.active = false;
+    if (s_.dirty) s_.lastEditMs = now_;  // autosave debounce counts from the release
     undo_.breakCoalescing();
 }
 
@@ -173,6 +178,8 @@ void UiController::tilt(float degrees) {
         tilt_.active = false;
         return;
     }
+    if (!tilt_.moved && fabsf(degrees) <= 1.f) return;
+    tilt_.moved = true;
     const ParamSpec& sp = m->type->params[tilt_.idx];
     const float v = paramFromNorm(sp, tilt_.startNorm + degrees / 60.f);
     if (v == m->params[tilt_.idx]) return;
