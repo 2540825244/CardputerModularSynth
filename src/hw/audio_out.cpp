@@ -19,6 +19,7 @@ void audioTask(void*) {
     static float mono[kBlock];
     static int16_t buf[kBlock * 2];
     float load = 0.f;
+    uint32_t blocks = 0;
     for (;;) {
         const uint32_t t0 = xthal_get_ccount();
         g_engine->processBlock(mono);
@@ -32,7 +33,7 @@ void audioTask(void*) {
         }
         load += 0.02f * ((float)cycles / kBlockBudgetCycles - load);
         g_engine->setCpuLoad(load);
-        g_stackHw = uxTaskGetStackHighWaterMark(nullptr);
+        if ((++blocks & 255) == 0) g_stackHw = uxTaskGetStackHighWaterMark(nullptr);
         size_t written = 0;
         const esp_err_t e = i2s_write(kI2sPort, buf, sizeof(buf), &written, portMAX_DELAY);
         if (e != ESP_OK) {
