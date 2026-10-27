@@ -1,12 +1,18 @@
 #include "registry.h"
 #include <cstring>
+#include "modules/env.h"
+#include "modules/lfo.h"
 #include "modules/osc.h"
 #include "modules/vca.h"
+#include "modules/vcf.h"
 
 // One line per module type, in place-menu order.
 static const ModuleTypeInfo* const kTypes[] = {
     &kOscType,
+    &kVcfType,
     &kVcaType,
+    &kEnvType,
+    &kLfoType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {

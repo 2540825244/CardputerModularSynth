@@ -1,0 +1,76 @@
+#include "vcf.h"
+#include <cmath>
+#include "../dsp_util.h"
+#include "Filters/svf.h"
+
+namespace {
+
+enum { kCutoff, kRes, kMode, kDrive };
+enum { kInIn, kInCut, kInRes };
+constexpr int kStep = 8;  // SetFreq/SetRes cadence in samples
+
+const char* const kModeNames[] = {"LP", "HP"};
+const ParamSpec kParams[] = {
+    {"cutoff", "CUT", 20.f, 20000.f, 1200.f, Curve::Log, Unit::Hz, nullptr},
+    {"res", "RES", 0.f, 1.f, 0.2f, Curve::Lin, Unit::Percent, nullptr},
+    {"mode", "MOD", 0.f, 1.f, 0.f, Curve::Stepped, Unit::Enum, kModeNames},
+    {"drive", "DRV", 0.f, 1.f, 0.f, Curve::Lin, Unit::Percent, nullptr},
+};
+const char* const kInKeys[] = {"in", "cut", "res"};
+const char* const kInLabels[] = {"IN", "CUT", "RES"};
+const char* const kOutKeys[] = {"out"};
+const char* const kOutLabels[] = {"OUT"};
+
+class Vcf : public Module {
+   public:
+    Vcf() : Module(kVcfType) {
+        svf_.Init(kSampleRate);
+        slew_.setTimeMs(10.f, kSampleRate / (float)kStep);
+        slew_.y = log2f(kParams[kCutoff].def / kC4Hz);
+    }
+
+    void process(const float* const* ins, const bool* connected) override {
+        const float cutHz = param(kCutoff);
+        if (cutHz != lastCutHz_) {  // log2f only when the knob moved
+            lastCutHz_ = cutHz;
+            cutVolts_ = log2f(cutHz / kC4Hz);
+        }
+        const float res0 = param(kRes);
+        const bool hp = param(kMode) >= 0.5f;
+        svf_.SetDrive(param(kDrive));
+        const float* in = connected[kInIn] ? ins[kInIn] : nullptr;
+        const float* cut = connected[kInCut] ? ins[kInCut] : nullptr;
+        const float* rcv = connected[kInRes] ? ins[kInRes] : nullptr;
+        float* o = out(0);
+        float hz = cutHz, res = res0;
+        for (int i = 0; i < kBlock; i += kStep) {
+            const float v = slew_.process(cutVolts_) + (cut ? cut[i] : 0.f);
+            hz = voltsToHz(v);
+            hz = hz < 20.f ? 20.f : (hz > 16000.f ? 16000.f : hz);
+            res = res0 + (rcv ? rcv[i] * 0.2f : 0.f);
+            res = res < 0.f ? 0.f : (res > 1.f ? 1.f : res);
+            svf_.SetRes(res);
+            svf_.SetFreq(hz);
+            for (int j = i; j < i + kStep; j++) {
+                svf_.Process(in ? in[j] * 0.2f : 0.f);
+                o[j] = (hp ? svf_.High() : svf_.Low()) * kAudioVolts;
+            }
+        }
+        setMonitor(0, hz);
+        setMonitor(1, res);
+    }
+
+   private:
+    daisysp::Svf svf_;
+    Slew slew_;  // cutoff in volts, stepped every kStep samples
+    float lastCutHz_ = -1.f, cutVolts_ = 0.f;
+};
+
+Module* create() { return new Vcf(); }
+
+}  // namespace
+
+const ModuleTypeInfo kVcfType = {
+    "vcf", "VCF", "LP/HP 12 dB SVF, 1V/OCT cutoff CV", Category::Processor, Icon::Vcf,
+    Drawing::FilterCurve, 4, kParams, 3, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
+    45, sizeof(Vcf) + kBlock * sizeof(float), 0, create};

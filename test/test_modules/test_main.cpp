@@ -5,6 +5,9 @@
 #include "core/registry.h"
 #include "core/modules/osc.h"
 #include "core/modules/vca.h"
+#include "core/modules/vcf.h"
+#include "core/modules/env.h"
+#include "core/modules/lfo.h"
 
 void setUp() {}
 void tearDown() {}
@@ -96,11 +99,141 @@ void test_vca_normalled() {
     delete m;
 }
 
+// ---- VCF ----
+static float sineRms(Module& m, float hz, float amp, int nBlocks, const float* cutCv = nullptr) {
+    static float in[kBlock];
+    float ph = 0.f, sum = 0.f;
+    int cnt = 0;
+    for (int b = 0; b < nBlocks; b++) {
+        for (int i = 0; i < kBlock; i++) {
+            in[i] = amp * sinf(6.2831853f * ph);
+            ph += hz / kSampleRate;
+            if (ph >= 1.f) ph -= 1.f;
+        }
+        const float* ins[3] = {in, cutCv, nullptr};
+        const bool conn[3] = {true, cutCv != nullptr, false};
+        m.process(ins, conn);
+        if (b >= nBlocks / 2)
+            for (int i = 0; i < kBlock; i++) { sum += m.out(0)[i] * m.out(0)[i]; cnt++; }
+    }
+    return sqrtf(sum / (float)cnt);
+}
+
+static float vcfRatio(float mode, float hz) {
+    Module* m = kVcfType.create();
+    m->setParam(0, 500.f);
+    m->setParam(1, 0.f);
+    m->setParam(2, mode);
+    float r = sineRms(*m, hz, 5.f, 300) / (5.f * 0.70710678f);
+    delete m;
+    return r;
+}
+
+void test_vcf_lowpass() {
+    TEST_ASSERT_TRUE(vcfRatio(0.f, 5000.f) < 0.1f);
+    TEST_ASSERT_TRUE(vcfRatio(0.f, 100.f) > 0.8f);
+}
+
+void test_vcf_hp() {
+    TEST_ASSERT_TRUE(vcfRatio(1.f, 5000.f) > 0.8f);
+    TEST_ASSERT_TRUE(vcfRatio(1.f, 100.f) < 0.1f);
+}
+
+void test_vcf_cut_cv() {
+    Module* m = kVcfType.create();
+    m->setParam(0, 500.f);
+    float cv[kBlock];
+    constBlock(cv, 1.f);
+    sineRms(*m, 440.f, 1.f, 300, cv);  // let the 10 ms cutoff slew settle
+    TEST_ASSERT_FLOAT_WITHIN(10.f, 1000.f, m->monitor(0));
+    delete m;
+}
+
+// ---- ENV ----
+static void setEnv(Module& m, float a, float d, float s, float r) {
+    m.setParam(0, a); m.setParam(1, d); m.setParam(2, s); m.setParam(3, r);
+}
+
+void test_env_shape() {
+    Module* m = kEnvType.create();
+    setEnv(*m, 10.f, 10.f, 0.5f, 10.f);
+    float g[kBlock];
+    constBlock(g, 5.f);
+    const float* ins[2] = {g, nullptr};
+    const bool conn[2] = {true, false};
+    float peak = 0.f, at80 = 0.f;
+    const int blocks100 = 150;  // 100 ms
+    for (int b = 0; b < blocks100; b++) {
+        m->process(ins, conn);
+        for (int i = 0; i < kBlock; i++) peak = fmaxf(peak, m->out(0)[i]);
+        if (b == 124) at80 = m->out(0)[kBlock - 1];  // ~ 83 ms
+    }
+    TEST_ASSERT_FLOAT_WITHIN(0.15f, 5.f, peak);
+    TEST_ASSERT_FLOAT_WITHIN(0.15f, 2.5f, at80);
+    TEST_ASSERT_EQUAL_FLOAT(3.f, m->monitor(0));
+    constBlock(g, 0.f);
+    float last = 9.f;
+    for (int b = 0; b < 150; b++) { m->process(ins, conn); last = m->out(0)[kBlock - 1]; }
+    TEST_ASSERT_TRUE(last < 0.05f);
+    delete m;
+}
+
+void test_env_retrig() {
+    Module* m = kEnvType.create();
+    setEnv(*m, 20.f, 10.f, 0.3f, 10.f);
+    float g[kBlock], rt[kBlock];
+    constBlock(g, 5.f);
+    constBlock(rt, 0.f);
+    const float* ins[2] = {g, rt};
+    const bool conn[2] = {true, true};
+    for (int b = 0; b < 200; b++) m->process(ins, conn);
+    TEST_ASSERT_TRUE(m->monitor(1) < 0.4f);
+    constBlock(rt, 5.f);
+    m->process(ins, conn);  // 0.67 ms: the retrig edge restarts the attack
+    TEST_ASSERT_EQUAL_FLOAT(1.f, m->monitor(0));
+    m->process(ins, conn);
+    TEST_ASSERT_TRUE(m->monitor(1) > 0.3f);
+    delete m;
+}
+
+// ---- LFO ----
+static int lfoRises(float rateV) {
+    Module* m = kLfoType.create();
+    m->setParam(0, 0.f);
+    m->setParam(1, 2.f);
+    float r[kBlock];
+    constBlock(r, rateV);
+    const float* ins[1] = {r};
+    const bool conn[1] = {true};
+    int n = 0;
+    float prev = 0.f;
+    for (int b = 0; b < 3000; b++) {  // 2 s
+        m->process(ins, conn);
+        for (int i = 0; i < kBlock; i++) {
+            if (prev < 0.f && m->out(0)[i] >= 0.f) n++;
+            prev = m->out(0)[i];
+        }
+    }
+    delete m;
+    return n;
+}
+
+void test_lfo_rate() {
+    TEST_ASSERT_INT_WITHIN(1, 4, lfoRises(0.f));
+    TEST_ASSERT_INT_WITHIN(1, 8, lfoRises(1.f));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
     RUN_TEST(test_osc_pitch);
     RUN_TEST(test_osc_amplitude);
     RUN_TEST(test_vca_normalled);
+    RUN_TEST(test_vcf_lowpass);
+    RUN_TEST(test_vcf_hp);
+    RUN_TEST(test_vcf_cut_cv);
+    RUN_TEST(test_env_shape);
+    RUN_TEST(test_env_retrig);
+    RUN_TEST(test_lfo_rate);
     return UNITY_END();
 }
