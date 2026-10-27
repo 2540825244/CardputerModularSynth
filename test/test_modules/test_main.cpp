@@ -8,6 +8,9 @@
 #include "core/modules/vcf.h"
 #include "core/modules/env.h"
 #include "core/modules/lfo.h"
+#include "core/modules/keys.h"
+#include "core/modules/out.h"
+#include "core/dsp_util.h"
 
 void setUp() {}
 void tearDown() {}
@@ -223,6 +226,101 @@ void test_lfo_rate() {
     TEST_ASSERT_INT_WITHIN(1, 8, lfoRises(1.f));
 }
 
+// ---- KEYS ----
+static void idle(Module& m, int blocks) {
+    const float* ins[1] = {nullptr};
+    const bool conn[1] = {false};
+    for (int b = 0; b < blocks; b++) m.process(ins, conn);
+}
+
+void test_keys_pitch_gate() {
+    KeysModule* k = static_cast<KeysModule*>(kKeysType.create());
+    k->noteOn(72);
+    idle(*k, 5);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.f, k->out(0)[kBlock - 1]);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, k->out(1)[kBlock - 1]);
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 4.f, k->out(2)[kBlock - 1]);  // vel 0.8 * 5
+    k->gateOff();
+    idle(*k, 1);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->out(1)[kBlock - 1]);
+    delete k;
+}
+
+void test_keys_glide() {
+    KeysModule* k = static_cast<KeysModule*>(kKeysType.create());
+    k->noteOn(60);
+    idle(*k, 5);
+    k->setParam(1, 100.f);
+    k->noteOn(72);
+    idle(*k, 75);  // 50 ms
+    TEST_ASSERT_TRUE(k->out(0)[kBlock - 1] < 0.9f);
+    idle(*k, 900);  // 600 ms total
+    TEST_ASSERT_TRUE(k->out(0)[kBlock - 1] > 0.99f);
+    delete k;
+}
+
+void test_keys_retrigger_gap() {
+    for (int legato = 0; legato < 2; legato++) {
+        KeysModule* k = static_cast<KeysModule*>(kKeysType.create());
+        k->setParam(3, (float)legato);
+        k->noteOn(60);
+        idle(*k, 1);
+        k->noteOn(62);
+        idle(*k, 1);
+        int low = 0;
+        for (int i = 0; i < kBlock; i++) low += k->out(1)[i] == 0.f;
+        TEST_ASSERT_EQUAL_INT(legato ? 0 : kBlock, low);
+        idle(*k, 1);
+        for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(5.f, k->out(1)[i]);
+        delete k;
+    }
+}
+
+// ---- OUT ----
+static float outPeak(OutModule& o, float amp, int blocks, float badValue = 0.f, bool useBad = false) {
+    float in[kBlock], ph = 0.f, pk = 0.f;
+    const float* ins[1] = {in};
+    const bool conn[1] = {true};
+    for (int b = 0; b < blocks; b++) {
+        for (int i = 0; i < kBlock; i++) {
+            in[i] = useBad ? badValue : amp * sinf(6.2831853f * ph);
+            ph += 1000.f / kSampleRate;
+            if (ph >= 1.f) ph -= 1.f;
+        }
+        o.process(ins, conn);
+        if (b >= blocks - 10)
+            for (int i = 0; i < kBlock; i++) {
+                const float y = o.masterOut()[i];
+                if (!(fabsf(y) <= 1.f)) return 99.f;  // also catches NaN
+                pk = fmaxf(pk, fabsf(y));
+            }
+    }
+    return pk;
+}
+
+void test_out_volume_select() {
+    OutModule* o = static_cast<OutModule*>(kOutType.create());
+    o->setParam(0, 0.5f);
+    o->setParam(1, 1.f);
+    o->setParam(2, 0.f);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, softClip(0.5f), outPeak(*o, 5.f, 300));
+    o->setParam(2, 1.f);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, softClip(1.f), outPeak(*o, 5.f, 300));
+    o->setParam(2, 0.f);
+    o->setAutoDest(1);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, softClip(1.f), outPeak(*o, 5.f, 300));
+    TEST_ASSERT_EQUAL_FLOAT(1.f, o->monitor(1));
+    delete o;
+}
+
+void test_out_bounded() {
+    OutModule* o = static_cast<OutModule*>(kOutType.create());
+    o->setParam(0, 1.f);
+    TEST_ASSERT_TRUE(outPeak(*o, 0.f, 50, 1e6f, true) <= 1.f);
+    TEST_ASSERT_TRUE(outPeak(*o, 0.f, 50, NAN, true) <= 1.f);
+    delete o;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -235,5 +333,10 @@ int main() {
     RUN_TEST(test_env_shape);
     RUN_TEST(test_env_retrig);
     RUN_TEST(test_lfo_rate);
+    RUN_TEST(test_keys_pitch_gate);
+    RUN_TEST(test_keys_glide);
+    RUN_TEST(test_keys_retrigger_gap);
+    RUN_TEST(test_out_volume_select);
+    RUN_TEST(test_out_bounded);
     return UNITY_END();
 }
