@@ -7,6 +7,8 @@
 namespace {
 
 constexpr int kFormat = 1;
+constexpr size_t kMaxPatchJson = 16384;  // a full 32-module, 64-cable patch is about 12 KB
+constexpr int kMaxStoredId = 0xFEFF;     // keeps nextId from wrapping
 
 int findKey(const char* const* keys, int n, const char* k) {
     if (!keys) return -1;
@@ -85,8 +87,20 @@ std::string patchToJson(const Patch& p) {
 
 LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budget) {
     LoadReport rep{LoadError::None, 0, 0};
+    if (json.size() > kMaxPatchJson) {
+        rep.error = LoadError::BadJson;
+        return rep;
+    }
+    JsonDocument filter;  // keep only what the loader reads
+    filter["format"] = true;
+    JsonObject fm = filter["modules"][0].to<JsonObject>();
+    for (const char* k : {"id", "type", "page", "cell", "params", "amounts"}) fm[k] = true;
+    JsonObject fc = filter["cables"][0].to<JsonObject>();
+    for (const char* k : {"from", "to", "color"}) fc[k] = true;
     JsonDocument doc;
-    if (deserializeJson(doc, json) != DeserializationError::Ok || !doc.is<JsonObject>() ||
+    if (deserializeJson(doc, json, DeserializationOption::Filter(filter),
+                        DeserializationOption::NestingLimit(6)) != DeserializationError::Ok ||
+        !doc.is<JsonObject>() ||
         !doc["format"].is<int>()) {
         rep.error = LoadError::BadJson;
         return rep;
@@ -110,7 +124,7 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
             continue;
         }
         const int id = m["id"].as<int>(), page = m["page"].as<int>(), cell = m["cell"].as<int>();
-        if (id < 0 || id > 0xFFFE || page < 0 || page >= kPages || cell < 0 || cell >= kCellsPerPage ||
+        if (id < 0 || id > kMaxStoredId || page < 0 || page >= kPages || cell < 0 || cell >= kCellsPerPage ||
             (budget && !budget->canAdd(scratch, *t).ok) ||
             scratch.addModuleWithId(static_cast<uint16_t>(id), *t, static_cast<uint8_t>(page),
                                     static_cast<uint8_t>(cell)) != PatchError::None) {
@@ -132,7 +146,7 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
             r->outAmount[o] = a < -1.f ? -1.f : (a > 1.f ? 1.f : a);
         }
     }
-    if (scratch.moduleCount() == 0) {
+    if (scratch.moduleCount() == 0 && rep.skippedModules > 0) {  // an empty file is a valid empty patch
         rep.error = LoadError::Empty;
         return rep;
     }

@@ -170,8 +170,67 @@ void test_newer_format() {
 }
 
 void test_empty() {
+    Patch p = voice();
+    TEST_ASSERT_EQUAL(LoadError::None, patchFromJson("{\"format\":1,\"modules\":[]}", p, nullptr).error);
+    TEST_ASSERT_EQUAL(0, p.moduleCount());
+    Patch q = voice();
+    Patch before = q;
+    LoadReport r = patchFromJson(
+        "{\"format\":1,\"modules\":[{\"id\":1,\"type\":\"zzz\",\"page\":0,\"cell\":0}]}", q, nullptr);
+    TEST_ASSERT_EQUAL(LoadError::Empty, r.error);
+    TEST_ASSERT_EQUAL(1, r.skippedModules);
+    TEST_ASSERT_EQUAL(0, memcmp(&before, &q, sizeof(Patch)));
+}
+
+void test_size_bounds() {
+    // maximal patch: 32 modules (a mix with many params), 64 cables
     Patch p;
-    TEST_ASSERT_EQUAL(LoadError::Empty, patchFromJson("{\"format\":1,\"modules\":[]}", p, nullptr).error);
+    uint16_t src[8], dst[8];
+    for (int i = 0; i < 8; i++) {
+        p.addModule(kVcfType, i / 4, i % 4, &src[i]);
+        p.addModule(kEnvType, 2, i, &dst[i]);
+    }
+    for (int i = 0; i < 16; i++) p.addModule(kOscType, 2, 8 + i, nullptr);
+    TEST_ASSERT_EQUAL(32, p.moduleCount());
+    for (int a = 0; a < 8; a++)
+        for (int b = 0; b < 8; b++) TEST_ASSERT_EQUAL(PatchError::None, p.addCable(src[a], 0, dst[b], 0));
+    for (int i = 0; i < p.moduleCount(); i++) {
+        ModuleRec* r = p.find(p.moduleAt(i).id);
+        for (int k = 0; k < r->type->numParams; k++) r->params[k] = r->type->params[k].min + 0.123456789f;
+        r->outAmount[0] = -0.123456789f;
+    }
+    const std::string json = patchToJson(p);
+    TEST_ASSERT_TRUE(json.size() <= 16384);
+    Patch q;
+    TEST_ASSERT_EQUAL(LoadError::None, patchFromJson(json, q, nullptr).error);
+    TEST_ASSERT_EQUAL(32, q.moduleCount());
+    TEST_ASSERT_EQUAL(64, q.cableCount());
+
+    Patch t = voice();
+    Patch before = t;
+    std::string big = "{\"format\":1,\"junk\":\"" + std::string(20000, 'x') + "\",\"modules\":[]}";
+    TEST_ASSERT_EQUAL(LoadError::BadJson, patchFromJson(big, t, nullptr).error);
+    std::string deep = "{\"format\":1,\"modules\":" + std::string(500, '[') + std::string(500, ']') + "}";
+    TEST_ASSERT_EQUAL(LoadError::BadJson, patchFromJson(deep, t, nullptr).error);
+    TEST_ASSERT_EQUAL(0, memcmp(&before, &t, sizeof(Patch)));
+}
+
+void test_id_range() {
+    const std::string json =
+        "{\"format\":1,\"modules\":["
+        "{\"id\":65535,\"type\":\"osc\",\"page\":0,\"cell\":0},"
+        "{\"id\":65280,\"type\":\"osc\",\"page\":0,\"cell\":1},"
+        "{\"id\":65279,\"type\":\"osc\",\"page\":0,\"cell\":3},"
+        "{\"id\":65278,\"type\":\"vca\",\"page\":0,\"cell\":2}]}";
+    Patch p;
+    LoadReport r = patchFromJson(json, p, nullptr);
+    TEST_ASSERT_EQUAL(LoadError::None, r.error);
+    TEST_ASSERT_EQUAL(2, r.skippedModules);
+    TEST_ASSERT_EQUAL(2, p.moduleCount());
+    TEST_ASSERT_EQUAL_UINT16(65280, p.nextId);
+    // the id space is exhausted: new modules are refused instead of wrapping onto old ids
+    TEST_ASSERT_EQUAL(PatchError::BadPin, p.addModule(kVcaType, 0, 5, nullptr));
+    TEST_ASSERT_EQUAL_UINT16(65280, p.nextId);
 }
 
 void test_budget_skip() {
@@ -198,6 +257,8 @@ int main() {
     RUN_TEST(test_cell_collision_and_instances);
     RUN_TEST(test_newer_format);
     RUN_TEST(test_empty);
+    RUN_TEST(test_size_bounds);
+    RUN_TEST(test_id_range);
     RUN_TEST(test_budget_skip);
     return UNITY_END();
 }

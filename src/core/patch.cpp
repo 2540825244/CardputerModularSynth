@@ -48,6 +48,7 @@ PatchError Patch::addModule(const ModuleTypeInfo& t, uint8_t page, uint8_t cell,
 PatchError Patch::addModuleWithId(uint16_t id, const ModuleTypeInfo& t, uint8_t page, uint8_t cell) {
     if (page >= kPages || cell >= kCellsPerPage) return PatchError::BadPin;
     if (findAt(page, cell)) return PatchError::CellTaken;
+    if (id > 0xFEFF) return PatchError::BadPin;  // nextId must never wrap
     if (find(id)) return PatchError::Duplicate;
     if (nModules_ >= kMaxModules) return PatchError::TooManyModules;
     if (t.maxInstances && countOfType(t) >= t.maxInstances) return PatchError::MaxInstances;
