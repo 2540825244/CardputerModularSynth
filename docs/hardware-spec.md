@@ -13,10 +13,10 @@ real device.
 | SoC | ESP32-S3FN8, 2× Xtensa LX7 @ 240 MHz | One core for audio, one for UI/MIDI |
 | FPU | Single-precision float only (double runs in software, division is slow) | Use `float`, multiply by reciprocals, no `double` |
 | SIMD | PIE 128-bit integer vector ops (esp-dsp uses them) | Useful for int16 mixing/FIR; not for float DSP |
-| SRAM | 512 KB total, ~300–400 KB free for the app | **Tight**: limits delay/reverb/granular buffers |
+| SRAM | 512 KB total; probe: 325,820 B free, 294,900 B largest block (252,432 / 233,460 with a 65 KB sprite + 8 KB stack) | **Tight**: limits delay/reverb/granular buffers |
 | PSRAM | **None** ("N8" = 8 MB flash, no PSRAM) | No large sample RAM; no multi-second buffers |
 | Flash | 8 MB | ~3 MB app + ~4 MB for wavetables/samples (memory-mapped, read-only) |
-| microSD | SPI: CS G12, MOSI G14, CLK G40, MISO G39 | Patch storage, sample streaming (mono 48k/16-bit = 96 KB/s, easy) |
+| microSD | SPI: CS G12, MOSI G14, CLK G40, MISO G39 | SD confirmed working (probe: SDHC, 59,818 MB). Patch storage, sample streaming (mono 48k/16-bit = 96 KB/s, easy) |
 
 CPU budget at 48 kHz: 240 MHz / 48 000 ≈ **5 000 cycles per sample per core**.
 
@@ -24,7 +24,7 @@ CPU budget at 48 kHz: 240 MHz / 48 000 ≈ **5 000 cycles per sample per core**.
 
 ```
 ESP32-S3 I2S ──► ES8311 (mono codec) ── OUTP (DACP) ─┬─► NS4150B amp ─► 1 W speaker
-  G41 SCLK/BCLK                                      │       (muted by HP_DET when a plug is inserted)
+  G41 SCLK/BCLK                                      │       (muted by HP_DET when a plug is inserted; hardware mute confirmed, but HP_DET is not on a readable GPIO)
   G43 LRCK                                           └─► 22 µF ─► PJ-342 3.5 mm jack (L and R carry the same signal)
   G42 DSDIN (S3 → codec, playback)
   G46 ASDOUT (codec → S3, record)
@@ -34,8 +34,9 @@ MEMS mic (MSM381A3729, differential) ──► ES8311 MIC1P/N
 
 - **The output is mono.** ES8311 has a single DAC, and both jack channels are tied to it.
 - **No MCLK.** The ES8311 MCLK pin is not connected, so the codec must run with
-  SCLK/BCLK as its master clock. That limits the sample-rate/BCLK ratios. Target
-  48 kHz; 96 kHz is **(verify)**.
+  SCLK/BCLK as its master clock. That limits the sample-rate/BCLK ratios. 48 kHz
+  works with no MCLK (probe, 2026-10-27). 96 kHz is **(verify)**.
+- **The jack is a hot line level** (probe: headphones very loud off-ear at -6 dBFS).
 - **The jack works as a line out.** Into the PO-33's high-impedance line in, the
   22 µF coupling cap is no problem (corner < 1 Hz). Into 32 Ω headphones it cuts
   bass below ~225 Hz.
@@ -47,7 +48,7 @@ MEMS mic (MSM381A3729, differential) ──► ES8311 MIC1P/N
 | Item | Detail |
 |---|---|
 | Display | ST7789V2 1.14" 240×135 IPS; on the internal Stamp bus (G33–G37), backlight G38 |
-| Keyboard | 56 keys (4×14) via TCA8418 (I2C 0x34, INT G11). Key rollover is a matrix: check polyphony/ghosting on chords **(verify)** |
+| Keyboard | 56 keys (4×14) via TCA8418 (I2C 0x34, INT G11). Key rollover is a matrix: key coordinates (probe-confirmed): x 0-13 left to right, y 0-3 top to bottom. Chord/ghosting check still pending **(verify)** |
 | IMU | BMI270 6-axis, I2C 0x69. Tilt/shake can be a modulation source |
 | Buttons | G0 (BOOT/user), reset; side power switch |
 | IR TX | G44 |
