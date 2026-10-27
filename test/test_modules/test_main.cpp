@@ -10,6 +10,8 @@
 #include "core/modules/lfo.h"
 #include "core/modules/keys.h"
 #include "core/modules/out.h"
+#include "core/modules/dly.h"
+#include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
 void setUp() {}
@@ -339,6 +341,75 @@ void test_out_bounded() {
     delete o;
 }
 
+// ---- delay pool / DLY ----
+void test_pool_exhaustion() {
+    int16_t* s[kDelaySlots];
+    for (int i = 0; i < kDelaySlots; i++) {
+        s[i] = delayPoolAcquire();
+        TEST_ASSERT_NOT_NULL(s[i]);
+        for (int j = 0; j < i; j++) TEST_ASSERT_TRUE(s[i] != s[j]);
+    }
+    TEST_ASSERT_EQUAL_INT(0, delayPoolFree());
+    TEST_ASSERT_NULL(delayPoolAcquire());
+    delayPoolRelease(s[0]);
+    int16_t* again = delayPoolAcquire();
+    TEST_ASSERT_NOT_NULL(again);
+    delayPoolRelease(again);
+    for (int i = 1; i < kDelaySlots; i++) delayPoolRelease(s[i]);
+    TEST_ASSERT_EQUAL_INT(kDelaySlots, delayPoolFree());
+}
+
+void test_dly_create_refused() {
+    int16_t* s[kDelaySlots];
+    for (int i = 0; i < kDelaySlots; i++) s[i] = delayPoolAcquire();
+    TEST_ASSERT_NULL(kDlyType.create());
+    for (int i = 0; i < kDelaySlots; i++) delayPoolRelease(s[i]);
+}
+
+void test_dly_echo() {
+    Module* m = kDlyType.create();
+    TEST_ASSERT_NOT_NULL(m);
+    m->setParam(0, 100.f);
+    m->setParam(1, 0.f);
+    m->setParam(2, 1.f);
+    float in[kBlock] = {};
+    in[0] = 5.f;
+    const float* ins[2] = {in, nullptr};
+    const bool conn[2] = {true, false};
+    int peakAt = -1;
+    float peak = 0.f;
+    for (int b = 0; b < 200; b++) {  // 6400 samples
+        m->process(ins, conn);
+        in[0] = 0.f;
+        for (int i = 0; i < kBlock; i++)
+            if (fabsf(m->out(0)[i]) > peak) { peak = fabsf(m->out(0)[i]); peakAt = b * kBlock + i; }
+    }
+    TEST_ASSERT_INT_WITHIN(2, 4800, peakAt);
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, 5.f, peak);
+    delete m;
+    TEST_ASSERT_EQUAL_INT(kDelaySlots, delayPoolFree());
+}
+
+void test_dly_feedback_bounded() {
+    Module* m = kDlyType.create();
+    m->setParam(0, 50.f);
+    m->setParam(1, 0.95f);
+    m->setParam(2, 0.5f);
+    float in[kBlock], ph = 0.f;
+    const float* ins[2] = {in, nullptr};
+    const bool conn[2] = {true, false};
+    for (int b = 0; b < 15000; b++) {  // 10 s
+        for (int i = 0; i < kBlock; i++) {
+            in[i] = 5.f * sinf(6.2831853f * ph);
+            ph += 220.f / kSampleRate;
+            if (ph >= 1.f) ph -= 1.f;
+        }
+        m->process(ins, conn);
+        for (int i = 0; i < kBlock; i++) TEST_ASSERT_TRUE(fabsf(m->out(0)[i]) <= 12.f);
+    }
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -357,5 +428,9 @@ int main() {
     RUN_TEST(test_keys_retrigger_gap);
     RUN_TEST(test_out_volume_select);
     RUN_TEST(test_out_bounded);
+    RUN_TEST(test_pool_exhaustion);
+    RUN_TEST(test_dly_create_refused);
+    RUN_TEST(test_dly_echo);
+    RUN_TEST(test_dly_feedback_bounded);
     return UNITY_END();
 }

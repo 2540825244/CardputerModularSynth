@@ -1,5 +1,6 @@
 #include "registry.h"
 #include <cstring>
+#include "modules/dly.h"
 #include "modules/env.h"
 #include "modules/keys.h"
 #include "modules/lfo.h"
@@ -16,6 +17,7 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kVcaType,
     &kEnvType,
     &kLfoType,
+    &kDlyType,
     &kOutType,
 };
 
