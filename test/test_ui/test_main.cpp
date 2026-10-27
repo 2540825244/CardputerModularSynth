@@ -1,0 +1,256 @@
+#include <unity.h>
+#include <cstring>
+#include <map>
+#include "core/modules/keys.h"
+#include "core/modules/osc.h"
+#include "core/modules/out.h"
+#include "core/registry.h"
+#include "ui/controller.h"
+
+void setUp() {}
+void tearDown() {}
+
+struct MemStorage : Storage {
+    std::map<std::string, std::string> files;
+    bool available() override { return true; }
+    bool read(const char* p, std::string& out) override {
+        auto it = files.find(p);
+        if (it == files.end()) return false;
+        out = it->second;
+        return true;
+    }
+    bool write(const char* p, const std::string& d) override {
+        files[p] = d;
+        return true;
+    }
+    bool exists(const char* p) override { return files.count(p) > 0; }
+};
+
+static uint32_t bigHeap() { return 1000000; }
+
+// Patch and UndoStack are large: keep them off the stack.
+static Patch gPatch;
+static UndoStack gUndo;
+static MemStorage gStore;
+
+enum { TKeys, TOsc, TVcf, TVca, TEnv, TLfo, TDly, TOut };
+
+struct Fx {
+    Engine eng{bigHeap};
+    UiController ui{gPatch, eng, gUndo, gStore};
+    uint32_t t = 0;
+    Fx() {
+        gPatch = Patch();
+        gUndo = UndoStack();
+        gStore.files.clear();
+    }
+    void send(KeyEvent::Type ty, bool grid, int c, int r, Side s) {
+        KeyEvent e{};
+        e.type = ty;
+        e.grid = grid;
+        e.col = (uint8_t)c;
+        e.row = (uint8_t)r;
+        e.side = s;
+        ui.handle(e, t += 10);
+    }
+    void sideDown(Side s) { send(KeyEvent::Down, false, 0, 0, s); }
+    void sideUp(Side s) { send(KeyEvent::Up, false, 0, 0, s); }
+    void side(Side s) { sideDown(s); sideUp(s); }
+    void down(int c, int r) { send(KeyEvent::Down, true, c, r, Side::Esc); }
+    void up(int c, int r) { send(KeyEvent::Up, true, c, r, Side::Esc); }
+    void tap(int c, int r) { down(c, r); up(c, r); }
+    void hold(int c, int r) { down(c, r); send(KeyEvent::Hold, true, c, r, Side::Esc); }
+    // place type `ty` at (c,r) on the current page via fn+cell
+    void place(int ty, int c, int r) {
+        sideDown(Side::Fn);
+        tap(c, r);
+        sideUp(Side::Fn);
+        tap(ty, 1);
+        side(Side::Enter);
+    }
+};
+
+void test_place_via_fn() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.down(2, 1);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    TEST_ASSERT_EQUAL(14, f.ui.state().placeCell);
+    f.tap(TOsc, 1);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    TEST_ASSERT_EQUAL(TOsc, f.ui.state().placeType);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    const ModuleRec* m = gPatch.findAt(0, 14);
+    TEST_ASSERT_NOT_NULL(m);
+    TEST_ASSERT_TRUE(m->type == &kOscType);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_EQUAL(14, f.ui.state().selCell);
+}
+
+void test_place_details_back() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.down(0, 0);
+    f.tap(TOsc, 1);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().placeType);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+}
+
+void test_place_via_hold() {
+    Fx f;
+    f.hold(3, 2);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    TEST_ASSERT_EQUAL(27, f.ui.state().placeCell);
+}
+
+void test_place_refused() {
+    Fx f;
+    f.place(TOut, 0, 0);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    f.sideDown(Side::Fn);
+    f.tap(1, 0);
+    f.sideUp(Side::Fn);
+    f.tap(TOut, 1);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL_STRING("MAX 1", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    TEST_ASSERT_EQUAL(TOut, f.ui.state().placeType);
+}
+
+void test_select_open_back() {
+    Fx f;
+    f.place(TOsc, 4, 2);
+    f.tap(4, 2);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    TEST_ASSERT_EQUAL(gPatch.findAt(0, 28)->id, f.ui.state().openId);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+void test_keys_opens_play() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
+}
+
+void test_delete_and_undo() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    const uint16_t id = gPatch.findAt(0, 13)->id;
+    f.side(Side::Del);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    TEST_ASSERT_NULL(f.eng.instance(id));
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL(id, gPatch.moduleAt(0).id);
+    TEST_ASSERT_NOT_NULL(f.eng.instance(id));
+}
+
+void test_move() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.sideDown(Side::Ctrl);
+    f.tap(1, 1);
+    TEST_ASSERT_EQUAL(gPatch.findAt(0, 13)->id, f.ui.state().moveFromId);
+    f.tap(5, 3);
+    f.sideUp(Side::Ctrl);
+    TEST_ASSERT_NULL(gPatch.findAt(0, 13));
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(0, 41));
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+    f.side(Side::Backslash);
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(0, 13));
+    TEST_ASSERT_NULL(gPatch.findAt(0, 41));
+}
+
+void test_move_cancel_by_esc() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.sideDown(Side::Ctrl);
+    f.tap(1, 1);
+    f.sideUp(Side::Ctrl);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+void test_paging() {
+    Fx f;
+    f.side(Side::Tab);
+    f.side(Side::Tab);
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(0, f.ui.state().page);
+    f.sideDown(Side::Fn);
+    f.side(Side::Tab);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(2, f.ui.state().page);
+    f.side(Side::Tab);  // -> 0
+    f.side(Side::Tab);  // -> 1
+    f.place(TOsc, 2, 2);
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(1, 26));
+    TEST_ASSERT_NULL(gPatch.findAt(0, 26));
+    f.side(Side::Tab);
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(0, f.ui.state().page);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().selCell);
+}
+
+void test_audition() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.sideDown(Side::Space);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
+    f.sideUp(Side::Space);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+}
+
+void test_toast_expiry() {
+    Fx f;
+    f.ui.toast("HI", 1000);
+    f.ui.tick(2499);
+    TEST_ASSERT_EQUAL_STRING("HI", f.ui.state().toast);
+    f.ui.tick(2500);
+    TEST_ASSERT_EQUAL_STRING("", f.ui.state().toast);
+}
+
+static void bump(Patch& p, void*) { p.nextId = (uint16_t)(p.nextId + 1); }
+
+void test_edit_coalescing_breaks() {
+    Fx f;
+    f.ui.edit(bump, nullptr, 7);
+    f.ui.edit(bump, nullptr, 7);
+    TEST_ASSERT_EQUAL(1, gUndo.size());
+    f.tap(0, 0);  // any non-edit key ends the run
+    f.ui.edit(bump, nullptr, 7);
+    TEST_ASSERT_EQUAL(2, gUndo.size());
+}
+
+int main() {
+    UNITY_BEGIN();
+    RUN_TEST(test_place_via_fn);
+    RUN_TEST(test_place_details_back);
+    RUN_TEST(test_place_via_hold);
+    RUN_TEST(test_place_refused);
+    RUN_TEST(test_select_open_back);
+    RUN_TEST(test_keys_opens_play);
+    RUN_TEST(test_delete_and_undo);
+    RUN_TEST(test_move);
+    RUN_TEST(test_move_cancel_by_esc);
+    RUN_TEST(test_paging);
+    RUN_TEST(test_audition);
+    RUN_TEST(test_toast_expiry);
+    RUN_TEST(test_edit_coalescing_breaks);
+    return UNITY_END();
+}

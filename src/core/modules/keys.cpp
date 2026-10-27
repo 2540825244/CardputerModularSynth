@@ -37,6 +37,8 @@ void KeysModule::process(const float* const*, const bool*) {
         lastTrig_ = trig;
         // New trigger on a high gate: drop it for this whole block so ENV retriggers.
         if (!legato && prevGateHigh_) gapPending_ = true;
+        // Released before this block: still give the gate one full block so the note isn't lost.
+        if (!gate) minHold_ = true;
     }
     const float glide = param(kGlide);
     if (glide != lastGlide_) {
@@ -44,8 +46,9 @@ void KeysModule::process(const float* const*, const bool*) {
         glideSlew_.setTimeMs(glide, kSampleRate);
     }
     const float target = (float)(note - 60) * (1.f / 12.f) + param(kOct);
-    const bool high = gate && !gapPending_;
+    const bool high = (gate || minHold_) && !gapPending_;
     gapPending_ = false;
+    if (high) minHold_ = false;
     const float vel = param(kVel) * kGateHighVolts;
     float* p = out(0);
     float* g = out(1);

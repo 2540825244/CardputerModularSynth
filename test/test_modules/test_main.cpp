@@ -296,6 +296,28 @@ void test_keys_retrigger_gap() {
     }
 }
 
+void test_keys_quick_tap() {
+    KeysModule* k = static_cast<KeysModule*>(kKeysType.create());
+    k->noteOn(64);
+    k->gateOff();  // released before the audio thread saw it
+    idle(*k, 1);
+    for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(5.f, k->out(1)[i]);
+    idle(*k, 1);
+    for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(0.f, k->out(1)[i]);
+    // a quick tap right after a held note still produces a gap, then one high block
+    k->noteOn(60);
+    idle(*k, 2);
+    k->noteOn(62);
+    k->gateOff();
+    idle(*k, 1);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->out(1)[0]);
+    idle(*k, 1);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, k->out(1)[0]);
+    idle(*k, 1);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->out(1)[0]);
+    delete k;
+}
+
 // ---- OUT ----
 static float outPeak(OutModule& o, float amp, int blocks, float badValue = 0.f, bool useBad = false) {
     float in[kBlock], ph = 0.f, pk = 0.f;
@@ -463,6 +485,7 @@ int main() {
     RUN_TEST(test_keys_pitch_gate);
     RUN_TEST(test_keys_glide);
     RUN_TEST(test_keys_retrigger_gap);
+    RUN_TEST(test_keys_quick_tap);
     RUN_TEST(test_out_volume_select);
     RUN_TEST(test_out_bounded);
     RUN_TEST(test_pool_exhaustion);

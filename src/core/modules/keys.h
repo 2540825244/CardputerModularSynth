@@ -17,7 +17,7 @@ class KeysModule : public Module {
     std::atomic<bool> gate_{false};
     std::atomic<uint32_t> trigCount_{0};
     uint32_t lastTrig_ = 0;
-    bool prevGateHigh_ = false, gapPending_ = false;
+    bool prevGateHigh_ = false, gapPending_ = false, minHold_ = false;
     Slew glideSlew_;
     float lastGlide_ = -1.f;
 };
