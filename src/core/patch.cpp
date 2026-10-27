@@ -90,6 +90,15 @@ PatchError Patch::moveModule(uint16_t id, uint8_t page, uint8_t cell) {
     return PatchError::None;
 }
 
+uint8_t Patch::nextCableColor() const {
+    int used[kNumCableColors] = {};
+    for (int i = 0; i < nCables_; i++) used[cables_[i].color % kNumCableColors]++;
+    int best = 0;
+    for (int c = 1; c < kNumCableColors; c++)
+        if (used[c] < used[best]) best = c;
+    return static_cast<uint8_t>(best);
+}
+
 PatchError Patch::addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint8_t toIn) {
     const ModuleRec* f = find(fromId);
     const ModuleRec* t = find(toId);
@@ -99,18 +108,14 @@ PatchError Patch::addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint
             cables_[i].toIn == toIn)
             return PatchError::Duplicate;
     if (nCables_ >= kMaxCables) return PatchError::TooManyCables;
-    int used[kNumCableColors] = {};
-    for (int i = 0; i < nCables_; i++) used[cables_[i].color % kNumCableColors]++;
-    int best = 0;
-    for (int c = 1; c < kNumCableColors; c++)
-        if (used[c] < used[best]) best = c;
+    const uint8_t best = nextCableColor();
     CableRec& c = cables_[nCables_++];
     memset(static_cast<void*>(&c), 0, sizeof(c));
     c.fromId = fromId;
     c.fromOut = fromOut;
     c.toId = toId;
     c.toIn = toIn;
-    c.color = static_cast<uint8_t>(best);
+    c.color = best;
     return PatchError::None;
 }
 

@@ -2,6 +2,7 @@
 #include <cstring>
 #include <map>
 #include "core/modules/keys.h"
+#include "core/modules/lfo.h"
 #include "core/modules/osc.h"
 #include "core/modules/out.h"
 #include "core/registry.h"
@@ -430,6 +431,161 @@ void test_audition_release_on_view_change() {
     TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
 }
 
+// ---- Task 16: carry ----
+static void fnTap(Fx& f, int c, int r) {
+    f.sideDown(Side::Fn);
+    f.tap(c, r);
+    f.sideUp(Side::Fn);
+}
+
+void test_carry_lfo_to_vcf() {
+    Fx f;
+    f.place(TLfo, 0, 0);
+    f.place(TVcf, 1, 0);
+    const uint16_t lfo = gPatch.findAt(0, 0)->id, vcf = gPatch.findAt(0, 1)->id;
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(lfo, f.ui.state().carry.id);
+    TEST_ASSERT_TRUE(f.ui.state().carry.fromOutput);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    f.tap(1, 0);
+    f.side(Side::Enter);
+    fnTap(f, 1, 2);
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    const CableRec& c = gPatch.cableAt(0);
+    TEST_ASSERT_EQUAL(lfo, c.fromId);
+    TEST_ASSERT_EQUAL(0, c.fromOut);
+    TEST_ASSERT_EQUAL(vcf, c.toId);
+    TEST_ASSERT_EQUAL(1, c.toIn);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+}
+
+void test_carry_from_input() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.place(TVcf, 1, 0);
+    const uint16_t osc = gPatch.findAt(0, 0)->id, vcf = gPatch.findAt(0, 1)->id;
+    f.tap(1, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 2);  // VCF.in
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    TEST_ASSERT_FALSE(f.ui.state().carry.fromOutput);
+    f.side(Side::Esc);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);  // OSC.out
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    TEST_ASSERT_EQUAL(osc, gPatch.cableAt(0).fromId);
+    TEST_ASSERT_EQUAL(vcf, gPatch.cableAt(0).toId);
+    TEST_ASSERT_EQUAL(0, gPatch.cableAt(0).toIn);
+}
+
+void test_carry_same_kind_rejected() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.place(TLfo, 1, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    f.side(Side::Esc);
+    f.tap(1, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    TEST_ASSERT_EQUAL_STRING("NEED INPUT", f.ui.state().toast);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(0, gPatch.cableCount());
+}
+
+void test_cancel_double_esc() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    f.side(Side::Esc);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    f.side(Side::Esc);  // now a normal Esc again
+    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+}
+
+void test_esc_not_consecutive_keeps_carry() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    f.side(Side::Esc);
+    f.tap(5, 3);  // another key in between
+    f.side(Side::Esc);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+}
+
+void test_del_cancels_carry() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    f.side(Side::Esc);
+    f.tap(0, 0);
+    f.side(Side::Del);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+}
+
+void test_carry_source_undone() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    f.side(Side::Esc);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+    // a later pin press starts a fresh carry
+    f.place(TVcf, 2, 0);
+    f.tap(2, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 2);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(0, gPatch.cableCount());
+}
+
+void test_open_module_undone() {
+    Fx f;
+    uint16_t id = openModule(f, TVcf, 0, 0);
+    (void)id;
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+void test_carry_duplicate_refused() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.place(TVcf, 1, 0);
+    uint16_t osc = gPatch.findAt(0, 0)->id, vcf = gPatch.findAt(0, 1)->id;
+    gPatch.addCable(osc, 0, vcf, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 3);
+    f.side(Side::Esc);
+    f.tap(1, 0);
+    f.side(Side::Enter);
+    fnTap(f, 0, 2);
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    TEST_ASSERT_EQUAL_STRING("ALREADY PATCHED", f.ui.state().toast);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -459,5 +615,14 @@ int main() {
     RUN_TEST(test_del_clears_move);
     RUN_TEST(test_audition_release_after_view_change);
     RUN_TEST(test_audition_release_on_view_change);
+    RUN_TEST(test_carry_lfo_to_vcf);
+    RUN_TEST(test_carry_from_input);
+    RUN_TEST(test_carry_same_kind_rejected);
+    RUN_TEST(test_cancel_double_esc);
+    RUN_TEST(test_esc_not_consecutive_keeps_carry);
+    RUN_TEST(test_del_cancels_carry);
+    RUN_TEST(test_carry_source_undone);
+    RUN_TEST(test_open_module_undone);
+    RUN_TEST(test_carry_duplicate_refused);
     return UNITY_END();
 }

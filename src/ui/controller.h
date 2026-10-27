@@ -37,6 +37,7 @@ class UiController {
     uint32_t now() const { return now_; }
     KeysModule* keysInstance();  // the KEYS instance, or nullptr
     void releaseAudition();
+    void validate();  // end a carry / close a view whose module is gone (after undo, load, delete)
     int lastNote = 60;
     bool auditioning = false;  // Space held in the patch view
 

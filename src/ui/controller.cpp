@@ -16,6 +16,25 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     if (!e.grid && e.side == Side::Fn) fn_ = e.type != KeyEvent::Up;
     if (!e.grid && e.side == Side::Ctrl) ctrl_ = e.type != KeyEvent::Up;
     coalescedEdit_ = false;
+    if (e.type == KeyEvent::Down) {
+        // A second consecutive Esc cancels a carry and does nothing else; Del cancels it too.
+        if (!e.grid && e.side == Side::Esc) {
+            if (s_.carry.active && s_.escPresses >= 1) {
+                s_.carry.active = false;
+                s_.escPresses = 0;
+                undo_.breakCoalescing();
+                return;
+            }
+            if (s_.escPresses < 255) s_.escPresses++;
+        } else {
+            s_.escPresses = 0;
+            if (!e.grid && e.side == Side::Del && s_.carry.active) {
+                s_.carry.active = false;
+                undo_.breakCoalescing();
+                return;
+            }
+        }
+    }
     if (auditioning && !e.grid && e.side == Side::Space && e.type == KeyEvent::Up) releaseAudition();
     switch (s_.view) {
         case View::Patch: patchViewKey(*this, e); break;
@@ -25,6 +44,7 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
             if (!e.grid && e.type == KeyEvent::Down && e.side == Side::Esc) s_.view = View::Patch;
             break;
     }
+    validate();
     if (auditioning && s_.view != View::Patch) releaseAudition();
     // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
     // changes nothing, so repeated taps of one fine key still merge; tilt drags (Task 19) end
@@ -42,6 +62,13 @@ KeysModule* UiController::keysInstance() {
 void UiController::releaseAudition() {
     auditioning = false;
     if (KeysModule* k = keysInstance()) k->gateOff();
+}
+
+void UiController::validate() {
+    if (s_.carry.active && !patch_.find(s_.carry.id)) s_.carry.active = false;
+    const bool inModule = s_.view == View::Module || s_.view == View::KeysPlay || s_.view == View::KeysSettings;
+    if (inModule && !patch_.find(s_.openId)) s_.view = View::Patch;
+    if (s_.moveFromId >= 0 && !patch_.find((uint16_t)s_.moveFromId)) s_.moveFromId = -1;
 }
 
 void UiController::tick(uint32_t nowMs) {

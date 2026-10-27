@@ -24,6 +24,45 @@ void doSetValue(Patch& p, void* c) {
     else m->params[v->idx] = v->value;
 }
 
+struct CableEdit {
+    uint16_t from, to;
+    uint8_t fromOut, toIn;
+};
+
+void doAddCable(Patch& p, void* c) {
+    const CableEdit* e = static_cast<CableEdit*>(c);
+    p.addCable(e->from, e->fromOut, e->to, e->toIn);
+}
+
+// fn + pin: start a carry, or drop it on a pin of the opposite kind.
+void pinAction(UiController& ui, const ModuleRec& m, bool isOutput, uint8_t pin) {
+    UiState& s = ui.mut();
+    const Patch& p = ui.patch();
+    if (!s.carry.active) {
+        s.carry = {true, m.id, isOutput, pin, p.nextCableColor()};
+        return;
+    }
+    if (s.carry.fromOutput == isOutput) {
+        ui.toast(s.carry.fromOutput ? "NEED INPUT" : "NEED OUTPUT", ui.now());
+        return;
+    }
+    CableEdit e = s.carry.fromOutput ? CableEdit{s.carry.id, m.id, s.carry.pin, pin}
+                                     : CableEdit{m.id, s.carry.id, pin, s.carry.pin};
+    for (int i = 0; i < p.cableCount(); i++) {
+        const CableRec& c = p.cableAt(i);
+        if (c.fromId == e.from && c.fromOut == e.fromOut && c.toId == e.to && c.toIn == e.toIn) {
+            ui.toast("ALREADY PATCHED", ui.now());
+            return;
+        }
+    }
+    if (p.cableCount() >= kMaxCables) {
+        ui.toast("TOO MANY CABLES", ui.now());
+        return;
+    }
+    ui.edit(doAddCable, &e);
+    s.carry.active = false;
+}
+
 void doUnpatch(Patch& p, void* c) {
     const PinEdit* e = static_cast<PinEdit*>(c);
     p.removeCablesAtPin(e->id, e->isOutput, e->pin);
@@ -81,6 +120,9 @@ void moduleViewKey(UiController& ui, const KeyEvent& e) {
             if (editable) setValue(ui, *m, sel, paramCoarse(specOf(*m, sel), e.col));
         } else {
             s.modCell = (int8_t)cellOf(e);
+            const CellRef c = moduleCell(*m->type, e.row, e.col);
+            if (ui.fnHeld() && (c.kind == CellKind::In || c.kind == CellKind::Out))
+                pinAction(ui, *m, c.kind == CellKind::Out, c.index);
         }
         return;
     }

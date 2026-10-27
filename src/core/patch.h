@@ -32,6 +32,7 @@ class Patch {
     void setCableColor(int i, uint8_t color) { if (i >= 0 && i < nCables_) cables_[i].color = color; }
     bool removeModule(uint16_t id);  // also removes its cables
     PatchError moveModule(uint16_t id, uint8_t page, uint8_t cell);
+    uint8_t nextCableColor() const;  // the colour addCable would pick
     PatchError addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint8_t toIn);  // picks colour
     int removeCablesAtPin(uint16_t id, bool isOutput, uint8_t pin);  // returns how many were removed
     ModuleRec* find(uint16_t id);
