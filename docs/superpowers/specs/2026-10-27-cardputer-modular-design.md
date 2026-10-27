@@ -269,13 +269,19 @@ Screenshot: `05-carry-cable.png`. **[owner chose this over split view; it was th
 | **ENV** (ADSR) | gate (+ retrigger in the mockup) | out | A, D, S, R, drawn live in its view. Curve/loop shown in the mockup **[Claude's call]**. |
 | **LFO** | (rate CV **[Claude's call]**) | out | Sine / square, rate |
 | **DLY** (delay) | in, (time CV) | out | Time, feedback, mix. Max time limited by RAM. |
-| **OUT** | in | — | **Line vs speaker** **[owner]**, limiter + DC blocker, level meter. **[proposed]** |
+| **OUT** | in | — | **Separate volume for speaker and line** **[owner]**, limiter + DC blocker, level meter. **[proposed]** |
 
-**OUT, line vs speaker:** per the schematic, a plug in the 3.5 mm jack mutes the speaker in
-hardware, and the amp enable doesn't seem to reach a GPIO. The owner wants to "switch between
-the two". Verify on hardware what the firmware can control. At minimum the module can show which
-output is active (from headphone detect, if readable) and offer a separate **speaker mute**.
-**[open — needs hardware check]**
+**OUT, speaker vs line:**
+- Per the schematic, a plug in the 3.5 mm jack mutes the speaker in hardware. **No firmware
+  switch between the outputs is needed.** **[owner]**
+- Instead, OUT keeps **two volume settings, one for the speaker and one for the line out**,
+  because the right level for the PO-33's line in differs from a comfortable speaker level. **[owner]**
+- **Picking which volume applies:**
+  - **Ideal:** automatic, from the headphone-detect signal (`HP_DET`). But on the schematic
+    `HP_DET` only drives the amp-enable circuit and doesn't appear to reach an ESP32 GPIO, so
+    the firmware may not be able to tell whether a plug is in. **[open — verify on hardware]**
+  - **Fallback if it's not readable:** a manual SPK/LINE toggle in OUT's view that only picks
+    which volume setting applies. The hardware still routes the audio. **[Claude's call]**
 
 **Keys and playing [owner]:** the owner's model is "a virtual keyboard module where in its menu you
 just map keys to virtual midi/oct/gate/etc out".
@@ -349,7 +355,7 @@ just map keys to virtual midi/oct/gate/etc out".
 4. Coarse-step scheme for log/unbounded parameters. Fine-step sizes.
 5. Cable colour reuse when there are more than 6 cables. Whether patching can start from an input.
 6. Output offset in addition to amount.
-7. Line/speaker control: what the hardware allows.
+7. Whether the firmware can read headphone-detect, to switch automatically between the speaker and line volume settings (§8.1).
 8. Bitmap font and final icon art.
 9. Patch file format (JSON vs INI). Redo.
 10. Hold-to-place timing. Ghosting limits of the key matrix.
@@ -371,10 +377,10 @@ just map keys to virtual midi/oct/gate/etc out".
 | Per-module menus | each module's view can do its own things | owner |
 | Undo / delete | `\` undo, `del` delete | owner |
 | Status | small, on the sides | owner |
-| Output | limiter/meter; line + speaker with switching | proposed + owner |
+| Output | limiter/meter; no output switch (hardware does it on plug-in); separate speaker and line volume | proposed + owner |
 | Look | style B default; A as optional theme | owner (theme: Claude's call) |
 | Value strip on top row | yes | proposed → owner liked it |
 | Output amount | on every output, merged into the pin cell | owner + Claude's call |
 | Cross-module patching | carry the cable | owner |
 | Toolchain | PlatformIO + Arduino core | owner |
-| v1 scope | starter-patch modules + Keys + patching + SD + line/speaker; rest later, keep expandable | proposed → owner agreed |
+| v1 scope | starter-patch modules + Keys + patching + SD + speaker/line volume settings; rest later, keep expandable | proposed → owner agreed |
