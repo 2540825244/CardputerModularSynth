@@ -423,6 +423,11 @@ void test_dly_tail_decays_to_zero() {
         m->process(ins, conn);
         in[0] = 0.f;
     }
+    // a flat 10 LSB fill (the worst case for rounding) must also decay
+    for (int i = 0; i < kBlock; i++) in[i] = 10.f * 10.f / 32767.f;
+    for (int b = 0; b < 200; b++) m->process(ins, conn);
+    for (int i = 0; i < kBlock; i++) in[i] = 0.f;
+    for (int b = 0; b < 30 * 48000 / kBlock; b++) m->process(ins, conn);
     for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(0.f, m->out(0)[i]);
     delete m;
 }
