@@ -27,4 +27,5 @@ struct UiState {
     bool fileSaveMode;
     bool dirty;
     uint32_t lastEditMs;
+    uint64_t keysHeld;  // KeysPlay: bit (3-row)*12+col per held note key
 };

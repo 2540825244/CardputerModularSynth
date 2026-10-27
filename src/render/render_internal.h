@@ -11,6 +11,7 @@ constexpr int kW = 240, kH = 135;
 constexpr int kStripW = 16, kGridX = 16, kGridW = 208;
 
 extern M5Canvas cv;
+extern uint32_t gNow;  // frame time, for pulsing
 
 inline int cellX(int col) { return kGridX + col * kGridW / kGridCols; }
 inline int cellY(int row) { return row * kH / kGridRows; }
@@ -42,6 +43,7 @@ void drawToast(const char* msg);
 void drawPatchView(const UiState&, const Patch&, Engine&);
 void drawPlaceView(const UiState&, const Patch&, Engine&);
 void drawFileView(const UiState&, const bool filled[12]);
-void drawModulePlaceholder(const UiState&, const Patch&);
+void drawModuleView(const UiState&, const Patch&, Engine&);  // Module and KeysSettings
+void drawKeysPlay(const UiState&, const Patch&);
 
 }  // namespace rd

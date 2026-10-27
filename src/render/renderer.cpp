@@ -6,6 +6,7 @@
 namespace rd {
 
 M5Canvas cv(&M5Cardputer.Display);
+uint32_t gNow = 0;
 
 void drawIcon(Ic ic, int x, int y, uint8_t color) {
     const uint16_t* rows = kIcons[(int)ic];
@@ -130,12 +131,15 @@ void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint3
     lastView = s.view;
     lastToast = s.toastUntilMs;
 
+    gNow = nowMs;
     cv.fillSprite(PBg);
     switch (s.view) {
         case View::Patch: drawPatchView(s, p, e); break;
         case View::Place: drawPlaceView(s, p, e); break;
         case View::File: drawFileView(s, filled); break;
-        default: drawModulePlaceholder(s, p); break;
+        case View::Module:
+        case View::KeysSettings: drawModuleView(s, p, e); break;
+        case View::KeysPlay: drawKeysPlay(s, p); break;
     }
     const float total = (float)heap_caps_get_total_size(MALLOC_CAP_8BIT);
     drawBars(e.cpuLoad(), total > 0 ? 1.f - heap_caps_get_free_size(MALLOC_CAP_8BIT) / total : 0.f);

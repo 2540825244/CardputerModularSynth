@@ -23,6 +23,7 @@ void shiftOct(UiController& ui, const ModuleRec& m, int dir) {
 
 void allNotesOff(UiController& ui) {
     ui.notes.clear();
+    ui.mut().keysHeld = 0;
     if (KeysModule* k = static_cast<KeysModule*>(ui.engine().instance(ui.mut().openId))) k->gateOff();
 }
 
@@ -49,11 +50,14 @@ void keysPlayKey(UiController& ui, const KeyEvent& e) {
         }
         if (e.type == KeyEvent::Hold) return;
         const int note = 48 + 12 * (3 - e.row) + e.col;
+        const uint64_t bit = 1ull << ((3 - e.row) * 12 + e.col);
         if (e.type == KeyEvent::Down) {
+            s.keysHeld |= bit;
             ui.notes.press(note);
             ui.lastNote = note;
             k->noteOn(note);
         } else {
+            s.keysHeld &= ~bit;
             ui.notes.release(note);
             const int cur = ui.notes.current();
             if (cur >= 0) k->noteOn(cur);

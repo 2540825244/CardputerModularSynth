@@ -69,20 +69,4 @@ void drawPatchView(const UiState& s, const Patch& p, Engine& e) {
     drawSides(sd);
 }
 
-void drawModulePlaceholder(const UiState& s, const Patch& p) {
-    const ModuleRec* m = p.find(s.openId);
-    Side4 sd = {};
-    sd.left[0] = Ic::Back;
-    sd.leftIcon[0] = true;
-    sd.right[1] = Ic::Undo;
-    sd.rightIcon[1] = true;
-    sd.fnActive = s.carry.active;
-    drawSides(sd);
-    cv.setFont(&fonts::Font0);
-    cv.setTextColor(PText);
-    cv.setTextDatum(textdatum_t::middle_center);
-    cv.drawString(m ? m->type->name : "?", kGridX + kGridW / 2, 50);
-    cv.drawString("MODULE VIEW", kGridX + kGridW / 2, 70);
-}
-
 }  // namespace rd
