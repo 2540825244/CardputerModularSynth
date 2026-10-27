@@ -176,10 +176,11 @@ Screenshot: `docs/design/01-patch-view-style-b.png`.
   **[owner]**
   - The mockup proposes `fn`+cell as the modifier. **[proposed]**
   - Hold-to-open timing **[open]**.
-  - **The selection menu itself has not been designed.** It is **[open]** and should follow §6's look.
+  - **Selection menu [owner, plan review]:** pressing a module type in the menu doesn't place it yet. It opens
+    that type's details (what it does, its pins, its cost), and `enter` places it.
 - **Side keys in patch view [proposed in mockup, not objected to]:**
   - `esc` file menu (save/load)
-  - `tab` next page
+  - `tab` next page, `fn`+`tab` previous page **[owner, plan review]**
   - `fn` place
   - `ctrl` move module (ctrl+module, then target cell)
   - `del` delete module
@@ -208,7 +209,8 @@ A only and are to be rendered in style B.
     An output with several cables shows several dots.
 - **Editing a parameter [owner]:**
   1. Select the cell. Then either:
-  2. Use the number row for **coarse** values.
+  2. Use the number row for **coarse** values: `1`…`9` = 10–90% of the knob, `0` = 100%, `-` = min,
+     `=` = default. For frequency and time the % is along the knob's log curve. **[owner, plan review]**
   3. Use **two keys for fine** −/+. The mockup uses `ctrl` = −, `space` = + **[proposed]**.
   4. Or **hold the parameter's key and tilt the device** to sweep it.
   - Bounded parameters spread their range over the 12 coarse keys. For unbounded or log-scale
@@ -308,6 +310,8 @@ just map keys to virtual midi/oct/gate/etc out".
   editing. **[owner]**
 - **Utilities:** switch, mux/demux **[owner]**. Mixer, attenuverter/offset, sample & hold,
   clock/divider **[proposed]**.
+- More note layouts for the Keys module (or other layout modules), beyond the v1 three-octave
+  chromatic grid. **[owner, plan review]**
 - Sequencer, scope/tuner **[proposed]**. Theme A **[Claude's call]**.
   Rings/Braids-style modules if CPU allows **[proposed]**.
 
@@ -385,3 +389,4 @@ just map keys to virtual midi/oct/gate/etc out".
 | Cross-module patching | carry the cable | owner |
 | Toolchain | PlatformIO + Arduino core | owner |
 | v1 scope | starter-patch modules + Keys + patching + SD + speaker/line volume settings; rest later, keep expandable | proposed → owner agreed |
+| Open items (§12) | decided in the v1 plan's table; owner changes: place menu shows details then `enter` places; `fn`+`tab` = previous page; coarse = "*k*0% of the knob", `-` min, `=` default; more Keys layouts later | owner (plan review) |
