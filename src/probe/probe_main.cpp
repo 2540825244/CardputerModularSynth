@@ -169,7 +169,7 @@ static int g_row = 0;
 
 static void head(const char* name) {
     canvas.setTextColor(kAcc, kBg);
-    canvas.setCursor(2, g_row * 9 + 1);
+    canvas.setCursor(2, g_row * 8 + 1);
     canvas.print(name);
     canvas.setTextColor(kFg, kBg);
     g_row++;
@@ -181,7 +181,7 @@ static void line(const char* fmt, ...) {
     va_start(a, fmt);
     vsnprintf(b, sizeof(b), fmt, a);
     va_end(a);
-    canvas.setCursor(2, g_row * 9 + 1);
+    canvas.setCursor(2, g_row * 8 + 1);
     canvas.print(b);
     g_row++;
 }
@@ -200,7 +200,6 @@ static void draw(const KeyPos* cur, int n) {
     g_row = 0;
 
     char b[48];
-    head("BOARD");
     line("id=%d %s", (int)M5.getBoard(), M5.getBoard() == m5::board_t::board_M5CardputerADV ? "CardputerADV" : "NOT ADV");
 
     head("AUDIO space=toggle");
@@ -248,6 +247,10 @@ static void draw(const KeyPos* cur, int n) {
 
 // Keyboard, codec I2C and display all live on core 0; core 1 only runs audio.
 static void uiTask(void*) {
+    // "post" RAM: sprite and this task's stack are both allocated by now
+    g_freeHeap2 = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    g_largest2 = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    g_minFree2 = ESP.getMinFreeHeap();
     if (g_audioStarted) startCodec();
     uint32_t lastScan = 0, lastDraw = 0;
     KeyPos cur[16];
@@ -292,9 +295,6 @@ void setup() {
 
     canvas.setColorDepth(16);
     g_spriteOk = canvas.createSprite(240, 135) != nullptr;
-    g_freeHeap2 = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    g_largest2 = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    g_minFree2 = ESP.getMinFreeHeap();
 
     if (!g_spriteOk) {
         M5Cardputer.Display.setTextColor(kAcc, kBg);
