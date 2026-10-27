@@ -6,6 +6,7 @@
 #include "hw/audio_out.h"
 #include "hw/keyboard.h"
 #include "hw/sd_storage.h"
+#include "hw/tilt.h"
 #include "render/renderer.h"
 #include "ui/controller.h"
 #include "ui/key_input.h"
@@ -27,7 +28,8 @@ static void printHeap(const char* tag) {
 static void uiTask(void*) {
     if (audioI2sError() == 0) codecBegin();
     uint32_t lastStatus = 0, lastDraw = 0;
-    bool steadyPrinted = false;
+    bool steadyPrinted = false, tiltWasActive = false;
+    float rollAtStart = 0.f;
     KeyPos pressed[16];
     KeyEvent ev[16];
     for (;;) {
@@ -36,6 +38,15 @@ static void uiTask(void*) {
         int ne = 0;
         gDecoder.update(pressed, n, now, ev, &ne, 16);
         for (int i = 0; i < ne; i++) gUi.handle(ev[i], now);
+        if (gUi.tiltActive()) {
+            const float roll = tiltRollDegrees();
+            if (!tiltWasActive) rollAtStart = roll;
+            float d = roll - rollAtStart;
+            if (d > 180.f) d -= 360.f;
+            if (d < -180.f) d += 360.f;
+            gUi.tilt(d);
+        }
+        tiltWasActive = gUi.tiltActive();
         gUi.tick(now);
         if (now - lastDraw >= 33) {  // <= 30 fps, core 0 only
             lastDraw = now;

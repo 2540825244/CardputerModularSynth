@@ -15,7 +15,12 @@ class UiController {
     UiController(Patch&, Engine&, UndoStack&, Storage&);
     void handle(const KeyEvent&, uint32_t nowMs);
     void tick(uint32_t nowMs);              // toast expiry, engine.collect (autosave: Task 17)
-    void tilt(float degreesSinceHoldStart); // Task 19
+    // Hold-and-tilt: while active, tilt() sets the param to start norm + degrees/60 (one undo entry).
+    void tilt(float degreesSinceHoldStart);
+    void beginTilt(uint16_t id, uint8_t paramIdx, int cell);
+    void endTilt();
+    bool tiltActive() const { return tilt_.active; }
+    int tiltCell() const { return tilt_.cell; }
     const UiState& state() const { return s_; }
 
     // Shared edit helpers, used by every view file.
@@ -59,6 +64,13 @@ class UiController {
     const KeyDecoder* dec_ = nullptr;
     bool fn_ = false, ctrl_ = false;
     bool coalescedEdit_ = false;
+    struct TiltState {
+        bool active;
+        uint16_t id;
+        uint8_t idx;
+        int cell;
+        float startNorm;
+    } tilt_ = {};
     uint32_t now_ = 0;
     bool autosaveBackoff_ = false, autosaveWarned_ = false;
     uint32_t autosaveRetryMs_ = 0;

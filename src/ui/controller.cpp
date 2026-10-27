@@ -48,6 +48,7 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
         case View::File: fileViewKey(*this, e); break;
     }
     validate();
+    if (tilt_.active && s_.view != View::Module && s_.view != View::KeysSettings) tilt_.active = false;
     if (auditioning && s_.view != View::Patch) releaseAudition();
     // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
     // changes nothing, so repeated taps of one fine key still merge; tilt drags (Task 19) end
@@ -141,7 +142,44 @@ bool UiController::loadAutosave() {
     return loadFile(path.c_str(), false, msg, sizeof msg);
 }
 
-void UiController::tilt(float) {}
+namespace {
+struct TiltEdit {
+    uint16_t id;
+    uint8_t idx;
+    float value;
+};
+void doTilt(Patch& p, void* c) {
+    const TiltEdit* t = static_cast<TiltEdit*>(c);
+    if (ModuleRec* m = p.find(t->id)) m->params[t->idx] = t->value;
+}
+}  // namespace
+
+void UiController::beginTilt(uint16_t id, uint8_t idx, int cell) {
+    const ModuleRec* m = patch_.find(id);
+    if (!m || idx >= m->type->numParams) return;
+    tilt_ = {true, id, idx, cell, paramToNorm(m->type->params[idx], m->params[idx])};
+}
+
+void UiController::endTilt() {
+    if (!tilt_.active) return;
+    tilt_.active = false;
+    undo_.breakCoalescing();
+}
+
+void UiController::tilt(float degrees) {
+    if (!tilt_.active) return;
+    const ModuleRec* m = patch_.find(tilt_.id);
+    if (!m) {
+        tilt_.active = false;
+        return;
+    }
+    const ParamSpec& sp = m->type->params[tilt_.idx];
+    const float v = paramFromNorm(sp, tilt_.startNorm + degrees / 60.f);
+    if (v == m->params[tilt_.idx]) return;
+    TiltEdit t{tilt_.id, tilt_.idx, v};
+    editValue(doTilt, &t, paramKey(tilt_.id, tilt_.idx, false));
+    engine_.setParam(tilt_.id, tilt_.idx, v);
+}
 
 bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {
     undo_.push(patch_, coalesceKey);

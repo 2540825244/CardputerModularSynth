@@ -111,6 +111,20 @@ void moduleViewKey(UiController& ui, const KeyEvent& e) {
         s.view = View::Patch;
         return;
     }
+    if (e.grid && e.row >= 1) {
+        if (e.type == KeyEvent::Hold) {
+            const CellRef c = moduleCell(*m->type, e.row, e.col);
+            if (c.kind == CellKind::Param) {
+                s.modCell = (int8_t)cellOf(e);
+                ui.beginTilt(m->id, c.index, cellOf(e));
+            }
+            return;
+        }
+        if (e.type == KeyEvent::Up) {
+            if (ui.tiltActive() && ui.tiltCell() == cellOf(e)) ui.endTilt();
+            return;
+        }
+    }
     if (e.type != KeyEvent::Down) return;
     const CellRef sel = selected(s, *m->type);
     const bool editable = sel.kind == CellKind::Param || sel.kind == CellKind::Out;

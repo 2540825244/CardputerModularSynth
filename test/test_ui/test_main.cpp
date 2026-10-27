@@ -839,6 +839,47 @@ void test_load_resets_ui_state() {
     TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
 }
 
+// ---- Task 21: hold-and-tilt ----
+static void openVcf(Fx& f) {
+    f.place(TVcf, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+}
+
+void test_tilt_edit() {
+    Fx f;
+    openVcf(f);
+    const ModuleRec* m = gPatch.findAt(0, 0);
+    const ParamSpec& sp = m->type->params[0];
+    const float start = paramToNorm(sp, m->params[0]);
+    f.hold(0, 1);  // CUT
+    f.ui.tilt(30.f);
+    TEST_ASSERT_EQUAL_FLOAT(paramFromNorm(sp, start + 0.5f), m->params[0]);
+    f.ui.tilt(-200.f);
+    TEST_ASSERT_EQUAL_FLOAT(20.f, m->params[0]);
+    f.up(0, 1);
+    f.ui.tilt(10.f);  // after release: ignored
+    TEST_ASSERT_EQUAL_FLOAT(20.f, m->params[0]);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+}
+
+void test_tilt_ignores_pins_and_patch_view() {
+    Fx f;
+    openVcf(f);
+    const ModuleRec* m = gPatch.findAt(0, 0);
+    f.hold(0, 2);  // IN pin
+    f.ui.tilt(30.f);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+    f.up(0, 2);
+    f.side(Side::Esc);
+    f.hold(0, 0);
+    f.ui.tilt(30.f);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -891,5 +932,7 @@ int main() {
     RUN_TEST(test_autosave_debounce);
     RUN_TEST(test_boot_load_autosave);
     RUN_TEST(test_load_resets_ui_state);
+    RUN_TEST(test_tilt_edit);
+    RUN_TEST(test_tilt_ignores_pins_and_patch_view);
     return UNITY_END();
 }
