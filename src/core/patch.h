@@ -32,6 +32,7 @@ class Patch {
     PatchError addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint8_t toIn);  // picks colour
     int removeCablesAtPin(uint16_t id, bool isOutput, uint8_t pin);  // returns how many were removed
     ModuleRec* find(uint16_t id);
+    const ModuleRec* find(uint16_t id) const;
     const ModuleRec* findAt(uint8_t page, uint8_t cell) const;
     int moduleCount() const { return nModules_; }
     const ModuleRec& moduleAt(int i) const { return modules_[i]; }

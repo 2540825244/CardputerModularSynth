@@ -12,6 +12,12 @@ ModuleRec* Patch::find(uint16_t id) {
     return nullptr;
 }
 
+const ModuleRec* Patch::find(uint16_t id) const {
+    for (int i = 0; i < nModules_; i++)
+        if (modules_[i].id == id) return &modules_[i];
+    return nullptr;
+}
+
 const ModuleRec* Patch::findAt(uint8_t page, uint8_t cell) const {
     for (int i = 0; i < nModules_; i++)
         if (modules_[i].page == page && modules_[i].cell == cell) return &modules_[i];
