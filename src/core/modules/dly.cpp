@@ -26,6 +26,8 @@ class Dly : public Module {
    public:
     explicit Dly(int16_t* buf) : Module(kDlyType), buf_(buf) {
         timeSlew_.setTimeMs(50.f, kSampleRate);
+        fbSlew_.setTimeMs(15.f, kSampleRate);
+        mixSlew_.setTimeMs(15.f, kSampleRate);
     }
     ~Dly() override { delayPoolRelease(buf_); }
 
@@ -35,17 +37,21 @@ class Dly : public Module {
             lastMs_ = ms;
             log2Samples_ = log2f(ms * kSamplesPerMs);
         }
+        float fbTarget = param(kFdbk);
+        fbTarget = fbTarget < 0.f ? 0.f : (fbTarget > 0.95f ? 0.95f : fbTarget);
+        const float mixTarget = param(kMix);
         if (!seeded_) {  // first block: no slew from the default
             seeded_ = true;
             timeSlew_.y = log2Samples_;
+            fbSlew_.y = fbTarget;
+            mixSlew_.y = mixTarget;
         }
-        float fb = param(kFdbk);
-        fb = fb < 0.f ? 0.f : (fb > 0.95f ? 0.95f : fb);
-        const float mix = param(kMix);
         const float* in = connected[kInIn] ? ins[kInIn] : nullptr;
         const float* tcv = connected[kInTime] ? ins[kInTime] : nullptr;
         float* o = out(0);
         for (int i = 0; i < kBlock; i++) {
+            const float fb = fbSlew_.process(fbTarget);
+            const float mix = mixSlew_.process(mixTarget);
             const float x = in ? sanitize(in[i]) : 0.f;
             float d = fastExp2(timeSlew_.process(log2Samples_) + (tcv ? tcv[i] : 0.f));
             d = d < 1.f ? 1.f : (d > (float)(kDelaySlotSamples - 2) ? (float)(kDelaySlotSamples - 2) : d);
@@ -59,7 +65,7 @@ class Dly : public Module {
             const float wet = (a + (b - a) * frac) * kLoadScale;
             float v = x + 10.f * softClip(fb * wet * 0.1f);
             v = v < -10.f ? -10.f : (v > 10.f ? 10.f : v);
-            buf_[w_] = (int16_t)lrintf(v * kStoreScale);
+            buf_[w_] = (int16_t)(v * kStoreScale);  // truncate: tails decay to 0
             if (++w_ >= kDelaySlotSamples) w_ = 0;
             o[i] = x * (1.f - mix) + wet * mix;
         }
@@ -69,6 +75,7 @@ class Dly : public Module {
     int16_t* buf_;
     int w_ = 0;
     Slew timeSlew_;  // log2(delay in samples)
+    Slew fbSlew_, mixSlew_;
     float lastMs_ = -1.f, log2Samples_ = 0.f;
     bool seeded_ = false;
 };

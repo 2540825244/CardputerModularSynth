@@ -394,19 +394,51 @@ void test_dly_feedback_bounded() {
     Module* m = kDlyType.create();
     m->setParam(0, 50.f);
     m->setParam(1, 0.95f);
-    m->setParam(2, 0.5f);
+    m->setParam(2, 1.f);
     float in[kBlock], ph = 0.f;
     const float* ins[2] = {in, nullptr};
     const bool conn[2] = {true, false};
     for (int b = 0; b < 15000; b++) {  // 10 s
         for (int i = 0; i < kBlock; i++) {
-            in[i] = 5.f * sinf(6.2831853f * ph);
+            in[i] = 10.f * sinf(6.2831853f * ph);
             ph += 220.f / kSampleRate;
             if (ph >= 1.f) ph -= 1.f;
         }
         m->process(ins, conn);
         for (int i = 0; i < kBlock; i++) TEST_ASSERT_TRUE(fabsf(m->out(0)[i]) <= 12.f);
     }
+    delete m;
+}
+
+void test_dly_tail_decays_to_zero() {
+    Module* m = kDlyType.create();
+    m->setParam(0, 50.f);
+    m->setParam(1, 0.95f);
+    m->setParam(2, 1.f);
+    float in[kBlock] = {};
+    in[0] = 5.f;
+    const float* ins[2] = {in, nullptr};
+    const bool conn[2] = {true, false};
+    for (int b = 0; b < 30 * 48000 / kBlock; b++) {  // 30 s
+        m->process(ins, conn);
+        in[0] = 0.f;
+    }
+    for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(0.f, m->out(0)[i]);
+    delete m;
+}
+
+void test_dly_mix_smoothed() {
+    Module* m = kDlyType.create();
+    m->setParam(2, 0.f);
+    float in[kBlock];
+    for (int i = 0; i < kBlock; i++) in[i] = 4.f;
+    const float* ins[2] = {in, nullptr};
+    const bool conn[2] = {true, false};
+    m->process(ins, conn);
+    m->setParam(2, 1.f);  // wet is silent, so mix 0 -> 1 must fade the dry out, not cut
+    m->process(ins, conn);
+    TEST_ASSERT_TRUE(m->out(0)[0] > 3.9f);
+    TEST_ASSERT_TRUE(m->out(0)[kBlock - 1] > 3.f);
     delete m;
 }
 
@@ -432,5 +464,7 @@ int main() {
     RUN_TEST(test_dly_create_refused);
     RUN_TEST(test_dly_echo);
     RUN_TEST(test_dly_feedback_bounded);
+    RUN_TEST(test_dly_tail_decays_to_zero);
+    RUN_TEST(test_dly_mix_smoothed);
     return UNITY_END();
 }
