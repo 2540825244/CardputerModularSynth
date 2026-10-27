@@ -24,7 +24,7 @@ enum class PatchError : uint8_t { None, CellTaken, TooManyModules, TooManyCables
 
 class Patch {
    public:
-    Patch() { clear(); }
+    Patch();  // zeroes the whole object, so unused slots and padding compare equal with memcmp
 
     PatchError addModule(const ModuleTypeInfo& t, uint8_t page, uint8_t cell, uint16_t* outId);  // params = defaults, amounts = 1
     bool removeModule(uint16_t id);  // also removes its cables

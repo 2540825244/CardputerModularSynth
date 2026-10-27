@@ -1,6 +1,14 @@
 #include "patch.h"
+#include <cstring>
+
+Patch::Patch() {
+    memset(static_cast<void*>(this), 0, sizeof(*this));
+    clear();
+}
 
 void Patch::clear() {
+    memset(static_cast<void*>(modules_), 0, sizeof(modules_));
+    memset(static_cast<void*>(cables_), 0, sizeof(cables_));
     nModules_ = 0;
     nCables_ = 0;
     nextId = 1;
@@ -37,7 +45,7 @@ PatchError Patch::addModule(const ModuleTypeInfo& t, uint8_t page, uint8_t cell,
     if (nModules_ >= kMaxModules) return PatchError::TooManyModules;
     if (t.maxInstances && countOfType(t) >= t.maxInstances) return PatchError::MaxInstances;
     ModuleRec& m = modules_[nModules_++];
-    m = ModuleRec{};
+    memset(static_cast<void*>(&m), 0, sizeof(m));
     m.id = nextId++;
     m.type = &t;
     m.page = page;
@@ -55,9 +63,11 @@ bool Patch::removeModule(uint16_t id) {
     if (idx < 0) return false;
     for (int i = idx; i + 1 < nModules_; i++) modules_[i] = modules_[i + 1];
     nModules_--;
+    memset(static_cast<void*>(&modules_[nModules_]), 0, sizeof(ModuleRec));
     int w = 0;
     for (int i = 0; i < nCables_; i++)
         if (cables_[i].fromId != id && cables_[i].toId != id) cables_[w++] = cables_[i];
+    memset(static_cast<void*>(&cables_[w]), 0, sizeof(CableRec) * (nCables_ - w));
     nCables_ = w;
     return true;
 }
@@ -86,7 +96,13 @@ PatchError Patch::addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint
     int best = 0;
     for (int c = 1; c < kNumCableColors; c++)
         if (used[c] < used[best]) best = c;
-    cables_[nCables_++] = CableRec{fromId, fromOut, toId, toIn, static_cast<uint8_t>(best)};
+    CableRec& c = cables_[nCables_++];
+    memset(static_cast<void*>(&c), 0, sizeof(c));
+    c.fromId = fromId;
+    c.fromOut = fromOut;
+    c.toId = toId;
+    c.toIn = toIn;
+    c.color = static_cast<uint8_t>(best);
     return PatchError::None;
 }
 
@@ -98,6 +114,7 @@ int Patch::removeCablesAtPin(uint16_t id, bool isOutput, uint8_t pin) {
         if (!hit) cables_[w++] = c;
     }
     int removed = nCables_ - w;
+    memset(static_cast<void*>(&cables_[w]), 0, sizeof(CableRec) * removed);
     nCables_ = w;
     return removed;
 }

@@ -1,4 +1,6 @@
 #include <unity.h>
+#include <cstring>
+#include <initializer_list>
 #include "core/modules/dly.h"
 #include "core/modules/env.h"
 #include "core/modules/keys.h"
@@ -117,6 +119,30 @@ void test_move() {
     TEST_ASSERT_EQUAL_UINT8(7, p.find(a)->cell);
 }
 
+void test_memcmp_deterministic() {
+    Patch a, b;
+    TEST_ASSERT_EQUAL(0, memcmp(&a, &b, sizeof(Patch)));
+    uint16_t o, v;
+    b.addModule(kOscType, 0, 0, &o);
+    b.addModule(kVcaType, 0, 1, &v);
+    b.addCable(o, 0, v, 0);
+    b.removeModule(o);
+    b.removeModule(v);
+    b.clear();
+    a.clear();
+    TEST_ASSERT_EQUAL(0, memcmp(&a, &b, sizeof(Patch)));
+    // same edits in two patches give identical bytes, also after removals
+    Patch c, d;
+    for (Patch* p : {&c, &d}) {
+        p->addModule(kOscType, 0, 0, &o);
+        p->addModule(kVcaType, 0, 1, &v);
+        p->addCable(o, 0, v, 0);
+        p->addCable(o, 0, v, 1);
+        p->removeCablesAtPin(v, false, 1);
+    }
+    TEST_ASSERT_EQUAL(0, memcmp(&c, &d, sizeof(Patch)));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_add_find);
@@ -125,5 +151,6 @@ int main() {
     RUN_TEST(test_cable_colours);
     RUN_TEST(test_remove_module_removes_cables);
     RUN_TEST(test_move);
+    RUN_TEST(test_memcmp_deterministic);
     return UNITY_END();
 }
