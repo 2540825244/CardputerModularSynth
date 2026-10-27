@@ -21,4 +21,5 @@ void fileViewKey(UiController& ui, const KeyEvent& e) {
     }
     if (e.side == Side::Tab) s.fileSaveMode = !s.fileSaveMode;
     else if (e.side == Side::Esc) s.view = View::Patch;
+    else if (e.side == Side::Backslash && !ui.undo()) ui.toast("NOTHING TO UNDO", ui.now());
 }

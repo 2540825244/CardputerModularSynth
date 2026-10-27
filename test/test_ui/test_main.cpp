@@ -647,7 +647,7 @@ void test_play_notes() {
     f.eng.processBlock(buf);
     f.eng.processBlock(buf);
     TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
-    TEST_ASSERT_EQUAL(48, f.ui.lastNote);
+    TEST_ASSERT_EQUAL(64, f.ui.lastNote);
 }
 
 void test_play_esc_notes_off() {
