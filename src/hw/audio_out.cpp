@@ -12,6 +12,7 @@ constexpr float kBlockBudgetCycles = 240e6f * kBlock / kSampleRate;
 volatile int g_i2sErr = 0;
 int g_codecFails = 0;
 Engine* g_engine = nullptr;
+volatile uint32_t g_stackHw = 0;
 
 // Own core-1 task; the UI never touches I2S.
 void audioTask(void*) {
@@ -31,6 +32,7 @@ void audioTask(void*) {
         }
         load += 0.02f * ((float)cycles / kBlockBudgetCycles - load);
         g_engine->setCpuLoad(load);
+        g_stackHw = uxTaskGetStackHighWaterMark(nullptr);
         size_t written = 0;
         const esp_err_t e = i2s_write(kI2sPort, buf, sizeof(buf), &written, portMAX_DELAY);
         if (e != ESP_OK) {
@@ -71,7 +73,7 @@ bool audioBegin(Engine& engine) {
         g_i2sErr = e;
         return false;
     }
-    xTaskCreatePinnedToCore(audioTask, "audio", 4096, nullptr, configMAX_PRIORITIES - 2, nullptr, 1);
+    xTaskCreatePinnedToCore(audioTask, "audio", 6144, nullptr, configMAX_PRIORITIES - 2, nullptr, 1);
     return true;
 }
 
@@ -86,3 +88,4 @@ void codecBegin() {
 
 int audioI2sError() { return g_i2sErr; }
 int codecFailures() { return g_codecFails; }
+uint32_t audioStackHighWater() { return g_stackHw; }

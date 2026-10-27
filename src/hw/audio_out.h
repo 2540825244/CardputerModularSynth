@@ -7,3 +7,4 @@ bool audioBegin(Engine&);
 void codecBegin();  // ES8311 register sequence; call from the core-0 side after audioBegin
 int audioI2sError();  // first esp_err_t seen by the audio path, 0 if none
 int codecFailures();  // I2C register writes that failed
+uint32_t audioStackHighWater();  // words free at the audio task's low-water mark

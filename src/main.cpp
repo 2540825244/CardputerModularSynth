@@ -44,10 +44,11 @@ static void uiTask(void*) {
         if (now - lastStatus >= 500) {
             lastStatus = now;
             const UiState& s = gUi.state();
-            Serial.printf("view=%d page=%d cpu=%.1f%% free=%u largest=%u i2s=%d codec=%d\n", (int)s.view, (int)s.page,
+            Serial.printf("view=%d page=%d cpu=%.1f%% free=%u largest=%u i2s=%d codec=%d stackHw ui=%u audio=%u\n", (int)s.view, (int)s.page,
                           gEngine.cpuLoad() * 100.f, (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
                           (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), audioI2sError(),
-                          codecFailures());
+                          codecFailures(), (unsigned)uxTaskGetStackHighWaterMark(nullptr),
+                          (unsigned)audioStackHighWater());
         }
         if (!steadyPrinted && now > 5000) {
             steadyPrinted = true;
@@ -63,6 +64,7 @@ void setup() {
     cfg.internal_mic = false;
     M5Cardputer.begin(cfg, true);
     Serial.begin(115200);
+    Serial.setTxTimeoutMs(0);  // never stall the UI task when no host is reading
     printHeap("boot");
 
     M5Cardputer.Display.setRotation(1);
