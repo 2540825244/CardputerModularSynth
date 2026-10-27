@@ -16,7 +16,8 @@ class UiController {
     const UiState& state() const { return s_; }
 
     // Shared edit helpers, used by every view file.
-    // Undo push, mutate, engine.apply, dirty. A non-zero coalesceKey merges consecutive edits.
+    // Undo push, mutate, engine.apply, dirty. A non-zero coalesceKey marks a value-only edit: it
+    // merges consecutive edits and skips apply (the caller calls engine.setParam/setOutAmount).
     bool edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey = 0);
     void toast(const char* msg, uint32_t nowMs);  // 1500 ms
     bool undo();                                  // pop, apply; false if nothing to undo

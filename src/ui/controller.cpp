@@ -19,12 +19,15 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     switch (s_.view) {
         case View::Patch: patchViewKey(*this, e); break;
         case View::Place: placeViewKey(*this, e); break;
+        case View::Module: moduleViewKey(*this, e); break;
         default:  // module / keys / file views arrive in Tasks 15 and 17
             if (!e.grid && e.type == KeyEvent::Down && e.side == Side::Esc) s_.view = View::Patch;
             break;
     }
-    // Anything but a coalescing param edit (cursor move, key release, view change) ends the run.
-    if (!coalescedEdit_) undo_.breakCoalescing();
+    // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
+    // changes nothing, so repeated taps of one fine key still merge; tilt drags (Task 19) end
+    // their run explicitly on release.
+    if (!coalescedEdit_ && e.type != KeyEvent::Up) undo_.breakCoalescing();
 }
 
 void UiController::tick(uint32_t nowMs) {
@@ -37,7 +40,8 @@ void UiController::tilt(float) {}
 bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {
     undo_.push(patch_, coalesceKey);
     fn(patch_, ctx);
-    engine_.apply(patch_);
+    // A keyed edit changes values only: the caller pushes them with setParam/setOutAmount.
+    if (!coalesceKey) engine_.apply(patch_);
     s_.dirty = true;
     s_.lastEditMs = now_;
     if (coalesceKey) coalescedEdit_ = true;

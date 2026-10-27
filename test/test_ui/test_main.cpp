@@ -5,7 +5,10 @@
 #include "core/modules/osc.h"
 #include "core/modules/out.h"
 #include "core/registry.h"
+#include "core/modules/vca.h"
+#include "core/modules/vcf.h"
 #include "ui/controller.h"
+#include "ui/layout.h"
 
 void setUp() {}
 void tearDown() {}
@@ -252,6 +255,127 @@ void test_edit_coalescing_breaks() {
     TEST_ASSERT_EQUAL(2, gUndo.size());
 }
 
+// ---- Task 15: module view ----
+static bool is(CellRef r, CellKind k, int idx = 0) { return r.kind == k && (k == CellKind::Empty || k == CellKind::Drawing || r.index == idx); }
+
+void test_layout_vcf() {
+    TEST_ASSERT_TRUE(is(moduleCell(kVcfType, 1, 0), CellKind::Param, 0));
+    TEST_ASSERT_TRUE(is(moduleCell(kVcfType, 1, 3), CellKind::Param, 3));
+    TEST_ASSERT_TRUE(is(moduleCell(kVcfType, 2, 2), CellKind::In, 2));
+    TEST_ASSERT_TRUE(is(moduleCell(kVcfType, 3, 0), CellKind::Out, 0));
+    TEST_ASSERT_TRUE(is(moduleCell(kVcfType, 1, 6), CellKind::Drawing));
+    TEST_ASSERT_TRUE(is(moduleCell(kVcfType, 3, 4), CellKind::Empty));
+}
+
+void test_layout_vca_no_drawing() {
+    TEST_ASSERT_TRUE(is(moduleCell(kVcaType, 1, 6), CellKind::Empty));
+}
+
+// Places `ty` at cell (c,r) on page 0, opens it, returns its id.
+static uint16_t openModule(Fx& f, int ty, int c, int r) {
+    f.place(ty, c, r);
+    uint16_t id = gPatch.findAt(0, (uint8_t)(r * 12 + c))->id;
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    return id;
+}
+
+void test_coarse_edit() {
+    Fx f;
+    uint16_t id = openModule(f, TVcf, 0, 0);
+    f.tap(0, 1);  // CUT
+    f.tap(9, 0);  // key 0 -> 100%
+    TEST_ASSERT_EQUAL_FLOAT(20000.f, gPatch.find(id)->params[0]);
+    TEST_ASSERT_EQUAL_FLOAT(20000.f, f.eng.instance(id)->param(0));
+    f.tap(11, 0);  // = -> default
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, gPatch.find(id)->params[0]);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, f.eng.instance(id)->param(0));
+}
+
+void test_fine_and_undo_coalesce() {
+    Fx f;
+    uint16_t id = openModule(f, TVcf, 0, 0);
+    f.tap(1, 1);  // RES
+    for (int i = 0; i < 5; i++) f.side(Side::Space);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 0.2f + 5.f / 128.f, gPatch.find(id)->params[1]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 0.2f + 5.f / 128.f, f.eng.instance(id)->param(1));
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL_FLOAT(0.2f, gPatch.find(id)->params[1]);
+    TEST_ASSERT_EQUAL_FLOAT(0.2f, f.eng.instance(id)->param(1));
+}
+
+void test_fine_minus_and_cursor_breaks() {
+    Fx f;
+    uint16_t id = openModule(f, TVcf, 0, 0);
+    f.tap(1, 1);
+    f.side(Side::Space);
+    f.tap(3, 1);  // cursor move ends the run
+    f.tap(1, 1);
+    f.side(Side::Ctrl);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 0.2f, gPatch.find(id)->params[1]);
+    f.side(Side::Backslash);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 0.2f + 1.f / 128.f, gPatch.find(id)->params[1]);
+}
+
+void test_enter_cycles_enum() {
+    Fx f;
+    uint16_t id = openModule(f, TVcf, 0, 0);
+    f.tap(2, 1);  // MOD
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.find(id)->params[2]);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, gPatch.find(id)->params[2]);
+}
+
+void test_amount_edit() {
+    Fx f;
+    uint16_t id = openModule(f, TOsc, 0, 0);
+    f.tap(0, 3);  // OUT 0
+    f.tap(10, 0);  // -
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, gPatch.find(id)->outAmount[0]);
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, f.eng.instance(id)->outAmount(0));
+    f.tap(4, 0);  // 5 -> 50% of -1..1
+    TEST_ASSERT_FLOAT_WITHIN(1e-6f, 0.f, gPatch.find(id)->outAmount[0]);
+}
+
+void test_del_resets_and_unpatches() {
+    Fx f;
+    uint16_t id = openModule(f, TVcf, 0, 0);
+    f.tap(0, 1);
+    f.tap(9, 0);
+    f.side(Side::Del);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, gPatch.find(id)->params[0]);
+    uint16_t other = 0;
+    gPatch.addModule(kOscType, 0, 30, &other);
+    TEST_ASSERT_EQUAL(PatchError::None, gPatch.addCable(other, 0, id, 0));
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    f.tap(0, 2);  // In 0
+    f.side(Side::Del);
+    TEST_ASSERT_EQUAL(0, gPatch.cableCount());
+    // Del on an Out pin also unpatches (and keeps its amount)
+    TEST_ASSERT_EQUAL(PatchError::None, gPatch.addCable(id, 0, other, 0));
+    f.tap(0, 3);
+    f.side(Side::Del);
+    TEST_ASSERT_EQUAL(0, gPatch.cableCount());
+}
+
+void test_tab_and_esc_in_module_view() {
+    Fx f;
+    openModule(f, TVcf, 0, 0);
+    f.tap(2, 3);  // an empty cell is selectable but Tab walks Param/Out cells
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(12, f.ui.state().modCell);  // first param
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(13, f.ui.state().modCell);
+    f.tap(3, 1);
+    f.side(Side::Tab);  // after last param -> the Out
+    TEST_ASSERT_EQUAL(36, f.ui.state().modCell);
+    f.side(Side::Tab);  // wraps
+    TEST_ASSERT_EQUAL(12, f.ui.state().modCell);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -268,5 +392,14 @@ int main() {
     RUN_TEST(test_audition);
     RUN_TEST(test_toast_expiry);
     RUN_TEST(test_edit_coalescing_breaks);
+    RUN_TEST(test_layout_vcf);
+    RUN_TEST(test_layout_vca_no_drawing);
+    RUN_TEST(test_coarse_edit);
+    RUN_TEST(test_fine_and_undo_coalesce);
+    RUN_TEST(test_fine_minus_and_cursor_breaks);
+    RUN_TEST(test_enter_cycles_enum);
+    RUN_TEST(test_amount_edit);
+    RUN_TEST(test_del_resets_and_unpatches);
+    RUN_TEST(test_tab_and_esc_in_module_view);
     return UNITY_END();
 }
