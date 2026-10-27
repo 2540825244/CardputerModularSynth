@@ -1,0 +1,11 @@
+{
+  "name": "DaisySP",
+  "version": "0.0.0",
+  "build": {
+    "srcDir": "Source",
+    "includeDir": "Source",
+    "flags": [
+      "-I$PROJECT_DIR/lib/DaisySP/Source/Utility"
+    ]
+  }
+}

@@ -1,3 +1,5 @@
 .superpowers/
 .playwright-mcp/
 .DS_Store
+.pio/
+dist/*.bin
