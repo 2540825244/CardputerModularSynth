@@ -18,7 +18,7 @@ items as [Claude's call] (see the table at its top).
 1. If not done yet: the owner reviews the plan and picks an execution method (subagent-driven or native).
 2. Execute it task by task. Tasks 2, 18, 19, 20 and 21 are **owner checkpoints**: the owner flashes and
    reports back (Claude can't hear the output or press keys). Stop and wait at each one.
-Probe done 2026-10-27, see docs/probe-results.md; chord/ghosting check still pending.
+Probe done 2026-10-27, see docs/probe-results.md; chords are reliable (owner-confirmed).
 
 ## Constraints to remember
 - PlatformIO + Arduino core. `pio` isn't on PATH: use `~/.platformio/penv/bin/pio`.

@@ -48,7 +48,7 @@ MEMS mic (MSM381A3729, differential) ──► ES8311 MIC1P/N
 | Item | Detail |
 |---|---|
 | Display | ST7789V2 1.14" 240×135 IPS; on the internal Stamp bus (G33–G37), backlight G38 |
-| Keyboard | 56 keys (4×14) via TCA8418 (I2C 0x34, INT G11). Key rollover is a matrix: key coordinates (probe-confirmed): x 0-13 left to right, y 0-3 top to bottom. Chord/ghosting check still pending **(verify)** |
+| Keyboard | 56 keys (4×14) via TCA8418 (I2C 0x34, INT G11). Key rollover is a matrix: key coordinates (probe-confirmed): x 0-13 left to right, y 0-3 top to bottom. Modifier + key chords confirmed "pretty reliable" on the device (probe, 2026-10-27) |
 | IMU | BMI270 6-axis, I2C 0x69. Tilt/shake can be a modulation source |
 | Buttons | G0 (BOOT/user), reset; side power switch |
 | IR TX | G44 |

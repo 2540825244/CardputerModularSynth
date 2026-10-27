@@ -24,7 +24,7 @@ Corner/side keys (x,y), with x=0 left and y=0 top assumed (confirmed):
 
 Chords (which register fully): `fn`+`q`, `ctrl`+`z`, `fn`+`ctrl`+`a`, three grid keys at once:
 
-Answer: NOT yet reported. The chord/ghosting check is still pending.
+Answer: the owner reports modifier + key chords are "pretty reliable" (2026-10-27). Done.
 
 ## (c) HP_DET: did any GPIO change with a plug?
 Answer: No. No GPIO changed with the plug in or out, so HP_DET is not readable by firmware.
