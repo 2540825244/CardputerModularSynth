@@ -199,6 +199,24 @@ void test_env_retrig() {
     delete m;
 }
 
+void test_env_retrig_gate_low() {
+    Module* m = kEnvType.create();
+    setEnv(*m, 5.f, 10.f, 0.5f, 10.f);
+    float g[kBlock], rt[kBlock];
+    constBlock(g, 0.f);
+    constBlock(rt, 0.f);
+    const float* ins[2] = {g, rt};
+    const bool conn[2] = {true, true};
+    m->process(ins, conn);
+    constBlock(rt, 5.f);
+    m->process(ins, conn);  // retrig edge with the gate low
+    constBlock(rt, 0.f);
+    for (int b = 0; b < 300; b++) m->process(ins, conn);
+    TEST_ASSERT_TRUE(m->out(0)[kBlock - 1] < 0.01f);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, m->monitor(0));
+    delete m;
+}
+
 // ---- LFO ----
 static int lfoRises(float rateV) {
     Module* m = kLfoType.create();
@@ -332,6 +350,7 @@ int main() {
     RUN_TEST(test_vcf_cut_cv);
     RUN_TEST(test_env_shape);
     RUN_TEST(test_env_retrig);
+    RUN_TEST(test_env_retrig_gate_low);
     RUN_TEST(test_lfo_rate);
     RUN_TEST(test_keys_pitch_gate);
     RUN_TEST(test_keys_glide);

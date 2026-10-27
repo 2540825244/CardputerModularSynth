@@ -37,7 +37,8 @@ class Env : public Module {
             const bool gate = gate_.process(g ? g[i] : 0.f);
             if (rt) {
                 retrig_.process(rt[i]);
-                if (retrig_.rose) adsr_.Retrigger(false);
+                // Retrigger only restarts the attack; with the gate low nothing would release it.
+                if (retrig_.rose && gate) adsr_.Retrigger(false);
             }
             lvl = adsr_.Process(gate);  // a gate rising edge restarts the attack itself
             o[i] = lvl * kAudioVolts;

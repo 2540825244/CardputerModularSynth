@@ -26,7 +26,6 @@ class Vcf : public Module {
     Vcf() : Module(kVcfType) {
         svf_.Init(kSampleRate);
         slew_.setTimeMs(10.f, kSampleRate / (float)kStep);
-        slew_.y = log2f(kParams[kCutoff].def / kC4Hz);
     }
 
     void process(const float* const* ins, const bool* connected) override {
@@ -34,6 +33,10 @@ class Vcf : public Module {
         if (cutHz != lastCutHz_) {  // log2f only when the knob moved
             lastCutHz_ = cutHz;
             cutVolts_ = log2f(cutHz / kC4Hz);
+        }
+        if (!seeded_) {  // start at the first target so a loaded patch doesn't sweep
+            seeded_ = true;
+            slew_.y = cutVolts_;
         }
         const float res0 = param(kRes);
         const bool hp = param(kMode) >= 0.5f;
@@ -49,7 +52,10 @@ class Vcf : public Module {
             hz = hz < 20.f ? 20.f : (hz > 16000.f ? 16000.f : hz);
             res = res0 + (rcv ? rcv[i] * 0.2f : 0.f);
             res = res < 0.f ? 0.f : (res > 1.f ? 1.f : res);
-            svf_.SetRes(res);
+            if (res != lastRes_) {
+                lastRes_ = res;
+                svf_.SetRes(res);
+            }
             svf_.SetFreq(hz);
             for (int j = i; j < i + kStep; j++) {
                 svf_.Process(in ? in[j] * 0.2f : 0.f);
@@ -63,7 +69,8 @@ class Vcf : public Module {
    private:
     daisysp::Svf svf_;
     Slew slew_;  // cutoff in volts, stepped every kStep samples
-    float lastCutHz_ = -1.f, cutVolts_ = 0.f;
+    float lastCutHz_ = -1.f, cutVolts_ = 0.f, lastRes_ = -1.f;
+    bool seeded_ = false;
 };
 
 Module* create() { return new Vcf(); }
