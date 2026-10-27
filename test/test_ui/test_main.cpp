@@ -5,6 +5,7 @@
 #include "core/modules/lfo.h"
 #include "core/modules/osc.h"
 #include "core/modules/out.h"
+#include "core/patch_io.h"
 #include "core/registry.h"
 #include "core/modules/vca.h"
 #include "core/modules/vcf.h"
@@ -16,7 +17,9 @@ void tearDown() {}
 
 struct MemStorage : Storage {
     std::map<std::string, std::string> files;
-    bool available() override { return true; }
+    bool avail = true;
+    int writes = 0;
+    bool available() override { return avail; }
     bool read(const char* p, std::string& out) override {
         auto it = files.find(p);
         if (it == files.end()) return false;
@@ -24,6 +27,8 @@ struct MemStorage : Storage {
         return true;
     }
     bool write(const char* p, const std::string& d) override {
+        if (!avail) return false;
+        writes++;
         files[p] = d;
         return true;
     }
@@ -47,6 +52,8 @@ struct Fx {
         gPatch = Patch();
         gUndo = UndoStack();
         gStore.files.clear();
+        gStore.avail = true;
+        gStore.writes = 0;
     }
     void send(KeyEvent::Type ty, bool grid, int c, int r, Side s) {
         KeyEvent e{};
@@ -611,6 +618,202 @@ void test_cable_edit_reaches_engine() {
     TEST_ASSERT_TRUE(peak() > 0.01f);
 }
 
+
+// ---- Task 17: keys view, file menu, autosave ----
+static void openKeysPlay(Fx& f) {
+    f.place(TKeys, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+}
+
+void test_play_notes() {
+    Fx f;
+    openKeysPlay(f);
+    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.down(0, 3);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(48.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
+    f.down(4, 2);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(64.f, k->monitor(0));
+    f.up(4, 2);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(48.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
+    f.up(0, 3);
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+    TEST_ASSERT_EQUAL(48, f.ui.lastNote);
+}
+
+void test_play_esc_notes_off() {
+    Fx f;
+    openKeysPlay(f);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.down(0, 1);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+}
+
+void test_enter_does_not_play() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.tap(0, 0);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.side(Side::Enter);
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+}
+
+void test_octave_cells() {
+    Fx f;
+    openKeysPlay(f);
+    const ModuleRec* m = gPatch.findAt(0, 0);
+    f.tap(1, 0);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, m->params[0]);
+    f.tap(0, 0);
+    f.tap(0, 0);
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, m->params[0]);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, m->params[0]);
+}
+
+void test_keys_flip() {
+    Fx f;
+    openKeysPlay(f);
+    f.tap(11, 0);
+    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
+    f.tap(11, 0);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+static void toFileSave(Fx& f) {
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+    f.side(Side::Tab);
+    TEST_ASSERT_TRUE(f.ui.state().fileSaveMode);
+}
+
+void test_save_load_slot() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.place(TOsc, 1, 0);
+    toFileSave(f);
+    f.tap(2, 0);
+    TEST_ASSERT_EQUAL_STRING("SAVED", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(1, (int)gStore.files.count("/modsynth/patches/slot03.json"));
+    gPatch.clear();
+    f.eng.apply(gPatch);
+    f.side(Side::Tab);
+    f.tap(2, 0);
+    TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(2, gPatch.moduleCount());
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+void test_load_errors() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.side(Side::Esc);
+    f.tap(5, 0);
+    TEST_ASSERT_EQUAL_STRING("NO FILE", f.ui.state().toast);
+    gStore.files["/modsynth/patches/slot01.json"] = "garbage{";
+    f.tap(0, 0);
+    TEST_ASSERT_EQUAL_STRING("BAD FILE", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+}
+
+void test_load_empty_patch_file() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    Patch empty;
+    gStore.files["/modsynth/patches/slot02.json"] = patchToJson(empty);
+    f.side(Side::Esc);
+    f.tap(1, 0);
+    TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+}
+
+void test_load_validates_open_view() {
+    Fx f;
+    Patch empty;
+    gStore.files["/modsynth/patches/slot02.json"] = patchToJson(empty);
+    f.place(TKeys, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Esc);
+    f.tap(1, 0);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    f.ui.validate();
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+}
+
+void test_sd_missing() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    gStore.avail = false;
+    toFileSave(f);
+    f.tap(0, 0);
+    TEST_ASSERT_EQUAL_STRING("NO SD", f.ui.state().toast);
+    // autosave: toast once, then retry only after 30 s
+    f.ui.tick(100000);
+    TEST_ASSERT_EQUAL_STRING("NO SD", f.ui.state().toast);
+    f.ui.tick(101500);
+    TEST_ASSERT_EQUAL_STRING("", f.ui.state().toast);
+    f.ui.tick(129999);
+    TEST_ASSERT_EQUAL_STRING("", f.ui.state().toast);
+    f.ui.tick(130000);  // retry fails silently
+    TEST_ASSERT_EQUAL_STRING("", f.ui.state().toast);
+    TEST_ASSERT_TRUE(f.ui.state().dirty);
+    gStore.avail = true;
+    f.ui.tick(159999);
+    TEST_ASSERT_TRUE(f.ui.state().dirty);
+    f.ui.tick(160000);
+    TEST_ASSERT_FALSE(f.ui.state().dirty);
+}
+
+void test_autosave_debounce() {
+    Fx f;
+    f.place(TKeys, 0, 0);  // last edit at t
+    const uint32_t t0 = f.ui.state().lastEditMs;
+    f.ui.tick(t0 + 1999);
+    TEST_ASSERT_EQUAL(0, gStore.writes);
+    TEST_ASSERT_TRUE(f.ui.state().dirty);
+    f.ui.tick(t0 + 2000);
+    TEST_ASSERT_EQUAL(1, gStore.writes);
+    TEST_ASSERT_EQUAL(1, (int)gStore.files.count("/modsynth/patches/autosave.json"));
+    TEST_ASSERT_FALSE(f.ui.state().dirty);
+    f.ui.tick(t0 + 5000);
+    TEST_ASSERT_EQUAL(1, gStore.writes);
+}
+
+void test_boot_load_autosave() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.ui.tick(f.ui.state().lastEditMs + 2000);
+    gPatch.clear();
+    f.eng.apply(gPatch);
+    TEST_ASSERT_TRUE(f.ui.loadAutosave());
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    TEST_ASSERT_FALSE(f.ui.state().dirty);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -650,5 +853,17 @@ int main() {
     RUN_TEST(test_open_module_undone);
     RUN_TEST(test_carry_duplicate_refused);
     RUN_TEST(test_cable_edit_reaches_engine);
+    RUN_TEST(test_play_notes);
+    RUN_TEST(test_play_esc_notes_off);
+    RUN_TEST(test_enter_does_not_play);
+    RUN_TEST(test_octave_cells);
+    RUN_TEST(test_keys_flip);
+    RUN_TEST(test_save_load_slot);
+    RUN_TEST(test_load_errors);
+    RUN_TEST(test_load_empty_patch_file);
+    RUN_TEST(test_load_validates_open_view);
+    RUN_TEST(test_sd_missing);
+    RUN_TEST(test_autosave_debounce);
+    RUN_TEST(test_boot_load_autosave);
     return UNITY_END();
 }

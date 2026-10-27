@@ -1,7 +1,9 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include "core/engine.h"
 #include "core/modules/keys.h"
+#include "core/note_stack.h"
 #include "core/patch.h"
 #include "core/storage.h"
 #include "core/undo.h"
@@ -39,8 +41,13 @@ class UiController {
     uint32_t now() const { return now_; }
     KeysModule* keysInstance();  // the KEYS instance, or nullptr
     void releaseAudition();
+    // Load a patch file into the live patch. keepUndo pushes undo first and marks dirty; the boot
+    // load does neither. Returns the toast text ("LOADED", "SKIPPED n", or the error) via msg.
+    bool loadFile(const char* path, bool keepUndo, char* msg, size_t msgSize);
+    bool loadAutosave();  // boot: no toast, not dirty
     void validate();  // end a carry / close a view whose module is gone (after undo, load, delete)
     int lastNote = 60;
+    NoteStack notes;           // KeysPlay held notes
     bool auditioning = false;  // Space held in the patch view
 
    private:
@@ -53,4 +60,6 @@ class UiController {
     bool fn_ = false, ctrl_ = false;
     bool coalescedEdit_ = false;
     uint32_t now_ = 0;
+    bool autosaveBackoff_ = false, autosaveWarned_ = false;
+    uint32_t autosaveRetryMs_ = 0;
 };

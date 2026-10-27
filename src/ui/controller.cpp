@@ -1,5 +1,8 @@
 #include "controller.h"
+#include <cstdio>
 #include <cstring>
+#include <memory>
+#include "core/patch_io.h"
 #include "views.h"
 
 UiController::UiController(Patch& p, Engine& e, UndoStack& u, Storage& st)
@@ -40,9 +43,9 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
         case View::Patch: patchViewKey(*this, e); break;
         case View::Place: placeViewKey(*this, e); break;
         case View::Module: moduleViewKey(*this, e); break;
-        default:  // module / keys / file views arrive in Tasks 15 and 17
-            if (!e.grid && e.type == KeyEvent::Down && e.side == Side::Esc) s_.view = View::Patch;
-            break;
+        case View::KeysPlay: keysPlayKey(*this, e); break;
+        case View::KeysSettings: keysSettingsKey(*this, e); break;
+        case View::File: fileViewKey(*this, e); break;
     }
     validate();
     if (auditioning && s_.view != View::Patch) releaseAudition();
@@ -74,6 +77,55 @@ void UiController::validate() {
 void UiController::tick(uint32_t nowMs) {
     if (s_.toast[0] && (int32_t)(nowMs - s_.toastUntilMs) >= 0) s_.toast[0] = 0;
     engine_.collect();
+    if (!s_.dirty || (int32_t)(nowMs - s_.lastEditMs) < 2000) return;
+    if (autosaveBackoff_ && (int32_t)(nowMs - autosaveRetryMs_) < 0) return;
+    if (storage_.available() && storage_.write(slotPath(0).c_str(), patchToJson(patch_))) {
+        s_.dirty = false;
+        autosaveBackoff_ = autosaveWarned_ = false;
+        return;
+    }
+    if (!autosaveWarned_) toast(storage_.available() ? "AUTOSAVE FAILED" : "NO SD", nowMs);
+    autosaveWarned_ = true;
+    autosaveBackoff_ = true;
+    autosaveRetryMs_ = nowMs + 30000;
+}
+
+bool UiController::loadFile(const char* path, bool keepUndo, char* msg, size_t msgSize) {
+    std::string text;
+    if (!storage_.available()) {
+        snprintf(msg, msgSize, "NO SD");
+        return false;
+    }
+    if (!storage_.read(path, text)) {
+        snprintf(msg, msgSize, "NO FILE");
+        return false;
+    }
+    std::unique_ptr<Patch> loaded(new Patch());  // too big for the stack
+    const LoadReport r = patchFromJson(text, *loaded, &engine_);
+    if (r.error != LoadError::None) {
+        snprintf(msg, msgSize, r.error == LoadError::NewerFormat ? "NEWER FW" : "BAD FILE");
+        return false;
+    }
+    if (keepUndo) undo_.push(patch_, 0);
+    patch_ = *loaded;
+    engine_.apply(patch_);
+    if (keepUndo) {
+        s_.dirty = true;
+        s_.lastEditMs = now_;
+    } else {
+        s_.dirty = false;
+    }
+    validate();
+    if (r.skippedModules > 0) snprintf(msg, msgSize, "SKIPPED %d", r.skippedModules);
+    else snprintf(msg, msgSize, "LOADED");
+    return true;
+}
+
+bool UiController::loadAutosave() {
+    const std::string path = slotPath(0);
+    if (!storage_.exists(path.c_str())) return false;
+    char msg[24];
+    return loadFile(path.c_str(), false, msg, sizeof msg);
 }
 
 void UiController::tilt(float) {}
