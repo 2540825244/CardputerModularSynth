@@ -6,6 +6,7 @@
 #include "hw/audio_out.h"
 #include "hw/keyboard.h"
 #include "hw/sd_storage.h"
+#include "render/renderer.h"
 #include "ui/controller.h"
 #include "ui/key_input.h"
 
@@ -25,7 +26,7 @@ static void printHeap(const char* tag) {
 // Keyboard, codec I2C, SD and the UI all live on core 0; core 1 only runs audio.
 static void uiTask(void*) {
     if (audioI2sError() == 0) codecBegin();
-    uint32_t lastStatus = 0;
+    uint32_t lastStatus = 0, lastDraw = 0;
     bool steadyPrinted = false;
     KeyPos pressed[16];
     KeyEvent ev[16];
@@ -36,6 +37,10 @@ static void uiTask(void*) {
         gDecoder.update(pressed, n, now, ev, &ne, 16);
         for (int i = 0; i < ne; i++) gUi.handle(ev[i], now);
         gUi.tick(now);
+        if (now - lastDraw >= 33) {  // <= 30 fps, core 0 only
+            lastDraw = now;
+            renderFrame(gUi.state(), gPatch, gEngine, gSd, now);
+        }
         if (now - lastStatus >= 500) {
             lastStatus = now;
             const UiState& s = gUi.state();
@@ -60,6 +65,9 @@ void setup() {
     Serial.begin(115200);
     printHeap("boot");
 
+    M5Cardputer.Display.setRotation(1);
+    if (!renderBegin()) Serial.println("renderBegin FAILED (sprite)");
+    printHeap("sprite");
     gSd.begin();
     gUi.setDecoder(&gDecoder);
     gUi.loadAutosave();
