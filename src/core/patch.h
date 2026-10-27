@@ -27,6 +27,9 @@ class Patch {
     Patch();  // zeroes the whole object, so unused slots and padding compare equal with memcmp
 
     PatchError addModule(const ModuleTypeInfo& t, uint8_t page, uint8_t cell, uint16_t* outId);  // params = defaults, amounts = 1
+    // Loader: keeps a stored id (Duplicate if taken) and raises nextId past it.
+    PatchError addModuleWithId(uint16_t id, const ModuleTypeInfo&, uint8_t page, uint8_t cell);
+    void setCableColor(int i, uint8_t color) { if (i >= 0 && i < nCables_) cables_[i].color = color; }
     bool removeModule(uint16_t id);  // also removes its cables
     PatchError moveModule(uint16_t id, uint8_t page, uint8_t cell);
     PatchError addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint8_t toIn);  // picks colour

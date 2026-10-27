@@ -40,19 +40,26 @@ int Patch::countOfType(const ModuleTypeInfo& t) const {
 }
 
 PatchError Patch::addModule(const ModuleTypeInfo& t, uint8_t page, uint8_t cell, uint16_t* outId) {
+    const PatchError e = addModuleWithId(nextId, t, page, cell);
+    if (e == PatchError::None && outId) *outId = modules_[nModules_ - 1].id;
+    return e;
+}
+
+PatchError Patch::addModuleWithId(uint16_t id, const ModuleTypeInfo& t, uint8_t page, uint8_t cell) {
     if (page >= kPages || cell >= kCellsPerPage) return PatchError::BadPin;
     if (findAt(page, cell)) return PatchError::CellTaken;
+    if (find(id)) return PatchError::Duplicate;
     if (nModules_ >= kMaxModules) return PatchError::TooManyModules;
     if (t.maxInstances && countOfType(t) >= t.maxInstances) return PatchError::MaxInstances;
     ModuleRec& m = modules_[nModules_++];
     memset(static_cast<void*>(&m), 0, sizeof(m));
-    m.id = nextId++;
+    m.id = id;
+    if (id >= nextId) nextId = static_cast<uint16_t>(id + 1);
     m.type = &t;
     m.page = page;
     m.cell = cell;
     for (int i = 0; i < t.numParams && i < kMaxParams; i++) m.params[i] = t.params[i].def;
     for (int i = 0; i < kMaxOuts; i++) m.outAmount[i] = 1.f;
-    if (outId) *outId = m.id;
     return PatchError::None;
 }
 
