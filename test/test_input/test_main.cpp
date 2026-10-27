@@ -67,11 +67,9 @@ void test_chord() {
     step(d, k, 2, 0, ev);
     TEST_ASSERT_TRUE(d.sideHeld(Side::Fn));
     TEST_ASSERT_TRUE(d.gridHeld(1, 1));
-    KeyPos k2[] = {{0, 2}, {2, 1}};
     int n = step(d, nullptr, 0, 0, ev);  // release all
     TEST_ASSERT_EQUAL(2, n);
     TEST_ASSERT_FALSE(d.sideHeld(Side::Fn));
-    (void)k2;
 }
 
 void test_chord_events() {
