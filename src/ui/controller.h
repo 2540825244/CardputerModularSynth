@@ -27,8 +27,11 @@ class UiController {
     Engine& engine() { return engine_; }
     UndoStack& undoStack() { return undo_; }
     Storage& storage() { return storage_; }
-    bool fnHeld() const { return fn_; }
-    bool ctrlHeld() const { return ctrl_; }
+    // Modifier state comes from the decoder (state after update()), because a same-frame chord
+    // emits the grid Down before the modifier Down. Without a decoder, falls back to event tracking.
+    void setDecoder(const KeyDecoder* d) { dec_ = d; }
+    bool fnHeld() const { return dec_ ? dec_->sideHeld(Side::Fn) : fn_; }
+    bool ctrlHeld() const { return dec_ ? dec_->sideHeld(Side::Ctrl) : ctrl_; }
     uint32_t now() const { return now_; }
     int lastNote = 60;
 
@@ -38,6 +41,7 @@ class UiController {
     UndoStack& undo_;
     Storage& storage_;
     UiState s_;
+    const KeyDecoder* dec_ = nullptr;
     bool fn_ = false, ctrl_ = false;
     bool coalescedEdit_ = false;
     uint32_t now_ = 0;

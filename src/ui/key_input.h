@@ -18,6 +18,8 @@ struct KeyEvent {
 class KeyDecoder {
    public:
     // Diffs against the previous call; Hold fires once per press after kHoldMs.
+    // Event order within a frame is key-index order (grid keys, then sides), so a same-frame
+    // chord emits the grid Down before the modifier Down: read modifiers via sideHeld().
     void update(const KeyPos* pressed, int n, uint32_t nowMs, KeyEvent* out, int* outCount, int outMax);
     bool sideHeld(Side s) const { return held_[kGridKeys + static_cast<int>(s)]; }
     bool gridHeld(uint8_t col, uint8_t row) const {

@@ -89,6 +89,21 @@ void test_place_via_fn() {
     TEST_ASSERT_EQUAL(14, f.ui.state().selCell);
 }
 
+void test_same_frame_chord() {
+    Fx f;
+    KeyDecoder dec;
+    f.ui.setDecoder(&dec);
+    KeyPos pressed[] = {{0, 2}, {3, 1}};  // fn + grid (2,1) in one frame
+    KeyEvent ev[16];
+    int n = 0;
+    dec.update(pressed, 2, 10, ev, &n, 16);
+    TEST_ASSERT_EQUAL(2, n);
+    TEST_ASSERT_TRUE(ev[0].grid);  // grid Down arrives before the Fn Down
+    for (int i = 0; i < n; i++) f.ui.handle(ev[i], 10);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    TEST_ASSERT_EQUAL(14, f.ui.state().placeCell);
+}
+
 void test_place_details_back() {
     Fx f;
     f.sideDown(Side::Fn);
@@ -240,6 +255,7 @@ void test_edit_coalescing_breaks() {
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
+    RUN_TEST(test_same_frame_chord);
     RUN_TEST(test_place_details_back);
     RUN_TEST(test_place_via_hold);
     RUN_TEST(test_place_refused);
