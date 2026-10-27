@@ -173,7 +173,10 @@ void pinCell(const UiState& s, const Patch& p, const ModuleRec& m, int col, int 
 void drawFilterCurve(const ModuleRec& m, Module* inst, int x, int y, int w, int h) {
     float fc = inst ? inst->monitor(0) : m.params[0];
     if (fc < 20.f) fc = m.params[0];
-    const float q = 0.5f + 9.5f * (inst ? inst->monitor(1) : m.params[1]);
+    // DaisySP Svf: Q = 1 / (2 * (1 - res^0.25)), res = monitor(1)
+    const float res = inst ? inst->monitor(1) : m.params[1];
+    float q = 1.f / (2.f * (1.f - powf(res < 0.f ? 0.f : res, 0.25f)));
+    q = q > 20.f ? 20.f : q;
     const bool hp = m.params[2] >= 0.5f;
     auto fx = [&](float f) { return x + (int)(log10f(f / 20.f) / 3.f * (w - 1)); };
     for (float f : {100.f, 1000.f, 10000.f}) cv.drawFastVLine(fx(f), y, h, PBorder);

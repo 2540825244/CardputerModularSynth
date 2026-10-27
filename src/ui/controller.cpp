@@ -70,7 +70,11 @@ void UiController::releaseAudition() {
 void UiController::validate() {
     if (s_.carry.active && !patch_.find(s_.carry.id)) s_.carry.active = false;
     const bool inModule = s_.view == View::Module || s_.view == View::KeysPlay || s_.view == View::KeysSettings;
-    if (inModule && !patch_.find(s_.openId)) s_.view = View::Patch;
+    if (inModule && !patch_.find(s_.openId)) {
+        s_.view = View::Patch;
+        notes.clear();
+        s_.keysHeld = 0;
+    }
     if (s_.moveFromId >= 0 && !patch_.find((uint16_t)s_.moveFromId)) s_.moveFromId = -1;
 }
 
@@ -117,6 +121,7 @@ bool UiController::loadFile(const char* path, bool keepUndo, char* msg, size_t m
     s_.selCell = -1;
     s_.modCell = -1;
     notes.clear();
+    s_.keysHeld = 0;
     if (keepUndo) {
         s_.dirty = true;
         s_.lastEditMs = now_;
