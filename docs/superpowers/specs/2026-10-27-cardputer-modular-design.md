@@ -281,10 +281,15 @@ output is active (from headphone detect, if readable) and offer a separate **spe
 just map keys to virtual midi/oct/gate/etc out".
 - **Opening the Keys module's view puts you in play mode.** The grid keys play notes per the
   mapping.
-- Its own settings (octave, glide, the key mapping, pins) live on a second inner page. A side
-  key switches between the play page and the settings page. The owner calls this "worst case"
-  and acceptable.
-- Which side key does the switch, and whether a smarter layout avoids it, is **[open]**.
+- Its own settings (octave, glide, the key mapping, pins) live on a second inner page, with a
+  control to flip between the play page and the settings page. The owner called this "worst
+  case" and acceptable.
+- **The flip control doesn't have to be a side key.** A grid cell works too. It depends on the
+  note layout:
+  - If the play page uses **the whole grid** (e.g. a full chromatic layout), a side key is the
+    better flip. The owner: it "generally work[s] better".
+  - If the note layout leaves spare cells, a flip cell (or settings cells) can sit in the grid.
+- The note layout (chromatic vs. other), and therefore where the flip lives, is **[open]**.
 - The owner also accepted "audition" on `space` in patch view.
 
 ### 8.2 Later releases (keep the system ready for these) **[owner unless noted]**
@@ -340,7 +345,7 @@ just map keys to virtual midi/oct/gate/etc out".
 
 1. Module selection menu design (look and navigation). Must match §6.
 2. Patch size: number of pages, paging direction.
-3. Which side key flips Keys between its play page and settings page (§8.1). Whether module view needs an audition key.
+3. Keys note layout (chromatic or other), which decides whether its play/settings flip is a side key or a grid cell (§8.1). Whether module view needs an audition key.
 4. Coarse-step scheme for log/unbounded parameters. Fine-step sizes.
 5. Cable colour reuse when there are more than 6 cables. Whether patching can start from an input.
 6. Output offset in addition to amount.
@@ -362,7 +367,7 @@ just map keys to virtual midi/oct/gate/etc out".
 | Signal model | all audio rate, ±5 V / 1 V/oct, summing inputs, feedback allowed | proposed → owner agreed |
 | Editing | number row coarse, two keys fine, hold+tilt | owner (extending a proposal) |
 | Tilt | also its own patchable module | owner |
-| Keyboard play | a Keys module mapping keys to pitch/gate/etc.; its open view plays notes, with a side key flipping to an inner settings page | owner |
+| Keyboard play | a Keys module mapping keys to pitch/gate/etc.; its open view plays notes, with a flip (side key if the grid is all notes, else a grid cell) to an inner settings page | owner |
 | Per-module menus | each module's view can do its own things | owner |
 | Undo / delete | `\` undo, `del` delete | owner |
 | Status | small, on the sides | owner |
