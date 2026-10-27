@@ -721,10 +721,9 @@ void test_save_load_slot() {
     f.tap(2, 0);
     TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
     TEST_ASSERT_EQUAL(2, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);  // a load returns to the patch view
     f.side(Side::Backslash);
     TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
-    f.side(Side::Esc);
-    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
 }
 
 void test_load_errors() {
@@ -758,9 +757,7 @@ void test_load_validates_open_view() {
     f.tap(0, 0);
     f.side(Side::Esc);
     f.tap(1, 0);
-    f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
-    f.ui.validate();
     TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
 }
 
@@ -814,6 +811,34 @@ void test_boot_load_autosave() {
     TEST_ASSERT_FALSE(f.ui.state().dirty);
 }
 
+void test_load_resets_ui_state() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    Patch other;
+    uint16_t id = 0;
+    other.addModule(kKeysType, 0, 0, &id);
+    TEST_ASSERT_EQUAL(gPatch.findAt(0, 0)->id, id);  // same id, different type
+    gStore.files["/modsynth/patches/slot01.json"] = patchToJson(other);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    f.sideDown(Side::Fn);
+    f.tap(0, 3);  // OSC output pin: start a carry
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    f.side(Side::Esc);
+    f.tap(5, 2);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    f.tap(0, 0);
+    TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().selCell);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().modCell);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -865,5 +890,6 @@ int main() {
     RUN_TEST(test_sd_missing);
     RUN_TEST(test_autosave_debounce);
     RUN_TEST(test_boot_load_autosave);
+    RUN_TEST(test_load_resets_ui_state);
     return UNITY_END();
 }

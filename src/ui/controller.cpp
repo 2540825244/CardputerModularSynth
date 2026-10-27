@@ -109,6 +109,14 @@ bool UiController::loadFile(const char* path, bool keepUndo, char* msg, size_t m
     if (keepUndo) undo_.push(patch_, 0);
     patch_ = *loaded;
     engine_.apply(patch_);
+    // Ids may now name different modules: drop every id-bound or position-bound UI reference.
+    s_.carry.active = false;
+    s_.view = View::Patch;
+    s_.openId = 0;
+    s_.moveFromId = -1;
+    s_.selCell = -1;
+    s_.modCell = -1;
+    notes.clear();
     if (keepUndo) {
         s_.dirty = true;
         s_.lastEditMs = now_;
