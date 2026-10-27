@@ -42,6 +42,11 @@ Module* Engine::instance(uint16_t id) { return instanceOf(id); }
 
 void Engine::retire(Module* m, Program* p, uint32_t gen) { retired_.push_back({gen, m, p}); }
 
+void Engine::pushValues(Module* m, const ModuleRec& r) {
+    for (int k = 0; k < r.type->numParams && k < kMaxParams; k++) m->setParam(k, r.params[k]);
+    for (int o = 0; o < r.type->numOuts && o < kMaxOuts; o++) m->setOutAmount(o, r.outAmount[o]);
+}
+
 int Engine::instantiateAll(const Patch& p) {
     int missing = 0;
     for (int i = 0; i < p.moduleCount(); i++) {
@@ -55,8 +60,7 @@ int Engine::instantiateAll(const Patch& p) {
             }
             insts_.push_back({r.id, m});
         }
-        for (int k = 0; k < r.type->numParams && k < kMaxParams; k++) m->setParam(k, r.params[k]);
-        for (int o = 0; o < r.type->numOuts && o < kMaxOuts; o++) m->setOutAmount(o, r.outAmount[o]);
+        pushValues(m, r);
     }
     return missing;
 }
@@ -116,9 +120,17 @@ void Engine::collect() {
     }
     retired_.resize(w);
     // retry modules that were refused for lack of a pool slot
-    const size_t before = insts_.size();
-    instantiateAll(patch_);
-    if (insts_.size() != before) publish(++gen_);
+    bool any = false;
+    for (int i = 0; i < patch_.moduleCount(); i++) {
+        const ModuleRec& r = patch_.moduleAt(i);
+        if (instanceOf(r.id)) continue;
+        Module* m = r.type->create();
+        if (!m) continue;
+        insts_.push_back({r.id, m});
+        pushValues(m, r);
+        any = true;
+    }
+    if (any) publish(++gen_);
 }
 
 void Engine::processBlock(float* mono) {

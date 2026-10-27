@@ -32,7 +32,23 @@ Program* compileProgram(const Patch& patch, Module* const* instances, uint32_t g
             }
             if (ready) pick = i;
         }
-        if (pick < 0) pick = firstLeft;  // cycle: lowest patch index
+        if (pick < 0) {
+            // Stalled: every remaining node waits on another. Break the loop only inside a cycle
+            // (transitive closure over remaining nodes), never at a node merely downstream of it.
+            bool reach[kMaxModules][kMaxModules] = {};
+            for (int c = 0; c < patch.cableCount(); c++) {
+                const int f = indexOf(patch.cableAt(c).fromId), t = indexOf(patch.cableAt(c).toId);
+                if (f >= 0 && t >= 0 && f != t && !done[f] && !done[t]) reach[f][t] = true;
+            }
+            for (int k = 0; k < n; k++)
+                for (int i = 0; i < n; i++)
+                    if (reach[i][k])
+                        for (int j = 0; j < n; j++)
+                            if (reach[k][j]) reach[i][j] = true;
+            for (int i = 0; i < n && pick < 0; i++)
+                if (!done[i] && reach[i][i]) pick = i;
+            if (pick < 0) pick = firstLeft;  // unreachable; keeps the loop total
+        }
 
         ProgramNode& node = prog->nodes[prog->numNodes++];
         node.m = instances[pick];

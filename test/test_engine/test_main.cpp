@@ -298,6 +298,67 @@ void test_type_change_recreates() {
     run(eng, 5);
 }
 
+void test_order_cycle_downstream() {
+    Patch p;
+    uint16_t out = add(p, kOutType, 0), o = add(p, kOscType, 1), f = add(p, kVcfType, 2),
+             a = add(p, kVcaType, 3);
+    wire(p, o, 0, f, 0);
+    wire(p, f, 0, a, 0);
+    wire(p, a, 0, o, 1);  // loop OSC -> VCF -> VCA -> OSC
+    wire(p, a, 0, out, 0);
+    Engine eng(bigHeap);
+    eng.apply(p);
+    Module* inst[kMaxModules];
+    for (int i = 0; i < p.moduleCount(); i++) inst[i] = eng.instance(p.moduleAt(i).id);
+    Program* prog = compileProgram(p, inst, 1);
+    TEST_ASSERT_EQUAL(4, prog->numNodes);
+    int posOut = -1, posVca = -1;
+    for (int i = 0; i < 4; i++) {
+        if (prog->nodes[i].m == eng.instance(out)) posOut = i;
+        if (prog->nodes[i].m == eng.instance(a)) posVca = i;
+    }
+    TEST_ASSERT_TRUE(posOut > posVca);
+    TEST_ASSERT_EQUAL_PTR(eng.instance(o), prog->nodes[0].m);  // loop broken at the lowest index inside it
+    delete prog;
+}
+
+void test_double_apply_before_block() {
+    Patch p;
+    uint16_t c = add(p, kCountedType, 0), out = add(p, kOutType, 1);
+    wire(p, c, 0, out, 0);
+    gDtorCount = 0;
+    {
+        Engine eng(bigHeap);
+        eng.apply(p);  // program 1, never run
+        Patch q = p;
+        q.removeModule(c);
+        eng.apply(q);  // program 2, never run either
+        eng.collect();
+        TEST_ASSERT_EQUAL(0, gDtorCount);
+        float buf[kBlock];
+        eng.processBlock(buf);
+        eng.collect();
+        TEST_ASSERT_EQUAL(1, gDtorCount);  // both old programs and the module freed
+    }
+}
+
+void test_apply_collect_without_block() {
+    Patch p;
+    uint16_t c = add(p, kCountedType, 0), out = add(p, kOutType, 1);
+    wire(p, c, 0, out, 0);
+    gDtorCount = 0;
+    Engine eng(bigHeap);
+    eng.apply(p);
+    run(eng, 5);
+    Patch q = p;
+    q.removeModule(c);
+    eng.apply(q);
+    for (int i = 0; i < 3; i++) eng.collect();
+    TEST_ASSERT_EQUAL(0, gDtorCount);
+    run(eng, 2);
+    TEST_ASSERT_EQUAL(1, gDtorCount);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_basic_voice);
@@ -310,5 +371,8 @@ int main() {
     RUN_TEST(test_apply_param_change_keeps_state);
     RUN_TEST(test_dly_replacement_retries);
     RUN_TEST(test_type_change_recreates);
+    RUN_TEST(test_order_cycle_downstream);
+    RUN_TEST(test_double_apply_before_block);
+    RUN_TEST(test_apply_collect_without_block);
     return UNITY_END();
 }

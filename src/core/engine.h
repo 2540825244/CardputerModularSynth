@@ -49,6 +49,7 @@ class Engine {
     };
     Module* instanceOf(uint16_t id) const;
     void retire(Module* m, Program* p, uint32_t gen);
+    static void pushValues(Module*, const ModuleRec&);
     int instantiateAll(const Patch&);  // creates missing, pushes params; returns # missing
     void publish(uint32_t gen);
 
