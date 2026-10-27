@@ -42,12 +42,16 @@ static void audioTask(void*) {
         }
         size_t written = 0;
         esp_err_t e = i2s_write(kI2sPort, buf, sizeof(buf), &written, portMAX_DELAY);
-        if (e != ESP_OK) g_i2sErr = e;
+        if (e != ESP_OK) {
+            if (!g_i2sErr) g_i2sErr = e;
+            vTaskDelay(1);  // never spin
+        }
         g_audioBlocks = g_audioBlocks + 1;
     }
 }
 
-static void startAudio() {
+// Returns true when the driver is installed and pinned; only then is the audio task created.
+static bool startAudio() {
     i2s_config_t cfg = {};
     cfg.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
     cfg.sample_rate = kRate;
@@ -60,7 +64,10 @@ static void startAudio() {
     cfg.use_apll = false;
     cfg.tx_desc_auto_clear = true;
     esp_err_t e = i2s_driver_install(kI2sPort, &cfg, 0, nullptr);
-    if (e != ESP_OK) g_i2sErr = e;
+    if (e != ESP_OK) {
+        g_i2sErr = e;
+        return false;
+    }
     i2s_pin_config_t pins = {};
     pins.mck_io_num = I2S_PIN_NO_CHANGE;
     pins.bck_io_num = 41;
@@ -68,11 +75,18 @@ static void startAudio() {
     pins.data_out_num = 42;
     pins.data_in_num = I2S_PIN_NO_CHANGE;
     e = i2s_set_pin(kI2sPort, &pins);
-    if (e != ESP_OK) g_i2sErr = e;
+    if (e != ESP_OK) {
+        g_i2sErr = e;
+        return false;
+    }
     xTaskCreatePinnedToCore(audioTask, "audio", 4096, nullptr, 5, nullptr, 1);
     g_audioStarted = true;
-    delay(50);  // let BCLK run before the codec (no MCLK) is configured
+    return true;
+}
 
+// Called from the core-0 UI task (I2C is core 0 only).
+static void startCodec() {
+    delay(50);  // let BCLK run before the codec (no MCLK) is configured
     // ES8311 sequence from M5Unified 0.2.28 _speaker_enabled_cb_cardputer_adv
     static const uint8_t regs[][2] = {{0x00, 0x80}, {0x01, 0xB5}, {0x02, 0x18}, {0x0D, 0x01},
                                       {0x12, 0x00}, {0x13, 0x10}, {0x32, 0xBF}, {0x37, 0x08}};
@@ -148,7 +162,7 @@ static void scanPins() {
 
 // ---- screen ----
 static M5Canvas canvas(&M5Cardputer.Display);
-static constexpr uint16_t kBg = 0xC635;   // approx #c4c6b8
+static const uint16_t kBg = lgfx::color565(0xc4, 0xc6, 0xb8);
 static constexpr uint16_t kFg = 0x18E3;   // approx #1d1f1a
 static constexpr uint16_t kAcc = 0xFA63;  // approx #ff4d1a
 static int g_row = 0;
@@ -172,7 +186,9 @@ static void line(const char* fmt, ...) {
     g_row++;
 }
 
-static uint32_t g_freeHeap, g_largest, g_minFree;
+static uint32_t g_freeHeap, g_largest, g_minFree;        // before the sprite
+static uint32_t g_freeHeap2, g_largest2, g_minFree2;     // after the sprite
+static bool g_spriteOk = false;
 static bool g_sdOk = false;
 static uint8_t g_sdType = 0;
 static uint64_t g_sdMb = 0;
@@ -220,7 +236,8 @@ static void draw(const KeyPos* cur, int n) {
     line("lvl %s", b);
 
     head("RAM");
-    line("free=%u big=%u min=%u", (unsigned)g_freeHeap, (unsigned)g_largest, (unsigned)g_minFree);
+    line("pre  f=%u b=%u m=%u", (unsigned)g_freeHeap, (unsigned)g_largest, (unsigned)g_minFree);
+    line("post f=%u b=%u m=%u", (unsigned)g_freeHeap2, (unsigned)g_largest2, (unsigned)g_minFree2);
 
     head("SD");
     if (g_sdOk) line("OK type=%d %uMB", g_sdType, (unsigned)g_sdMb);
@@ -229,9 +246,31 @@ static void draw(const KeyPos* cur, int n) {
     canvas.pushSprite(0, 0);
 }
 
+// Keyboard, codec I2C and display all live on core 0; core 1 only runs audio.
+static void uiTask(void*) {
+    if (g_audioStarted) startCodec();
+    uint32_t lastScan = 0, lastDraw = 0;
+    KeyPos cur[16];
+    int n = 0;
+    for (;;) {
+        pollKeys(cur, n);
+        uint32_t now = millis();
+        if (now - lastScan >= 50) {
+            lastScan = now;
+            scanPins();
+        }
+        if (now - lastDraw >= 50) {
+            lastDraw = now;
+            draw(cur, n);
+        }
+        vTaskDelay(pdMS_TO_TICKS(2));
+    }
+}
+
 void setup() {
     auto cfg = M5.config();
     cfg.internal_spk = false;  // we own the codec
+    cfg.internal_mic = false;
     M5Cardputer.begin(cfg, true);
     M5Cardputer.Display.setRotation(1);
     M5Cardputer.Display.fillScreen(kBg);
@@ -252,22 +291,19 @@ void setup() {
     g_minFree = ESP.getMinFreeHeap();
 
     canvas.setColorDepth(16);
-    canvas.createSprite(240, 135);
+    g_spriteOk = canvas.createSprite(240, 135) != nullptr;
+    g_freeHeap2 = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    g_largest2 = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    g_minFree2 = ESP.getMinFreeHeap();
+
+    if (!g_spriteOk) {
+        M5Cardputer.Display.setTextColor(kAcc, kBg);
+        M5Cardputer.Display.drawString("SPRITE FAIL", 2, 2);
+        vTaskDelete(nullptr);
+        return;
+    }
+    xTaskCreatePinnedToCore(uiTask, "ui", 8192, nullptr, 1, nullptr, 0);
+    vTaskDelete(nullptr);  // loop() never runs
 }
 
-void loop() {
-    static uint32_t lastScan = 0, lastDraw = 0;
-    KeyPos cur[16];
-    int n;
-    pollKeys(cur, n);
-    uint32_t now = millis();
-    if (now - lastScan >= 50) {
-        lastScan = now;
-        scanPins();
-    }
-    if (now - lastDraw >= 50) {
-        lastDraw = now;
-        draw(cur, n);
-    }
-    delay(2);
-}
+void loop() {}
