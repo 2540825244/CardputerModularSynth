@@ -123,6 +123,9 @@ synth use unless a specific feature needs it.
 
 ## Sources
 
+Offline copies of the schematics and datasheets are in [`docs/reference/`](reference/README.md).
+
+
 - https://docs.m5stack.com/en/core/Cardputer-Adv
 - Schematic: https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1178/Sch_M5CardputerAdv_v1.0_2025_06_20_17_19_58.pdf
 - Stamp schematic: https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1150/Sch_StampS3_v0.3.3.pdf
