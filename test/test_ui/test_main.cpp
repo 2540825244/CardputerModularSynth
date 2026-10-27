@@ -376,6 +376,60 @@ void test_tab_and_esc_in_module_view() {
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
 }
 
+void test_move_across_pages() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    const uint16_t id = gPatch.findAt(0, 13)->id;
+    f.sideDown(Side::Ctrl);
+    f.tap(1, 1);
+    f.side(Side::Tab);
+    f.tap(4, 0);
+    f.sideUp(Side::Ctrl);
+    TEST_ASSERT_NULL(gPatch.findAt(0, 13));
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(1, 4));
+    TEST_ASSERT_EQUAL(id, gPatch.findAt(1, 4)->id);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+}
+
+void test_del_clears_move() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.sideDown(Side::Ctrl);
+    f.tap(1, 1);
+    f.sideUp(Side::Ctrl);
+    TEST_ASSERT_TRUE(f.ui.state().moveFromId >= 0);
+    f.side(Side::Del);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+}
+
+void test_audition_release_after_view_change() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.sideDown(Side::Space);
+    f.side(Side::Esc);  // File view while Space is held
+    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+    f.sideUp(Side::Space);
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+}
+
+void test_audition_release_on_view_change() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.tap(0, 0);
+    f.sideDown(Side::Space);
+    f.side(Side::Enter);  // KeysPlay opens while Space is held: gate drops at once
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -401,5 +455,9 @@ int main() {
     RUN_TEST(test_amount_edit);
     RUN_TEST(test_del_resets_and_unpatches);
     RUN_TEST(test_tab_and_esc_in_module_view);
+    RUN_TEST(test_move_across_pages);
+    RUN_TEST(test_del_clears_move);
+    RUN_TEST(test_audition_release_after_view_change);
+    RUN_TEST(test_audition_release_on_view_change);
     return UNITY_END();
 }

@@ -14,14 +14,6 @@ void doMove(Patch& p, void* c) {
     p.moveModule(m->id, m->page, m->cell);
 }
 
-KeysModule* keysInstance(UiController& ui) {
-    const Patch& p = ui.patch();
-    for (int i = 0; i < p.moduleCount(); i++)
-        if (p.moduleAt(i).type == &kKeysType)
-            return static_cast<KeysModule*>(ui.engine().instance(p.moduleAt(i).id));
-    return nullptr;
-}
-
 void openPlace(UiController& ui, int cell) {
     UiState& s = ui.mut();
     s.view = View::Place;
@@ -69,10 +61,12 @@ void patchViewKey(UiController& ui, const KeyEvent& e) {
     }
     const bool down = e.type == KeyEvent::Down;
     if (e.side == Side::Space) {
-        if (KeysModule* k = keysInstance(ui)) {
-            if (down) k->noteOn(ui.lastNote);
-            else if (e.type == KeyEvent::Up) k->gateOff();
-        }
+        // The release is handled by UiController::handle, whatever view is active by then.
+        if (down)
+            if (KeysModule* k = ui.keysInstance()) {
+                k->noteOn(ui.lastNote);
+                ui.auditioning = true;
+            }
         return;
     }
     if (!down) return;
@@ -87,13 +81,13 @@ void patchViewKey(UiController& ui, const KeyEvent& e) {
         }
         case Side::Tab:
             s.page = (uint8_t)((s.page + (ui.fnHeld() ? kPages - 1 : 1)) % kPages);
-            s.selCell = -1;
-            s.moveFromId = -1;
+            s.selCell = -1;  // a pending move survives, so a module can change page
             break;
         case Side::Del: {
             const ModuleRec* m = s.selCell >= 0 ? ui.patch().findAt(s.page, (uint8_t)s.selCell) : nullptr;
             if (!m) break;
             Cell c{m->id, 0, 0};
+            s.moveFromId = -1;
             ui.edit(doRemove, &c);
             break;
         }

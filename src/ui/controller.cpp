@@ -16,6 +16,7 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     if (!e.grid && e.side == Side::Fn) fn_ = e.type != KeyEvent::Up;
     if (!e.grid && e.side == Side::Ctrl) ctrl_ = e.type != KeyEvent::Up;
     coalescedEdit_ = false;
+    if (auditioning && !e.grid && e.side == Side::Space && e.type == KeyEvent::Up) releaseAudition();
     switch (s_.view) {
         case View::Patch: patchViewKey(*this, e); break;
         case View::Place: placeViewKey(*this, e); break;
@@ -24,10 +25,23 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
             if (!e.grid && e.type == KeyEvent::Down && e.side == Side::Esc) s_.view = View::Patch;
             break;
     }
+    if (auditioning && s_.view != View::Patch) releaseAudition();
     // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
     // changes nothing, so repeated taps of one fine key still merge; tilt drags (Task 19) end
     // their run explicitly on release.
     if (!coalescedEdit_ && e.type != KeyEvent::Up) undo_.breakCoalescing();
+}
+
+KeysModule* UiController::keysInstance() {
+    for (int i = 0; i < patch_.moduleCount(); i++)
+        if (patch_.moduleAt(i).type == &kKeysType)
+            return static_cast<KeysModule*>(engine_.instance(patch_.moduleAt(i).id));
+    return nullptr;
+}
+
+void UiController::releaseAudition() {
+    auditioning = false;
+    if (KeysModule* k = keysInstance()) k->gateOff();
 }
 
 void UiController::tick(uint32_t nowMs) {

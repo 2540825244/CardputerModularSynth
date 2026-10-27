@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "core/engine.h"
+#include "core/modules/keys.h"
 #include "core/patch.h"
 #include "core/storage.h"
 #include "core/undo.h"
@@ -34,7 +35,10 @@ class UiController {
     bool fnHeld() const { return dec_ ? dec_->sideHeld(Side::Fn) : fn_; }
     bool ctrlHeld() const { return dec_ ? dec_->sideHeld(Side::Ctrl) : ctrl_; }
     uint32_t now() const { return now_; }
+    KeysModule* keysInstance();  // the KEYS instance, or nullptr
+    void releaseAudition();
     int lastNote = 60;
+    bool auditioning = false;  // Space held in the patch view
 
    private:
     Patch& patch_;
