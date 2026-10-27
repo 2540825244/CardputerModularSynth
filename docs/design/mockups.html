@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cardputer Modular Mockups</title>
+<style>
+  body { margin:0; padding:32px; background:#f4f4f5; color:#18181b; font-family: system-ui, -apple-system, sans-serif; }
+  h2 { font-size:24px; margin:0 0 8px; } h3 { font-size:17px; margin:24px 0 6px; }
+  .subtitle { color:#71717a; margin:0 0 14px; line-height:1.5; }
+  .section { margin-bottom: 36px; }
+  .cards { display:flex; gap:20px; flex-wrap:wrap; }
+  .card { background:#e4e4e7; border-radius:10px; overflow:hidden; max-width:520px; }
+  .card-image { padding:16px; } .card-body { padding:0 16px 14px; } .card-body p { color:#52525b; font-size:14px; line-height:1.5; }
+  code { background:#e4e4e7; padding:0 3px; border-radius:3px; }
+</style>
+<script>window.toggleSelect = function(){};</script>
+</head><body>
+<!-- Snapshot of the brainstorm mockup (screens-v2), 2026-10-27. Decisions: look B is default; carry-the-cable patching chosen; AMT merges into the output pin (so the separate AMT cells shown here are superseded). -->
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  .dev-wrap { position: relative; margin: 8px 8px 24px; }
+  .x3 { width: 720px; height: 405px; }
+  .x2 { width: 480px; height: 270px; }
+  .x3 .dev { transform: scale(3); transform-origin: 0 0; }
+  .x2 .dev { transform: scale(2); transform-origin: 0 0; }
+  .dev {
+    width: 240px; height: 135px; position: relative; overflow: hidden;
+    display: grid; grid-template-columns: 16px 1fr 16px;
+    background: var(--bg); color: var(--fg);
+    font-family: 'Silkscreen', ui-monospace, monospace; font-size: 8px; line-height: 1;
+    -webkit-font-smoothing: none;
+    border-radius: 2px; box-shadow: 0 0 0 4px #222, 0 0 0 5px #444;
+  }
+  .sa { --bg:#0b0b0c; --cell:#16171a; --key:#3a3d42; --fg:#ece9e2; --dim:#7b7f85; --sel:#ffffff;
+        --src:#ff6a2b; --mod:#4c7dff; --proc:#cfcac0; --side:#101113; --bar:#ff6a2b; --seg:#2a2c30; }
+  .sb { --bg:#c4c6b8; --cell:transparent; --key:#9a9d90; --fg:#1d1f1a; --dim:#5e6157; --sel:#ff4d1a;
+        --src:#1d1f1a; --mod:#1d1f1a; --proc:#1d1f1a; --side:#b6b8aa; --bar:#ff4d1a; --seg:#adb0a2; }
+  .sb .cell { border: 1px dotted #8f9286; }
+  .side { background: var(--side); display: grid; grid-template-rows: repeat(4, 1fr); position: relative; }
+  .side .slot { display:flex; align-items:center; justify-content:center; color: var(--fg); position: relative; }
+  .side .slot svg { width: 12px; height: 12px; }
+  .side .slot.on { color: var(--bar); }
+  .side .slot .txt { font-size: 6px; }
+  .meter { position:absolute; bottom:1px; width:2px; height:131px; background: var(--seg); }
+  .meter i { position:absolute; bottom:0; left:0; width:2px; background: var(--dim); }
+  .grid { display:grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(4, 1fr); gap: 1px; padding: 1px; position: relative; }
+  .cell { background: var(--cell); position: relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap: 2px; overflow: hidden; }
+  .cell .k { color: var(--key); font-size: 6px; }
+  .cell.sel { outline: 1px solid var(--sel); outline-offset: -1px; }
+  .cell .cat { position:absolute; top:0; left:0; right:0; height:2px; }
+  .cell svg { width: 11px; height: 11px; }
+  .cell .lb { font-size: 6px; letter-spacing: -0.3px; }
+  .cell .v { font-size: 5px; color: var(--dim); letter-spacing: -0.3px; }
+  .cell.sel .v { color: var(--fg); }
+  .dots { position:absolute; bottom:2px; right:2px; display:flex; gap:1px; }
+  .dots b { width:3px; height:3px; border-radius: 50%; display:block; }
+  .pin .dir { position:absolute; top:2px; left:2px; font-size:5px; color: var(--dim); }
+  .pin .peer { font-size:5px; color: var(--dim); }
+  .pin .pd { width:5px; height:5px; border-radius:50%; border:1px solid var(--dim); box-sizing:border-box; }
+  .pulse { animation: pulse .8s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .wob svg { animation: wob 1.6s ease-in-out infinite; }
+  @keyframes wob { 0%,100% { transform: scaleY(1);} 50% { transform: scaleY(-1);} }
+  .vu { position:absolute; left:1px; top:4px; bottom:2px; width:2px; background:#b6ff3b; animation: vu .35s steps(4) infinite alternate; bottom:auto; }
+  @keyframes vu { from { height: 4px; } to { height: 14px; } }
+  .widget { position: relative; overflow: hidden; }
+  .vbar { height:100%; display:grid; grid-template-columns: repeat(12, 1fr); gap:1px; position: relative; }
+  .vbar .s { background: var(--seg); position: relative; }
+  .vbar .s.f { background: var(--bar); }
+  .vbar .s .k { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:5px; color: var(--bg); opacity:.7; }
+  .vbar .s:not(.f) .k { color: var(--key); opacity: 1; }
+  .vbar .ov { position:absolute; top:3px; left:3px; right:3px; display:flex; justify-content:space-between; font-size:7px; color: var(--fg); pointer-events:none; text-shadow: 0 0 2px var(--bg), 0 0 2px var(--bg); }
+  .banner { display:flex; align-items:center; justify-content:center; gap: 4px; font-size: 7px; background: var(--seg); }
+  .divider { position:absolute; top:34px; bottom:1px; left: calc(50% - 0px); width:1px; background: var(--bar); }
+  .legend { font-size: 13px; color: var(--text-secondary, #888); margin-top: 18px; line-height: 1.6; }
+  .legend code { font-size: 12px; }
+  .row { display:flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+  .note { max-width: 300px; font-size: 14px; line-height: 1.55; }
+  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:3px; background:#ff6a2b22; color:#ff6a2b; margin-left:6px; vertical-align: middle; }
+</style>
+
+<h2>Cardputer modular: screen mockups</h2>
+<p class="subtitle">Mockups at 3× scale (2× for the side-by-side comparisons) of the real 240×135 screen. The 12×4 middle grid sits directly on the 12×4 middle keys, and the side icons sit level with <code>esc tab fn ctrl</code> on the left and <code>del \ enter space</code> on the right. Empty cells show their key letter faintly.</p>
+
+<div class="section">
+  <h3>1 · Look: which direction?</h3>
+  <p class="subtitle">Patch view (zoomed out), page 1, with your first patch. VCF is selected, so only its cables show, as dots in matching colours on the modules at the other end.</p>
+  <div class="cards">
+    <div class="card" data-choice="style-a" onclick="toggleSelect(this)">
+      <div class="card-image"><div class="dev-wrap x2" id="patchA"></div></div>
+      <div class="card-body"><h3>A · OP-1 dark</h3><p>Black screen. Colours mark module type: orange = sound source, blue = modulator, white = processor/IO. Cable dots use a separate bright palette.</p></div>
+    </div>
+    <div class="card" data-choice="style-b" onclick="toggleSelect(this)">
+      <div class="card-image"><div class="dev-wrap x2" id="patchB"></div></div>
+      <div class="card-body"><h3>B · Pocket Operator LCD</h3><p>Grey "segment LCD" look with one orange accent. Very TE, but colour-matched cable dots clash with the monochrome style.</p></div>
+    </div>
+  </div>
+  <div class="legend">
+    Side keys in patch view (proposal):<br>
+    <code>esc</code> file menu (save/load) · <code>tab</code> next page (shows 1/3) · <code>fn</code>+cell place module · <code>ctrl</code>+cell move module<br>
+    <code>del</code> delete · <code>\</code> undo · <code>enter</code> open module · <code>space</code> audition (hold to play a note)<br>
+    Thin bars on the far left and right edges: CPU and RAM.
+  </div>
+</div>
+
+<div class="section">
+  <h3>2 · Module view: VCF (zoomed in)</h3>
+  <div class="row">
+    <div class="dev-wrap x3" id="vcf"></div>
+    <div class="note">
+      <p><b>Top row = value strip.</b> It shows the selected parameter's value. Keys <code>1</code>–<code>=</code> jump to 12 coarse steps.</p>
+      <p><code>ctrl</code> / <code>space</code> = fine −/+. Hold the parameter's key and tilt to sweep it.</p>
+      <p><b>Inputs (in) and outputs (out)</b> show a dot in the cable's colour and the module at the other end. An output's amount (AMT) sits right next to it and is edited like any other parameter.</p>
+      <p>Spare cells hold a live drawing: the filter curve, wobbling with its LFO.</p>
+      <p><code>fn</code>+pin = start or finish a cable · <code>del</code> on a pin = unpatch.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3 · Module view: ADSR</h3>
+  <div class="row">
+    <div class="dev-wrap x3" id="adsr"></div>
+    <div class="note">
+      <p>The envelope draws its own shape, and a dot runs along it while the gate is open.</p>
+      <p>A, D, S and R sit on the bottom row of keys. Attack is selected, so the top strip shows its value.</p>
+      <p>The output (OUT) has two cables (to VCA and VCF), so it shows two dots.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>4 · Patching between two modules: which flow?</h3>
+  <p class="subtitle">Zoomed in, you only see one module, so a cable needs a way to reach the other module.</p>
+  <div class="cards">
+    <div class="card" data-choice="patch-armed" onclick="toggleSelect(this)">
+      <div class="card-image"><div class="dev-wrap x2" id="armed"></div></div>
+      <div class="card-body"><h3>A · Carry the cable</h3><p><code>fn</code>+LFO.OUT "picks up" a cable. Then <code>esc</code> to patch view, open VCF, and <code>fn</code>+CUT to drop it. The top strip reminds you what you're holding, and <code>esc</code> twice cancels.</p></div>
+    </div>
+    <div class="card" data-choice="patch-split" onclick="toggleSelect(this)">
+      <div class="card-image"><div class="dev-wrap x2" id="split"></div></div>
+      <div class="card-body"><h3>B · Split view</h3><p>In patch view, <code>fn</code>+LFO then <code>fn</code>+VCF opens both modules side by side, 6 columns each. Pick an output on one side and an input on the other. Faster for building, but each module gets only half the cells.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const KEYS = [["1","2","3","4","5","6","7","8","9","0","-","="],["q","w","e","r","t","y","u","i","o","p","[","]"],["Aa","a","s","d","f","g","h","j","k","l",";","'"],["op","al","z","x","c","v","b","n","m",",",".","/"]];
+  const C = { yel:"#ffe14d", pink:"#ff8fc8", cyan:"#39d0ff", mag:"#ff3d9a", vio:"#a77bff", lime:"#b6ff3b" };
+  const P = 'fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="square"';
+  const I = {
+    osc:`<path ${P} d="M1 6 Q3.5 0.5 6 6 T11 6"/>`,
+    lfo:`<path ${P} d="M1 6 Q3.5 2 6 6 T11 6"/>`,
+    vcf:`<path ${P} d="M1 4 H6 Q8 4 8.5 2.5 Q9.2 6 11 11"/>`,
+    vca:`<path ${P} d="M2 2 L10 6 L2 10 Z"/>`,
+    adsr:`<path ${P} d="M1 10 L3 2 L5 6 H8 L11 10"/>`,
+    dly:`<path ${P} d="M2 2 V10 M5 4 V10 M8 6 V10 M11 8 V10"/>`,
+    out:`<path ${P} d="M1 4 H3 L6 1 V11 L3 8 H1 Z M8 4 Q9.5 6 8 8 M9.5 2.5 Q12 6 9.5 9.5"/>`,
+    keys:`<path ${P} d="M1 2 H11 V10 H1 Z M4 6 V10 M8 6 V10"/><path fill="currentColor" d="M3 2 h2 v4 h-2z M7 2 h2 v4 h-2z"/>`,
+    file:`<path ${P} d="M2 1 H8 L10 3 V11 H2 Z M4 1 V4 H8 V1 M4 8 H8"/>`,
+    plus:`<path ${P} d="M6 2 V10 M2 6 H10"/>`,
+    minus:`<path ${P} d="M2 6 H10"/>`,
+    move:`<path ${P} d="M6 1 V11 M1 6 H11 M4 3 L6 1 L8 3 M4 9 L6 11 L8 9 M3 4 L1 6 L3 8 M9 4 L11 6 L9 8"/>`,
+    trash:`<path ${P} d="M2 3 H10 M5 1 H7 M3 3 V11 H9 V3 M5 5 V9 M7 5 V9"/>`,
+    undo:`<path ${P} d="M4 2 L2 4 L4 6 M2 4 H7 Q10 4 10 7 Q10 10 7 10 H4"/>`,
+    enter:`<path ${P} d="M10 1 V7 H2 M4 5 L2 7 L4 9"/>`,
+    play:`<path fill="currentColor" d="M3 2 L10 6 L3 10 Z"/>`,
+    back:`<path ${P} d="M8 1 L3 6 L8 11"/>`,
+    next:`<path ${P} d="M2 6 H10 M7 3 L10 6 L7 9"/>`,
+    cable:`<path ${P} d="M2 10 Q2 5 6 6 Q10 7 10 2"/><circle cx="2" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="2" r="1.5" fill="currentColor"/>`,
+    toggle:`<path ${P} d="M1 4 H11 V8 H1 Z"/><path fill="currentColor" d="M6 4 h5 v4 h-5z"/>`,
+    tilt:`<path ${P} d="M3 3 L9 1 L11 7 L5 9 Z M1 11 H11"/>`,
+  };
+  const svg = (n, extra='') => `<svg viewBox="0 0 12 12" ${extra}>${I[n]}</svg>`;
+  const dots = (cs) => cs && cs.length ? `<div class="dots">${cs.map(c=>`<b style="background:${c}"></b>`).join('')}</div>` : '';
+
+  function cellHTML(r, c, s) {
+    if (!s) return `<div class="cell" style="grid-row:${r+1};grid-column:${c+1}"><span class="k">${KEYS[r][c]}</span></div>`;
+    const pos = `grid-row:${r+1};grid-column:${c+1}`;
+    const sel = s.sel ? ' sel' : '';
+    if (s.t === 'mod') {
+      return `<div class="cell${sel}${s.wob?' wob':''}" style="${pos}"><div class="cat" style="background:var(--${s.cat})"></div>${svg(s.icon)}<span class="lb">${s.name}</span>${s.vu?'<div class="vu"></div>':''}${dots(s.dots)}</div>`;
+    }
+    if (s.t === 'par') {
+      return `<div class="cell${sel}" style="${pos}"><span class="lb">${s.name}</span><span class="v">${s.val}</span></div>`;
+    }
+    if (s.t === 'in' || s.t === 'out') {
+      const dotsHtml = (s.dots||[]).map(d => `<div class="pd${s.pulse?' pulse':''}" style="background:${d};border-color:${d}"></div>`).join('') || `<div class="pd${s.pulse?' pulse':''}" ${s.pulse?`style="border-color:${s.pulse}"`:''}></div>`;
+      return `<div class="cell pin${sel}" style="${pos}"><span class="dir">${s.t==='in'?'in':'out'}</span><span class="lb">${s.name}</span><div style="display:flex;gap:1px">${dotsHtml}</div><span class="peer">${s.peer||'&nbsp;'}</span></div>`;
+    }
+  }
+
+  function vbar(label, value, n) {
+    const segs = KEYS[0].map((k,i)=>`<div class="s${i<n?' f':''}"><span class="k">${k}</span></div>`).join('');
+    return `<div class="vbar">${segs}<div class="ov"><span>${label}</span><span>${value}</span></div></div>`;
+  }
+
+  function render(id, o) {
+    const cells = o.cells || {};
+    const covered = new Set();
+    let widgets = '';
+    (o.widgets||[]).forEach(w => {
+      for (let r=w.r; r<w.r+w.h; r++) for (let c=w.c; c<w.c+w.w; c++) covered.add(r+','+c);
+      widgets += `<div class="widget ${w.cls||''}" style="grid-row:${w.r+1}/span ${w.h};grid-column:${w.c+1}/span ${w.w}">${w.html}</div>`;
+    });
+    let g = '';
+    for (let r=0;r<4;r++) for (let c=0;c<12;c++) { if (!covered.has(r+','+c)) g += cellHTML(r,c,cells[r+','+c]); }
+    const slot = s => `<div class="slot${s.on?' on':''}">${s.txt?`<span class="txt">${s.txt}</span>`:svg(s.i)}</div>`;
+    document.getElementById(id).innerHTML = `
+      <div class="dev ${o.style}">
+        <div class="side">${o.left.map(slot).join('')}<div class="meter" style="left:0"><i style="height:${o.cpu}%;background:${o.style==='sa'?'#3ddc84':'#1d1f1a'}"></i></div></div>
+        <div class="grid">${g}${widgets}${o.split?'<div class="divider"></div>':''}</div>
+        <div class="side">${o.right.map(slot).join('')}<div class="meter" style="right:0"><i style="height:${o.ram}%;background:${o.style==='sa'?'#39d0ff':'#1d1f1a'}"></i></div></div>
+      </div>`;
+  }
+
+  // ---------- patch view ----------
+  const patchCells = {
+    '1,0': {t:'mod', name:'KEY', cat:'proc', icon:'keys'},
+    '1,2': {t:'mod', name:'OSC', cat:'src', icon:'osc', dots:[C.cyan]},
+    '1,4': {t:'mod', name:'VCF', cat:'proc', icon:'vcf', sel:true, dots:[C.cyan, C.mag, C.vio]},
+    '1,6': {t:'mod', name:'VCA', cat:'proc', icon:'vca', dots:[C.vio]},
+    '1,8': {t:'mod', name:'DLY', cat:'proc', icon:'dly'},
+    '1,10':{t:'mod', name:'OUT', cat:'proc', icon:'out', vu:true},
+    '2,2': {t:'mod', name:'LFO', cat:'mod', icon:'lfo', wob:true, dots:[C.mag]},
+    '2,4': {t:'mod', name:'ENV', cat:'mod', icon:'adsr'},
+  };
+  const patchSide = {
+    left:[{i:'file'},{txt:'1/3'},{i:'plus'},{i:'move'}],
+    right:[{i:'trash'},{i:'undo'},{i:'enter'},{i:'play'}],
+  };
+  render('patchA', {style:'sa', ...patchSide, cells:patchCells, cpu:34, ram:41});
+  render('patchB', {style:'sb', ...patchSide, cells:patchCells, cpu:34, ram:41});
+
+  const modSide = {
+    left:[{i:'back'},{i:'next'},{i:'cable'},{i:'minus'}],
+    right:[{i:'trash'},{i:'undo'},{i:'toggle'},{i:'plus'}],
+  };
+
+  // ---------- VCF ----------
+  const filt = `<svg viewBox="0 0 120 96" preserveAspectRatio="none" style="width:100%;height:100%;display:block;background:var(--cell)">
+      <g stroke="#2a2c30" stroke-width="1">${[20,40,60,80,100].map(x=>`<line x1="${x}" y1="0" x2="${x}" y2="96"/>`).join('')}</g>
+      <g><animateTransform attributeName="transform" type="translate" values="-14 0; 14 0; -14 0" dur="1.6s" repeatCount="indefinite"/>
+        <path d="M-20 40 H50 Q62 40 66 26 Q70 40 80 70 L110 100" fill="none" stroke="#ff6a2b" stroke-width="2"/>
+        <line x1="66" y1="0" x2="66" y2="96" stroke="#ff6a2b" stroke-dasharray="2 3" stroke-width="1"/>
+      </g>
+      <text x="4" y="90" font-size="9" fill="#7b7f85" font-family="Silkscreen, monospace">LP 24dB</text>
+    </svg>`;
+  render('vcf', {style:'sa', ...modSide, cpu:34, ram:41,
+    widgets:[{r:0,c:0,w:12,h:1,html:vbar('CUTOFF','1.20kHz',7)},{r:1,c:5,w:7,h:3,html:filt}],
+    cells:{
+      '1,0':{t:'par',name:'CUT',val:'1.2k',sel:true},
+      '1,1':{t:'par',name:'RES',val:'40%'},
+      '1,2':{t:'par',name:'MOD',val:'LP|hp'},
+      '1,3':{t:'par',name:'DRV',val:'10%'},
+      '2,0':{t:'in',name:'IN',dots:[C.cyan],peer:'OSC'},
+      '2,1':{t:'in',name:'CUT',dots:[C.mag],peer:'LFO'},
+      '2,2':{t:'in',name:'RES'},
+      '3,0':{t:'out',name:'OUT',dots:[C.vio],peer:'VCA'},
+      '3,1':{t:'par',name:'AMT',val:'+100'},
+    }});
+
+  // ---------- ADSR ----------
+  const env = `<svg viewBox="0 0 160 64" preserveAspectRatio="none" style="width:100%;height:100%;display:block;background:var(--cell)">
+      <path d="M4 60 L18 6 L50 28 H112 L156 60" fill="none" stroke="#4c7dff" stroke-width="2"/>
+      <path d="M4 60 L18 6 L50 28 H112 L156 60 Z" fill="#4c7dff22"/>
+      <circle r="3" fill="#ffffff"><animateMotion dur="2.4s" repeatCount="indefinite" path="M4 60 L18 6 L50 28 H112 L156 60"/></circle>
+      <g font-size="7" fill="#7b7f85" font-family="Silkscreen, monospace"><text x="8" y="58">A</text><text x="32" y="58">D</text><text x="78" y="58">S</text><text x="132" y="58">R</text></g>
+    </svg>`;
+  render('adsr', {style:'sa', ...modSide, cpu:34, ram:41,
+    widgets:[{r:0,c:0,w:12,h:1,html:vbar('ATTACK','12ms',3)},{r:1,c:0,w:8,h:2,html:env}],
+    cells:{
+      '1,8':{t:'in',name:'GATE',dots:[C.pink],peer:'KEY'},
+      '1,9':{t:'in',name:'RTRG'},
+      '2,8':{t:'out',name:'OUT',dots:[C.lime,C.yel],peer:'VCA+1'},
+      '2,9':{t:'par',name:'AMT',val:'+80'},
+      '3,0':{t:'par',name:'A',val:'12ms',sel:true},
+      '3,1':{t:'par',name:'D',val:'180'},
+      '3,2':{t:'par',name:'S',val:'60%'},
+      '3,3':{t:'par',name:'R',val:'400'},
+      '3,4':{t:'par',name:'CRV',val:'EXP'},
+      '3,5':{t:'par',name:'LOOP',val:'OFF'},
+    }});
+
+  // ---------- patching: armed ----------
+  const armedBanner = `<div class="banner" style="height:100%"><span style="width:5px;height:5px;border-radius:50%;background:${C.mag};display:inline-block" class="pulse"></span><span>HOLDING LFO.OUT</span><span style="color:#7b7f85">→ FN+INPUT</span></div>`;
+  render('armed', {style:'sa',
+    left:[{i:'back'},{i:'next'},{i:'cable',on:true},{i:'minus'}],
+    right:[{i:'trash'},{i:'undo'},{i:'toggle'},{i:'plus'}], cpu:34, ram:41,
+    widgets:[{r:0,c:0,w:12,h:1,html:armedBanner},{r:1,c:5,w:7,h:3,html:filt}],
+    cells:{
+      '1,0':{t:'par',name:'CUT',val:'1.2k'},
+      '1,1':{t:'par',name:'RES',val:'40%'},
+      '1,2':{t:'par',name:'MOD',val:'LP|hp'},
+      '1,3':{t:'par',name:'DRV',val:'10%'},
+      '2,0':{t:'in',name:'IN',dots:[C.cyan],peer:'OSC'},
+      '2,1':{t:'in',name:'CUT',pulse:C.mag,sel:true,peer:'?'},
+      '2,2':{t:'in',name:'RES',pulse:C.mag},
+      '3,0':{t:'out',name:'OUT',dots:[C.vio],peer:'VCA'},
+      '3,1':{t:'par',name:'AMT',val:'+100'},
+    }});
+
+  // ---------- patching: split ----------
+  const splitBanner = `<div class="banner" style="height:100%"><span style="color:#4c7dff">LFO</span><span style="color:#7b7f85">⟷</span><span>VCF</span></div>`;
+  render('split', {style:'sa', split:true,
+    left:[{i:'back'},{i:'next'},{i:'cable',on:true},{i:'minus'}],
+    right:[{i:'trash'},{i:'undo'},{i:'toggle'},{i:'plus'}], cpu:34, ram:41,
+    widgets:[{r:0,c:0,w:12,h:1,html:splitBanner}],
+    cells:{
+      '1,0':{t:'par',name:'RATE',val:'2.1Hz'},
+      '1,1':{t:'par',name:'SHP',val:'SIN'},
+      '2,0':{t:'out',name:'OUT',pulse:C.mag,sel:true},
+      '2,1':{t:'par',name:'AMT',val:'+60'},
+      '1,6':{t:'par',name:'CUT',val:'1.2k'},
+      '1,7':{t:'par',name:'RES',val:'40%'},
+      '2,6':{t:'in',name:'IN',dots:[C.cyan],peer:'OSC'},
+      '2,7':{t:'in',name:'CUT',pulse:C.mag},
+      '2,8':{t:'in',name:'RES',pulse:C.mag},
+      '3,6':{t:'out',name:'OUT',dots:[C.vio],peer:'VCA'},
+    }});
+})();
+</script>
+</body></html>
