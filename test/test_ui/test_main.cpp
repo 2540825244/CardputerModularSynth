@@ -533,9 +533,10 @@ void test_esc_not_consecutive_keeps_carry() {
     fnTap(f, 0, 3);
     f.side(Side::Esc);
     f.tap(5, 3);  // another key in between
-    f.side(Side::Esc);
     TEST_ASSERT_TRUE(f.ui.state().carry.active);
-    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+    f.side(Side::Esc);  // v1.2: in the patch view one esc drops the cable (its icon is cancel)
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
 }
 
 void test_del_cancels_carry() {
@@ -830,9 +831,9 @@ void test_load_resets_ui_state() {
     TEST_ASSERT_TRUE(f.ui.state().carry.active);
     f.side(Side::Esc);
     f.tap(5, 2);
+    f.side(Side::Esc);  // drops the carry (v1.2): the file menu can't be reached while carrying
     f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
-    TEST_ASSERT_TRUE(f.ui.state().carry.active);
     f.slot(0);
     TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
     TEST_ASSERT_FALSE(f.ui.state().carry.active);
