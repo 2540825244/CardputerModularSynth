@@ -25,6 +25,8 @@
 #include "core/modules/fx.h"
 #include "core/modules/proc.h"
 #include "core/modules/src.h"
+#include "core/modules/mod.h"
+#include "core/scales.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -247,8 +249,8 @@ static int lfoRises(float rateV) {
     m->setParam(1, 2.f);
     float r[kBlock];
     constBlock(r, rateV);
-    const float* ins[1] = {r};
-    const bool conn[1] = {true};
+    const float* ins[2] = {r, r};
+    const bool conn[2] = {true, false};
     int n = 0;
     float prev = 0.f;
     for (int b = 0; b < 3000; b++) {  // 2 s
@@ -1177,6 +1179,165 @@ void test_fmo_index_zero_is_sine() {
     TEST_ASSERT_FLOAT_WITHIN(0.3f, 5.f, mx);
 }
 
+
+// ---- v1.2 Task 11: modulators and sequencers ----
+// Clocks module `m` (clock on input 0) `n` times; each clock is 4 blocks high, 4 low. Returns
+// out `o` sampled at the end of each high phase.
+static std::vector<float> clocked(Module* m, int n, int o) {
+    static float ck[kBlock], z[kBlock];
+    const float* ins[kMaxIns] = {ck, z, z, z, z, z, z, z};
+    bool c[kMaxIns] = {true};
+    std::vector<float> r;
+    for (int k = 0; k < n; k++) {
+        constBlock(ck, 5.f);
+        for (int b = 0; b < 4; b++) m->process(ins, c);
+        r.push_back(m->out(o)[kBlock - 1]);
+        constBlock(ck, 0.f);
+        for (int b = 0; b < 4; b++) m->process(ins, c);
+    }
+    return r;
+}
+
+void test_quantize_major() {
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 0.f, quantize(0.02f, 1, 0));            // C
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 2.f / 12.f, quantize(1.4f / 12.f, 1, 0));  // C#+ -> D
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 11.f / 12.f, quantize(10.6f / 12.f, 1, 0)); // A#+ -> B
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, -1.f / 12.f, quantize(-0.9f / 12.f, 1, 0)); // below C -> B below
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 7.f / 12.f, quantize(6.6f / 12.f, 9, 0));  // maj pentatonic: F#+ -> G
+    TEST_ASSERT_EQUAL(7, scaleSize(1));
+    TEST_ASSERT_EQUAL(14, scaleDegree(1, 8));  // degree 8 of major = D an octave up
+    TEST_ASSERT_EQUAL(-1, scaleDegree(1, -1));  // degree -1 = B below
+}
+
+void test_seq_steps_and_gates() {
+    Module* m = kSeqType.create();
+    for (int i = 0; i < 12; i++) m->setParam(i, (float)i);  // step i = i semitones
+    m->setParam(13, 4.f);                                    // length 4
+    m->setParam(14, 0.9f);  // gate 90% of the clock period (the test clock is high for 50%)
+    std::vector<float> p = clocked(m, 9, 0);
+    for (int k = 0; k < 9; k++) TEST_ASSERT_FLOAT_WITHIN(1e-5f, (float)(k % 4) / 12.f, p[k]);
+    m->setParam(12, (float)0b1011);  // step 3 (index 2) gate off
+    std::vector<float> g = clocked(m, 4, 1);  // any 4 consecutive steps hold the one gated-off step
+    int offs = 0;
+    for (float v : g) offs += v < 1.f;
+    TEST_ASSERT_EQUAL(1, offs);
+    delete m;
+}
+
+void test_trg_lanes() {
+    Module* m = kTrgType.create();
+    m->setParam(0, (float)0b0101);
+    m->setParam(1, (float)0b0010);
+    m->setParam(2, 0.f);
+    m->setParam(3, 4.f);
+    std::vector<float> a = clocked(m, 8, 0);
+    const float expA[] = {5, 0, 5, 0, 5, 0, 5, 0};
+    for (int k = 0; k < 8; k++) TEST_ASSERT_EQUAL_FLOAT(expA[k], a[k]);
+    delete m;
+    Module* n = kTrgType.create();
+    n->setParam(1, (float)0b0010);
+    n->setParam(3, 4.f);
+    std::vector<float> b = clocked(n, 4, 1);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, b[0]);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, b[1]);
+    delete n;
+}
+
+void test_euc_e38() {
+    const char* want = "x..x..x.";
+    for (int i = 0; i < 8; i++) TEST_ASSERT_EQUAL(want[i] == 'x', euclidHit(8, 3, 0, i));
+    Module* m = kEucType.create();
+    std::vector<float> g = clocked(m, 8, 0);
+    for (int i = 0; i < 8; i++) TEST_ASSERT_EQUAL_FLOAT(want[i] == 'x' ? 5.f : 0.f, g[i]);
+    delete m;
+}
+
+void test_tur_locked_loops() {
+    Module* m = kTurType.create();
+    m->setParam(0, 5.f);
+    m->setParam(1, 0.f);  // never flips: a fixed 5-step loop
+    std::vector<float> v = clocked(m, 20, 0);
+    for (int k = 5; k < 20; k++) TEST_ASSERT_EQUAL_FLOAT(v[k - 5], v[k]);
+    delete m;
+}
+
+void test_lgc_xor() {
+    Module* m = kLgcType.create();
+    static float a[kBlock], b[kBlock];
+    const float* ins[2] = {a, b};
+    bool c[2] = {true, true};
+    const float va[] = {0, 5, 0, 5}, vb[] = {0, 0, 5, 5}, xr[] = {0, 5, 5, 0}, an[] = {0, 0, 0, 5};
+    for (int k = 0; k < 4; k++) {
+        constBlock(a, va[k]);
+        constBlock(b, vb[k]);
+        m->process(ins, c);
+        TEST_ASSERT_EQUAL_FLOAT(xr[k], m->out(2)[0]);
+        TEST_ASSERT_EQUAL_FLOAT(an[k], m->out(0)[0]);
+    }
+    delete m;
+}
+
+void test_lfo_old_waves_same() {
+    TEST_ASSERT_EQUAL_STRING("SIN", kLfoType.params[0].enumNames[0]);
+    TEST_ASSERT_EQUAL_STRING("SQR", kLfoType.params[0].enumNames[1]);
+    Module* m = kLfoType.create();
+    m->setParam(0, 1.f);
+    m->setParam(1, 10.f);
+    static float z[kBlock];
+    const float* ins[2] = {z, z};
+    bool c[2] = {false, false};
+    m->process(ins, c);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, m->out(0)[0]);  // square starts high
+    delete m;
+}
+
+void test_ad_loop() {
+    Module* m = kAdType.create();
+    m->setParam(0, 1.f);
+    m->setParam(1, 5.f);
+    m->setParam(3, 1.f);  // loop: cycles without a trigger
+    static float z[kBlock];
+    const float* ins[1] = {z};
+    bool c[1] = {false};
+    int eocs = 0;
+    float mx = 0.f;
+    for (int b = 0; b < 300; b++) {
+        m->process(ins, c);
+        for (int k = 0; k < kBlock; k++) {
+            mx = m->out(0)[k] > mx ? m->out(0)[k] : mx;
+            if (k > 0 && m->out(1)[k] > 1.f && m->out(1)[k - 1] < 1.f) eocs++;
+        }
+    }
+    TEST_ASSERT_TRUE(mx > 4.5f);
+    TEST_ASSERT_TRUE(eocs >= 10);  // 200 ms, cycles of ~6 ms
+    delete m;
+}
+
+void test_sco_tuner() {
+    std::vector<float> v;
+    Module* m = kScoType.create();
+    static float b[kBlock];
+    const float* ins[1] = {b};
+    bool c[1] = {true};
+    float ph = 0.f;
+    for (int blk = 0; blk < 300; blk++) {
+        for (int k = 0; k < kBlock; k++) {
+            b[k] = 3.f * sinf(ph);
+            ph += 6.2831853f * 440.f / kSampleRate;
+        }
+        m->process(ins, c);
+    }
+    TEST_ASSERT_FLOAT_WITHIN(3.f, 440.f, m->monitor(0));
+    int n = 0, head = 0;
+    const float* d = m->displayBuffer(&n, &head);
+    TEST_ASSERT_NOT_NULL(d);
+    TEST_ASSERT_EQUAL(96, n);
+    float mx = 0.f;
+    for (int i = 0; i < n; i++) mx = fabsf(d[i]) > mx ? fabsf(d[i]) : mx;
+    TEST_ASSERT_TRUE(mx > 2.f);
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -1246,5 +1407,14 @@ int main() {
     RUN_TEST(test_str_pluck_decays);
     RUN_TEST(test_ssw_pitch);
     RUN_TEST(test_fmo_index_zero_is_sine);
+    RUN_TEST(test_quantize_major);
+    RUN_TEST(test_seq_steps_and_gates);
+    RUN_TEST(test_trg_lanes);
+    RUN_TEST(test_euc_e38);
+    RUN_TEST(test_tur_locked_loops);
+    RUN_TEST(test_lgc_xor);
+    RUN_TEST(test_lfo_old_waves_same);
+    RUN_TEST(test_ad_loop);
+    RUN_TEST(test_sco_tuner);
     return UNITY_END();
 }

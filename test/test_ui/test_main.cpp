@@ -12,6 +12,7 @@
 #include "core/modules/vcf.h"
 #include "ui/controller.h"
 #include "ui/layout.h"
+#include "core/modules/mod.h"
 #include "core/presets.h"
 #include "ui/anim.h"
 #include "ui/side_icons.h"
@@ -47,6 +48,14 @@ static UndoStack gUndo;
 static MemStorage gStore;
 
 enum { TKeys, TOsc, TVcf, TVca, TEnv, TLfo, TDly, TOut };
+
+static int registryIndex(const ModuleTypeInfo& t) {
+    int n = 0;
+    const ModuleTypeInfo* const* all = allTypes(&n);
+    for (int i = 0; i < n; i++)
+        if (all[i] == &t) return i;
+    return -1;
+}
 
 struct Fx {
     Engine eng{bigHeap};
@@ -1701,6 +1710,27 @@ void test_system_settings_saved() {
     TEST_ASSERT_EQUAL(600, g.ui.holdMs());
 }
 
+
+void test_bit_cell_tap_toggles() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.tap(0, 1);
+    f.sideUp(Side::Fn);
+    f.tileTap(registryIndex(kTrgType));
+    f.side(Side::Enter);
+    f.tap(0, 1);
+    f.side(Side::Enter);  // open TRG: page PATT
+    const ModuleRec* m = gPatch.findAt(0, 12);
+    TEST_ASSERT_TRUE(m->type == &kTrgType);
+    const uint32_t before = (uint32_t)m->params[1];
+    f.tap(3, 2);  // lane 2, step 4
+    TEST_ASSERT_EQUAL_UINT32(before ^ (1u << 3), (uint32_t)gPatch.findAt(0, 12)->params[1]);
+    f.tap(3, 2);
+    TEST_ASSERT_EQUAL_UINT32(before, (uint32_t)gPatch.findAt(0, 12)->params[1]);
+    f.side(Side::Backslash);  // each tap is its own undo step
+    TEST_ASSERT_EQUAL_UINT32(before ^ (1u << 3), (uint32_t)gPatch.findAt(0, 12)->params[1]);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1815,5 +1845,6 @@ int main() {
     RUN_TEST(test_file_tab_pages);
     RUN_TEST(test_slot_36_save);
     RUN_TEST(test_system_settings_saved);
+    RUN_TEST(test_bit_cell_tap_toggles);
     return UNITY_END();
 }

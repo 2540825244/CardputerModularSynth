@@ -6,7 +6,9 @@
 
 enum class Category : uint8_t { Source, Modulator, Processor, Effect, Utility };  // place-menu page, bar colour
 enum class Icon : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, Mix, Atn, Snh, Clk, Mux, Dmx, Tilt, Rev, Fx, Psh, Fold, Drive, Crush, Ring, Noise, Drum, Hat, String, Bell, Seq, Steps, Euclid, Quant, Logic, Dice, Chaos, Knob, Scope, Grind, Slew, Lpg, Fm, Saw };
-enum class Drawing : uint8_t { None, FilterCurve, Envelope };  // module-view drawing at cols 5-11, rows 2-4
+// Module-view drawings. FilterCurve/Envelope/Scope cover the Drawing cells; Playhead marks the
+// column of the playing step (monitor(0)) on a sequencer page.
+enum class Drawing : uint8_t { None, FilterCurve, Envelope, Scope, Playhead };
 
 class Module;
 
@@ -80,6 +82,9 @@ class Module {
     // Fills out(o) for kBlock samples. ins[i] is only valid when connected[i].
     virtual void process(const float* const* ins, const bool* connected) = 0;
     virtual const float* masterOut() const { return nullptr; }  // OUT only: +-1 full-scale block
+    // SCO: a ring of recent input samples for the module view (UI reads it unlocked; a torn frame
+    // only shows for one redraw). *n = length, *head = the oldest sample's index.
+    virtual const float* displayBuffer(int* n, int* head) const { (void)n; (void)head; return nullptr; }
 
    private:
     const ModuleTypeInfo& type_;

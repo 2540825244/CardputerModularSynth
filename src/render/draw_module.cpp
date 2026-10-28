@@ -211,6 +211,34 @@ void bitCell(const ModuleRec& m, int col, int row, CellRef c, bool selected) {
 
 // ---- live drawings ----
 
+// SCO: the trace over the Drawing cells, a 0 V line, and the tuner's note and frequency.
+void drawScope(Module* inst, int x, int y, int w, int h) {
+    const int mid = y + h / 2;
+    for (int i = 0; i < w; i += 3) cv.drawPixel(x + i, mid, PBorder);
+    if (!inst) return;
+    int n = 0, head = 0;
+    const float* buf = inst->displayBuffer(&n, &head);
+    if (!buf || n < 2) return;
+    int prev = 0;
+    for (int px = 0; px < w; px++) {
+        const float v = buf[(head + px * (n - 1) / (w - 1)) % n];
+        int yy = mid - (int)(v / 10.f * (h / 2 - 2));
+        yy = yy < y ? y : (yy > y + h - 1 ? y + h - 1 : yy);
+        if (px) cv.drawLine(x + px - 1, prev, x + px, yy, PAccent);
+        prev = yy;
+    }
+    const float hz = inst->monitor(0);
+    if (hz > 15.f && hz < 8000.f) {
+        static const char* const kN[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+        const float midi = 69.f + 12.f * log2f(hz / 440.f);
+        const int note = (int)lroundf(midi);
+        const int cents = (int)lroundf((midi - (float)note) * 100.f);
+        char lab[24];
+        snprintf(lab, sizeof lab, "%s%d %+dC  %.1fHZ", kN[((note % 12) + 12) % 12], note / 12 - 1, cents, (double)hz);
+        smallText(lab, x + w / 2, y + 2, PText);
+    }
+}
+
 void drawFilterCurve(const ModuleRec& m, Module* inst, int x, int y, int w, int h) {
     float fc = inst ? inst->monitor(0) : m.params[0];
     if (fc < 20.f) fc = m.params[0];
@@ -281,12 +309,13 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
     if (s.carry.active) drawBanner(s, p);
     else drawStrip(s, *m);
     const Drawing drawing = modulePageDrawing(t, s.modPage);
-    if (drawing != Drawing::None) {
+    if (drawing != Drawing::None && drawing != Drawing::Playhead) {
         const int x = cellX(5), y = cellY(1), w = cellX(11) + cellW(11) - x, h = cellY(3) + cellH(3) - y;
         cv.fillRect(x, y, w, h, PEmpty);
         Module* inst = e.instance(m->id);
         if (drawing == Drawing::FilterCurve) drawFilterCurve(*m, inst, x, y, w, h);
-        else drawEnvelope(*m, inst, x, y, w, h);
+        else if (drawing == Drawing::Scope) drawScope(inst, x, y, w, h);
+        else if (drawing == Drawing::Envelope) drawEnvelope(*m, inst, x, y, w, h);
     }
     for (int row = 1; row < kGridRows; row++) {
         for (int col = 0; col < kGridCols; col++) {
@@ -301,6 +330,12 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
                 default: break;
             }
         }
+    }
+    if (drawing == Drawing::Playhead) {  // the playing step's column: a bar over its cells
+        Module* inst = e.instance(m->id);
+        const int step = inst ? (int)inst->monitor(0) : -1;
+        if (step >= 0 && step < kGridCols)
+            for (int row = 1; row < kGridRows; row++) cv.fillRect(cellX(step) + 1, cellY(row), cellW(step) - 2, 2, PAccent);
     }
 }
 

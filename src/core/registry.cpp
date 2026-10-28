@@ -4,6 +4,7 @@
 #include "modules/fx.h"
 #include "modules/proc.h"
 #include "modules/src.h"
+#include "modules/mod.h"
 #include "modules/dmx.h"
 #include "modules/env.h"
 #include "modules/keys.h"
@@ -71,6 +72,19 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kSnrType,
     &kHatType,
     &kPrtType,
+    // v1.2 modulators, sequencers, utilities
+    &kAdType,
+    &kRndType,
+    &kSeqType,
+    &kTrgType,
+    &kEucType,
+    &kTurType,
+    &kChsType,
+    &kQntType,
+    &kLgcType,
+    &kBrnType,
+    &kKnbType,
+    &kScoType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {
