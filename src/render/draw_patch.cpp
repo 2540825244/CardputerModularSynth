@@ -53,20 +53,14 @@ void drawPatchView(const UiState& s, const Patch& p, Engine& e) {
                 const int n = cableDots(p, sel->id, m->id, colors, 6);
                 if (n) drawDots(col, row, colors, n);
             }
+            if (s.carry.active && (gNow / 250) % 2 == 0) {  // modules that can take the cable pulse
+                const bool fits = s.carry.fromOutput ? m->type->numIns > 0 : m->type->numOuts > 0;
+                if (fits && m->id != s.carry.id) dotted(cellX(col), cellY(row), cellW(col), cellH(row), PAccent);
+            }
             if (isSel) outline(col, row, PAccent);
             if (m->id == (uint16_t)s.moveFromId) dotted(cellX(col) + 1, cellY(row) + 1, cellW(col) - 2, cellH(row) - 2, PAccent);
         }
     }
-    Side4 sd = {};
-    sd.left[0] = Ic::File; sd.left[2] = Ic::Plus; sd.left[3] = Ic::Move;
-    sd.leftIcon[0] = sd.leftIcon[2] = sd.leftIcon[3] = true;
-    sd.right[0] = Ic::Trash; sd.right[1] = Ic::Undo; sd.right[2] = Ic::Enter; sd.right[3] = Ic::Play;
-    sd.rightIcon[0] = sd.rightIcon[1] = sd.rightIcon[2] = sd.rightIcon[3] = true;
-    char page[8];
-    snprintf(page, sizeof page, "%d/%d", s.page + 1, kPages);
-    sd.tabText = page;
-    sd.fnActive = s.carry.active;
-    drawSides(sd);
 }
 
 }  // namespace rd

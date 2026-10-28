@@ -12,6 +12,7 @@
 #include "core/modules/vcf.h"
 #include "ui/controller.h"
 #include "ui/layout.h"
+#include "ui/side_icons.h"
 
 void setUp() {}
 void tearDown() {}
@@ -1452,6 +1453,98 @@ void test_side_held_tracked() {
     TEST_ASSERT_EQUAL(f.t, f.ui.state().pressMs);
 }
 
+
+// ---- v1.2 Task 4: side icons ----
+static SideIcons icons(Fx& f) { return sideIcons(f.ui.state(), gPatch, f.ui.fnHeld()); }
+static const int kEsc = (int)Side::Esc, kTab = (int)Side::Tab, kFnS = (int)Side::Fn, kEnt = (int)Side::Enter,
+                 kBs = (int)Side::Backslash, kDel = (int)Side::Del;
+
+void test_icons_move_esc_cancel() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    TEST_ASSERT_TRUE(icons(f).icon[kEsc] == Ic::File);
+    f.side(Side::Ctrl);  // OSC is selected after placing
+    TEST_ASSERT_TRUE(f.ui.state().moveFromId >= 0);
+    SideIcons r = icons(f);
+    TEST_ASSERT_TRUE(r.icon[kEsc] == Ic::Cancel);
+    TEST_ASSERT_TRUE(r.icon[kFnS] == Ic::Copy);
+    TEST_ASSERT_TRUE(r.active[(int)Side::Ctrl]);
+    f.side(Side::Esc);
+    TEST_ASSERT_TRUE(icons(f).icon[kEsc] == Ic::File);
+}
+
+void test_icons_carry_fn_active() {
+    Fx f;
+    openModule(f, TOsc, 0, 0);
+    f.sideDown(Side::Fn);
+    f.tap(0, 3);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_TRUE(icons(f).active[kFnS]);
+    f.side(Side::Esc);
+    SideIcons r = icons(f);
+    TEST_ASSERT_TRUE(r.active[kFnS]);
+    TEST_ASSERT_TRUE(r.icon[kEsc] == Ic::Cancel);
+    f.side(Side::Esc);  // in the patch view one esc drops the cable
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+void test_icons_enter_follows_selection() {
+    Fx f;
+    TEST_ASSERT_FALSE(icons(f).shown[kEnt]);
+    f.tap(3, 2);
+    TEST_ASSERT_TRUE(icons(f).icon[kEnt] == Ic::Plus);
+    TEST_ASSERT_FALSE(icons(f).shown[kDel]);
+    openModule(f, TVcf, 0, 0);
+    f.tap(0, 1);  // CUT
+    TEST_ASSERT_TRUE(icons(f).icon[kEnt] == Ic::Tilt);
+    f.tap(2, 1);  // MOD
+    TEST_ASSERT_TRUE(icons(f).icon[kEnt] == Ic::Toggle);
+    f.tap(0, 2);  // IN
+    TEST_ASSERT_TRUE(icons(f).icon[kEnt] == Ic::Cable);
+    TEST_ASSERT_TRUE(icons(f).shown[kDel]);
+}
+
+void test_icons_tab_page_text() {
+    Fx f;
+    TEST_ASSERT_EQUAL_STRING("1/3", icons(f).tabText);
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL_STRING("2/3", icons(f).tabText);
+    f.side(Side::Tab);
+    f.side(Side::Tab);  // back to page 1, where openModule looks
+    openModule(f, TVca, 0, 0);
+    TEST_ASSERT_EQUAL_STRING("", icons(f).tabText);
+}
+
+void test_icons_fn_held_redo() {
+    Fx f;
+    TEST_ASSERT_TRUE(icons(f).icon[kBs] == Ic::Undo);
+    f.sideDown(Side::Fn);
+    TEST_ASSERT_TRUE(icons(f).icon[kBs] == Ic::Redo);
+    f.sideUp(Side::Fn);
+}
+
+void test_help_visible_after_fn_hold() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    TEST_ASSERT_FALSE(helpVisible(f.ui.state(), f.t + 100));
+    TEST_ASSERT_TRUE(helpVisible(f.ui.state(), f.t + 700));
+    f.side(Side::Tab);
+    TEST_ASSERT_FALSE(helpVisible(f.ui.state(), f.t + 700));
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_FALSE(helpVisible(f.ui.state(), f.t + 700));
+}
+
+void test_side_pressed_flash() {
+    Fx f;
+    f.sideDown(Side::Del);
+    TEST_ASSERT_TRUE(sidePressed(f.ui.state(), kDel, f.t + 500));
+    f.sideUp(Side::Del);
+    const uint32_t down = f.ui.state().sideDownMs[kDel];
+    TEST_ASSERT_TRUE(sidePressed(f.ui.state(), kDel, down + 100));
+    TEST_ASSERT_FALSE(sidePressed(f.ui.state(), kDel, down + 200));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1549,5 +1642,12 @@ int main() {
     RUN_TEST(test_chord_pins_patch);
     RUN_TEST(test_redo_fn_backslash);
     RUN_TEST(test_side_held_tracked);
+    RUN_TEST(test_icons_move_esc_cancel);
+    RUN_TEST(test_icons_carry_fn_active);
+    RUN_TEST(test_icons_enter_follows_selection);
+    RUN_TEST(test_icons_tab_page_text);
+    RUN_TEST(test_icons_fn_held_redo);
+    RUN_TEST(test_help_visible_after_fn_hold);
+    RUN_TEST(test_side_pressed_flash);
     return UNITY_END();
 }

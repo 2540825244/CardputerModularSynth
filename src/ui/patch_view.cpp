@@ -139,6 +139,9 @@ void sideKey(UiController& ui, const KeyEvent& e) {
         case Side::Esc:
             if (s.moveFromId >= 0) {
                 s.moveFromId = -1;
+            } else if (s.carry.active) {  // esc shows a cancel icon while carrying
+                s.carry.active = false;
+                ui.undoStack().breakCoalescing();
             } else {
                 s.view = View::File;
                 s.fileSaveMode = false;

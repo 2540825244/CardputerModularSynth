@@ -4,6 +4,8 @@
 #include "icons.h"
 #include "palette.h"
 #include "renderer.h"
+#include "ui/key_input.h"
+#include "ui/side_icons.h"
 
 namespace rd {
 
@@ -30,13 +32,10 @@ void outline(int col, int row, uint8_t color);
 // Key-cap labels per grid cell (row 0..3, col 0..11), nullptr-free.
 const char* keyLabel(int row, int col);
 
-struct Side4 {
-    bool leftIcon[4], rightIcon[4];
-    Ic left[4], right[4];
-    bool fnActive;
-    const char* tabText;  // drawn in the tab slot instead of an icon when non-null
-};
-void drawSides(const Side4&);
+// Both side strips from sideIcons(); held keys draw inverted (src/ui/side_icons.h).
+void drawSides(const UiState&, const Patch&, bool fnHeld);
+void drawHelp(const UiState&, const Patch&, bool fnHeld);  // fn-held overlay naming each side key
+void drawCarryStrip(const UiState&, const Patch&);          // patch view: thin "holding" banner
 void drawBars(float cpu, float ram);
 void drawToast(const char* msg);
 

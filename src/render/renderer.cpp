@@ -1,4 +1,5 @@
 #include <esp_heap_caps.h>
+#include <stdio.h>
 #include <string.h>
 #include "core/patch_io.h"
 #include "render_internal.h"
@@ -84,16 +85,69 @@ void moduleTile(const ModuleTypeInfo& t, int col, int row, bool dim, int iconDy)
     smallText(t.name, x + w / 2, y + 22, fg);
 }
 
-void drawSides(const Side4& s) {
+void drawSides(const UiState& st, const Patch& p, bool fnHeld) {
+    const SideIcons si = sideIcons(st, p, fnHeld);
     cv.fillRect(0, 0, kStripW, kH, PStrip);
     cv.fillRect(kW - kStripW, 0, kStripW, kH, PStrip);
-    for (int i = 0; i < 4; i++) {
-        const int cy = cellY(i) + cellH(i) / 2;
-        if (i == 2 && s.fnActive) cv.fillRect(0, cellY(i), kStripW, cellH(i), PAccent);
-        if (i == 1 && s.tabText) smallText(s.tabText, 8, cy - 2, PText);
-        else if (s.leftIcon[i]) drawIcon(s.left[i], 2, cy - 6, i == 2 && s.fnActive ? PBg : PText);
-        if (s.rightIcon[i]) drawIcon(s.right[i], kW - kStripW + 2, cy - 6, PText);
+    for (int i = 0; i < 8; i++) {
+        const int row = i % 4;
+        const int x = i < 4 ? 0 : kW - kStripW;
+        const int y = cellY(row), h = cellH(row), cy = y + h / 2;
+        const bool pressed = sidePressed(st, i, gNow);
+        const bool lit = si.active[i] && (!pressed || (gNow / 250) % 2 == 0);
+        uint8_t fg = si.shown[i] ? PText : PFaint;
+        if (pressed) {
+            cv.fillRoundRect(x + 1, y + 1, kStripW - 2, h - 2, 3, PText);
+            fg = PBg;
+        } else if (lit) {
+            cv.fillRect(x, y, kStripW, h, PAccent);
+            fg = PBg;
+        }
+        if (i == (int)Side::Tab && si.tabText[0]) smallText(si.tabText, x + 8, cy - 2, fg);
+        else if (si.shown[i]) drawIcon(si.icon[i], x + 2, cy - 6, fg);
     }
+}
+
+void drawHelp(const UiState& st, const Patch& p, bool fnHeld) {
+    const SideIcons si = sideIcons(st, p, fnHeld);
+    static const char* const kKeys[8] = {"ESC", "TAB", "FN", "CTRL", "DEL", "\\", "ENTER", "SPACE"};
+    cv.fillRoundRect(kGridX + 4, 4, kGridW - 8, kH - 8, 4, PBg);
+    cv.drawRoundRect(kGridX + 4, 4, kGridW - 8, kH - 8, 4, PText);
+    cv.setFont(&fonts::Font0);
+    cv.setTextColor(PText);
+    for (int i = 0; i < 8; i++) {
+        const int row = i % 4;
+        const int cy = cellY(row) + cellH(row) / 2;
+        const char* name = si.shown[i] && si.name[i] ? si.name[i] : "-";
+        if (i < 4) {
+            cv.setTextDatum(textdatum_t::middle_left);
+            cv.setTextColor(PDim);
+            cv.drawString(kKeys[i], kGridX + 10, cy);
+            cv.setTextColor(PText);
+            cv.drawString(name, kGridX + 46, cy);
+        } else {
+            cv.setTextDatum(textdatum_t::middle_right);
+            cv.setTextColor(PDim);
+            cv.drawString(kKeys[i], kGridX + kGridW - 10, cy);
+            cv.setTextColor(PText);
+            cv.drawString(name, kGridX + kGridW - 46, cy);
+        }
+    }
+    smallText("HOLD FN = HELP   FN+KEY = ALT", kGridX + kGridW / 2, kH - 14, PDim);
+}
+
+void drawCarryStrip(const UiState& st, const Patch& p) {
+    const ModuleRec* src = p.find(st.carry.id);
+    char line[40] = "HOLDING CABLE";
+    if (src) {
+        const char* pin = st.carry.fromOutput ? (st.carry.pin < src->type->numOuts ? src->type->outLabels[st.carry.pin] : "?")
+                                              : (st.carry.pin < src->type->numIns ? src->type->inLabels[st.carry.pin] : "?");
+        snprintf(line, sizeof line, "HOLDING %s.%s  FN DROPS  ESC CANCELS", src->type->name, pin);
+    }
+    cv.fillRect(kGridX, 0, kGridW, 8, PAccent);
+    const uint8_t col = PCable0 + st.carry.color % kNumCableColors;
+    if ((gNow / 250) % 2 == 0) cv.fillCircle(kGridX + 5, 4, 2, col);
+    smallText(line, kGridX + kGridW / 2 + 4, 1, PBg);
 }
 
 // Bottom-up fill, 2 px wide.
@@ -136,7 +190,7 @@ bool renderBegin() {
 
 uint32_t renderSpriteBytes() { return g_spriteBytes; }
 
-void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint32_t nowMs) {
+void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint32_t nowMs, bool fnHeld) {
     if (!g_ready) return;
     using namespace rd;
     // File-slot presence is cached: refreshed on entering the file view and when a toast appears.
@@ -157,6 +211,9 @@ void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint3
         case View::File: drawFileView(s, filled); break;
         case View::Module: drawModuleView(s, p, e); break;
     }
+    drawSides(s, p, fnHeld);
+    if (s.view == View::Patch && s.carry.active) drawCarryStrip(s, p);
+    if (helpVisible(s, nowMs)) drawHelp(s, p, fnHeld);
     const float total = (float)heap_caps_get_total_size(MALLOC_CAP_8BIT);
     drawBars(e.cpuLoad(), total > 0 ? 1.f - heap_caps_get_free_size(MALLOC_CAP_8BIT) / total : 0.f);
     if (s.toast[0] && (int32_t)(nowMs - s.toastUntilMs) < 0) drawToast(s.toast);

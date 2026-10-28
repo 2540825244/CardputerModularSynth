@@ -56,14 +56,6 @@ void drawPlaceView(const UiState& s, const Patch& p, Engine& e) {
         smallText("PLACE MODULE", kGridX + kGridW / 2, cellY(0) + 6, PDim);
         smallText("TAP A TYPE TO SEE IT, HOLD OR FN+TAP TO PLACE", kGridX + kGridW / 2, cellY(0) + 18, PDim);
     }
-    Side4 sd = {};
-    sd.left[0] = Ic::Back;
-    sd.leftIcon[0] = true;
-    if (s.placeType >= 0) {
-        sd.right[2] = Ic::Enter;
-        sd.rightIcon[2] = true;
-    }
-    drawSides(sd);
 }
 
 void drawFileView(const UiState& s, const bool filled[12]) {
@@ -89,15 +81,6 @@ void drawFileView(const UiState& s, const bool filled[12]) {
     cv.setTextSize(1);
     smallText(s.fileSaveMode ? "TAP A SLOT, ENTER TO SAVE" : "TAP A SLOT, ENTER TO LOAD", kGridX + kGridW / 2, cellY(3) - 6, PDim);
     smallText("TAB = SAVE / LOAD", kGridX + kGridW / 2, cellY(3) + 6, PDim);
-    Side4 sd = {};
-    sd.left[0] = Ic::Back;
-    sd.left[1] = Ic::Toggle;
-    sd.leftIcon[0] = sd.leftIcon[1] = true;
-    sd.right[1] = Ic::Undo;
-    sd.rightIcon[1] = true;
-    sd.right[2] = Ic::Enter;
-    sd.rightIcon[2] = s.fileSlot >= 0;
-    drawSides(sd);
 }
 
 }  // namespace rd

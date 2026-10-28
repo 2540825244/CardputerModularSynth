@@ -8,6 +8,6 @@
 // Core-0 only. renderBegin allocates the 4-bit sprite; false if it could not be created.
 bool renderBegin();
 // Full redraw into the sprite, then pushSprite. Call at <= 30 fps.
-void renderFrame(const UiState&, const Patch&, Engine&, Storage&, uint32_t nowMs);
+void renderFrame(const UiState&, const Patch&, Engine&, Storage&, uint32_t nowMs, bool fnHeld);
 // Sprite buffer bytes, for the RAM report.
 uint32_t renderSpriteBytes();

@@ -284,23 +284,6 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
             }
         }
     }
-    const Sel sel = selection(s, *m);
-    Side4 sd = {};
-    sd.left[0] = Ic::Back; sd.left[1] = Ic::Next; sd.left[2] = Ic::Cable; sd.left[3] = Ic::Minus;
-    sd.leftIcon[0] = sd.leftIcon[1] = sd.leftIcon[2] = sd.leftIcon[3] = true;
-    sd.right[0] = Ic::Trash; sd.right[1] = Ic::Undo; sd.right[2] = Ic::Toggle; sd.right[3] = Ic::Plus;
-    sd.rightIcon[0] = sd.rightIcon[1] = sd.rightIcon[3] = true;
-    // Enter = do-it on the selection: a pin carries, a stepped param toggles; hold it on a knob to tilt.
-    if (sel.c.kind == CellKind::In || sel.c.kind == CellKind::Out) sd.right[2] = Ic::Cable;
-    else if (sel.spec && sel.spec->curve == Curve::Stepped) sd.right[2] = Ic::Toggle;
-    else sd.right[2] = Ic::Tilt;
-    sd.rightIcon[2] = sel.c.kind != CellKind::Empty;
-    char page[8];
-    const int np = modulePageCount(t);
-    snprintf(page, sizeof page, "%d/%d", s.modPage + 1, np);
-    if (np > 1) sd.tabText = page;
-    sd.fnActive = s.carry.active;
-    drawSides(sd);
 }
 
 void drawKeysPlay(const UiState& s, const Patch& p) {
@@ -330,13 +313,6 @@ void drawKeysPlay(const UiState& s, const Patch& p) {
             }
         }
     }
-    Side4 sd = {};
-    sd.left[0] = Ic::Back;
-    sd.leftIcon[0] = true;
-    sd.right[1] = Ic::Undo;
-    sd.rightIcon[1] = true;
-    sd.tabText = "1/2";
-    drawSides(sd);
 }
 
 }  // namespace rd

@@ -53,7 +53,7 @@ static void uiTask(void*) {
         gUi.tick(now);
         if (now - lastDraw >= 33) {  // <= 30 fps, core 0 only
             lastDraw = now;
-            renderFrame(gUi.state(), gPatch, gEngine, gSd, now);
+            renderFrame(gUi.state(), gPatch, gEngine, gSd, now, gUi.fnHeld());
         }
         if (now - lastStatus >= 500) {
             lastStatus = now;
