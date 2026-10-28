@@ -88,6 +88,7 @@ bool keysPlayAction(UiController& ui, const Action& a) {
 bool keysSettingsAction(UiController& ui, const Action& a) {
     if (a.act == Act::Key && !a.key.grid && a.key.type == KeyEvent::Down && a.key.side == Side::Esc) {
         ui.mut().view = View::KeysPlay;
+        ui.mut().escPresses = 0;  // a page flip, not a step back: the next esc leaves (carry kept)
         return false;
     }
     return moduleViewAction(ui, a);

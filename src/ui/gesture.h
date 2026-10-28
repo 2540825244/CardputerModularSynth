@@ -21,9 +21,10 @@ struct Action {
 
 class GestureMapper {
    public:
+    // holdBlocked: a grid hold does not do-it (the patch view's ctrl+module move).
     // raw = true (Keys play view): every event becomes one Act::Key and pending Enter/activation
     // state is forgotten. Returns the number of actions written to out (<= 2).
-    int map(const KeyEvent&, bool fnHeld, bool ctrlHeld, bool raw, Action* out);
+    int map(const KeyEvent&, bool fnHeld, bool holdBlocked, bool raw, Action* out);
     // View changed: keys still held belong to the old view, so their hold/release do nothing;
     // a pending Enter is forgotten.
     void reset();

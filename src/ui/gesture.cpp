@@ -19,7 +19,7 @@ void GestureMapper::consume(const KeyEvent& e) {
     }
 }
 
-int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool ctrlHeld, bool raw, Action* out) {
+int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool holdBlocked, bool raw, Action* out) {
     const int cell = e.grid ? e.row * kGridCols + e.col : -1;
     if (e.grid && (cell < 0 || cell >= kCells)) return 0;
     if (e.grid) held_[cell] = e.type != KeyEvent::Up;
@@ -38,7 +38,7 @@ int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool ctrlHeld, bool raw, 
                 out[1] = make(Act::Activate, cell, e);
                 return 2;
             case KeyEvent::Hold:
-                if (activated_[cell] || ctrlHeld) return 0;
+                if (activated_[cell] || holdBlocked) return 0;
                 activated_[cell] = true;
                 out[0] = make(Act::Activate, cell, e);
                 return 1;

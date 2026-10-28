@@ -1120,6 +1120,70 @@ void test_place_menu_row2_tile() {
     TEST_ASSERT_TRUE(m->type == &kEnvType);
 }
 
+// ---- v1.1 review round 1 ----
+void test_carry_out_of_keys_settings() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.side(Side::Enter);
+    f.tap(11, 0);  // settings
+    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
+    f.sideDown(Side::Fn);
+    f.tap(0, 3);  // PIT out: start a carry
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    f.side(Side::Esc);  // flip to play
+    f.side(Side::Esc);  // to the patch view, still carrying
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+}
+
+void test_hold_enter_on_stepped_param_steps() {
+    Fx f;
+    const ModuleRec* m = placeAndOpen(f, TVcf);
+    f.tap(2, 1);  // MOD (LP/HP)
+    f.holdSide(Side::Enter);
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+    TEST_ASSERT_EQUAL_FLOAT(1.f, m->params[2]);
+    f.sideUp(Side::Enter);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, m->params[2]);
+}
+
+void test_file_tab_clears_slot() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.side(Side::Esc);
+    f.tap(2, 0);  // picked in LOAD mode
+    f.side(Side::Tab);  // to SAVE
+    TEST_ASSERT_EQUAL(-1, f.ui.state().fileSlot);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(0, (int)gStore.files.count("/modsynth/patches/slot03.json"));
+}
+
+void test_ctrl_hold_pin_still_carries_in_module_view() {
+    Fx f;
+    placeAndOpen(f, TOsc);
+    f.sideDown(Side::Ctrl);
+    f.hold(0, 3);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+}
+
+void test_select_during_sweep_ends_it() {
+    Fx f;
+    const ModuleRec* m = placeAndOpen(f, TVcf);
+    f.tap(0, 1);  // CUT
+    f.holdSide(Side::Enter);
+    TEST_ASSERT_TRUE(f.ui.tiltActive());
+    f.tap(1, 1);  // RES
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+    f.ui.tilt(30.f);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+    f.sideUp(Side::Enter);
+    f.tap(0, 1);
+    f.holdSide(Side::Enter);
+    f.side(Side::Tab);
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1192,5 +1256,10 @@ int main() {
     RUN_TEST(test_place_type_at_by_category);
     RUN_TEST(test_place_cell_of_inverts);
     RUN_TEST(test_place_menu_row2_tile);
+    RUN_TEST(test_carry_out_of_keys_settings);
+    RUN_TEST(test_hold_enter_on_stepped_param_steps);
+    RUN_TEST(test_file_tab_clears_slot);
+    RUN_TEST(test_ctrl_hold_pin_still_carries_in_module_view);
+    RUN_TEST(test_select_during_sweep_ends_it);
     return UNITY_END();
 }

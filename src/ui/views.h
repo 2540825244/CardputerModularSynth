@@ -14,7 +14,8 @@ bool fileViewAction(UiController&, const Action&);
 
 struct ViewDef {
     bool (*onAction)(UiController&, const Action&);
-    bool rawKeys;  // true: every key arrives as Act::Key (the Keys play view plays notes)
+    bool rawKeys;         // true: every key arrives as Act::Key (the Keys play view plays notes)
+    bool ctrlBlocksHold;  // true: ctrl held turns a grid hold's do-it off (patch view: ctrl = move)
 };
 const ViewDef& viewDef(View);
 

@@ -37,7 +37,10 @@ bool fileViewAction(UiController& ui, const Action& a) {
         case Act::Key: {
             const KeyEvent& e = a.key;
             if (e.grid || e.type != KeyEvent::Down) break;
-            if (e.side == Side::Tab) s.fileSaveMode = !s.fileSaveMode;
+            if (e.side == Side::Tab) {
+                s.fileSaveMode = !s.fileSaveMode;
+                s.fileSlot = -1;  // a slot picked to load is never saved over by one enter
+            }
             else if (e.side == Side::Esc) s.view = View::Patch;
             else if (e.side == Side::Backslash && !ui.undo()) ui.toast("NOTHING TO UNDO", ui.now());
             break;

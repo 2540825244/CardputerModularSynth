@@ -17,9 +17,9 @@ UiController::UiController(Patch& p, Engine& e, UndoStack& u, Storage& st)
 }
 
 const ViewDef& viewDef(View v) {
-    static const ViewDef kPatch{patchViewAction, false}, kModule{moduleViewAction, false},
-        kPlace{placeViewAction, false}, kFile{fileViewAction, false}, kKeysPlay{keysPlayAction, true},
-        kKeysSettings{keysSettingsAction, false};
+    static const ViewDef kPatch{patchViewAction, false, true}, kModule{moduleViewAction, false, false},
+        kPlace{placeViewAction, false, false}, kFile{fileViewAction, false, false},
+        kKeysPlay{keysPlayAction, true, false}, kKeysSettings{keysSettingsAction, false, false};
     switch (v) {
         case View::Module: return kModule;
         case View::Place: return kPlace;
@@ -61,9 +61,10 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     // stay with the old view.
     const View before = s_.view;
     Action acts[2];
-    const int n = mapper_.map(e, fnHeld(), ctrlHeld(), viewDef(before).rawKeys, acts);
+    const ViewDef& vd = viewDef(before);
+    const int n = mapper_.map(e, fnHeld(), ctrlHeld() && vd.ctrlBlocksHold, vd.rawKeys, acts);
     for (int i = 0; i < n && s_.view == before; i++)
-        if (viewDef(before).onAction(*this, acts[i])) {
+        if (vd.onAction(*this, acts[i])) {
             mapper_.consume(e);
             break;
         }

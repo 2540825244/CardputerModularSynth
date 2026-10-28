@@ -135,6 +135,7 @@ void sideKey(UiController& ui, const ModuleRec& m, const KeyEvent& e) {
             }
             break;
         case Side::Tab:
+            ui.endTilt();
             s.modCell = (int8_t)nextEditable(*m.type, s.modCell < 0 ? 0 : s.modCell);
             break;
         case Side::Del:
@@ -165,6 +166,7 @@ bool moduleViewAction(UiController& ui, const Action& a) {
     }
     switch (a.act) {
         case Act::Select:
+            if (ui.tiltActive() && a.cell >= kGridCols) ui.endTilt();  // the cursor leaves the swept param
             if (a.cell < kGridCols) {  // value strip: coarse value for the selected cell
                 const CellRef sel = selected(s, *m->type);
                 if (sel.kind == CellKind::Param || sel.kind == CellKind::Out)
@@ -175,9 +177,12 @@ bool moduleViewAction(UiController& ui, const Action& a) {
             break;
         case Act::Activate: activate(ui, *m, a.cell >= 0 ? a.cell : s.modCell); break;
         case Act::Sweep: {
+            // Only knobs sweep; a stepped param (LP/HP) steps like a tap of enter.
             const CellRef sel = selected(s, *m->type);
-            if (sel.kind == CellKind::Param) ui.beginTilt(m->id, sel.index);
-            else activate(ui, *m, s.modCell);
+            if (sel.kind == CellKind::Param && m->type->params[sel.index].curve != Curve::Stepped)
+                ui.beginTilt(m->id, sel.index);
+            else
+                activate(ui, *m, s.modCell);
             break;
         }
         case Act::SweepEnd: ui.endTilt(); break;
