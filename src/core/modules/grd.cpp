@@ -76,16 +76,21 @@ const PageDef kGrdPages[] = {
 constexpr size_t kShared = 16384;            // Plaits' engine buffer
 constexpr int kChunk = (int)plaits::kBlockSize;  // Plaits' envelopes and LPG step once per 12 samples
 
+// One heap block: the object with Plaits' 16 KB buffer right behind it (two blocks could pass
+// the largest-block check and still fail the second allocation).
 class Grd : public Module {
    public:
-    explicit Grd(char* shared) : Module(kGrdType), shared_(shared) {
+    static void* operator new(size_t sz, const std::nothrow_t& nt) noexcept { return ::operator new(sz + kShared, nt); }
+    static void operator delete(void* p) noexcept { ::operator delete(p); }
+    static void operator delete(void* p, const std::nothrow_t&) noexcept { ::operator delete(p); }
+
+    Grd() : Module(kGrdType), shared_(reinterpret_cast<char*>(this) + sizeof(Grd)) {
         stmlib::BufferAllocator a(shared_, kShared);
         voice_.Init(&a);
         lad_.Init(kSampleRate);
         env_.Init(kSampleRate);
         cutSlew_.setTimeMs(10.f, kSampleRate / 8.f);
     }
-    ~Grd() override { delete[] shared_; }
 
     void process(const float* const* ins, const bool* c) override {
         const int vca = (int)param(kVca), flt = (int)param(kFlt);
@@ -126,9 +131,13 @@ class Grd : public Module {
             lfoPh_ += lfoInc;
             if (lfoPh_ >= 1.f) lfoPh_ -= 1.f;
             const float lfo = lfoPh_ < 0.5f ? 4.f * lfoPh_ - 1.f : 3.f - 4.f * lfoPh_;
+            // Triggers seen since the last render go to the next one (<= 12 samples late; Plaits
+            // delays them 1 ms anyway), so no pulse falls between chunks or blocks.
+            if (gated && ins[kInTrig][i] > trigMax_) trigMax_ = ins[kInTrig][i];
             if (pos_ == kChunk) {  // render the next 12 samples with the CVs as they are now
                 p.timbre = clampf(timb + lfo * lTim, 0.f, 1.f);
                 render(p, ins, c, i, vca);
+                trigMax_ = 0.f;
                 pos_ = 0;
             }
             const float e = env_.Process(gate_.process(gated ? ins[kInTrig][i] : 0.f));
@@ -174,12 +183,7 @@ class Grd : public Module {
             m.level = 0.99f;
             m.level_patched = true;
         }
-        float trig = 0.f;  // a trigger anywhere in the chunk counts
-        if (c[kInTrig]) {
-            const int end = s + kChunk < kBlock ? s + kChunk : kBlock;
-            for (int i = s; i < end; i++) trig = ins[kInTrig][i] > trig ? ins[kInTrig][i] : trig;
-        }
-        m.trigger = trig * 0.2f;
+        m.trigger = trigMax_ * 0.2f;
         voice_.Render(p, m, fifo_, kChunk);
     }
 
@@ -187,6 +191,7 @@ class Grd : public Module {
     plaits::Voice voice_;
     plaits::Voice::Frame fifo_[kChunk];
     int pos_ = kChunk;  // next frame to play; kChunk = render first
+    float trigMax_ = 0.f;
     daisysp::LadderFilter lad_;
     daisysp::Adsr env_;
     GateDetector gate_;
@@ -195,15 +200,9 @@ class Grd : public Module {
     bool seeded_ = false;
 };
 
-Module* create() {
-    char* shared = new (std::nothrow) char[kShared];
-    if (!shared) return nullptr;
-    Grd* g = new (std::nothrow) Grd(shared);
-    if (!g) delete[] shared;
-    return g;
-}
+Module* create() { return new (std::nothrow) Grd(); }
 
-constexpr uint32_t kLargest = sizeof(Grd) > kShared ? sizeof(Grd) : kShared;
+constexpr uint32_t kOneBlock = sizeof(Grd) + kShared;
 
 }  // namespace
 
@@ -217,4 +216,4 @@ const ModuleTypeInfo kGrdType = {
     22, kParams, 9, kInKeys, kInLabels, 4, kOutKeys, kOutLabels,
     // cpuCycles: a guess until measured on the device (Engine learns it); the engine can change
     // live, so a lower measurement never lowers it.
-    2400, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kLargest, true};
+    2400, kOneBlock + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kOneBlock, true};

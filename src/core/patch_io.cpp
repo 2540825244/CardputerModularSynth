@@ -1,6 +1,7 @@
 #include "patch_io.h"
 #include <ArduinoJson.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include "registry.h"
@@ -87,13 +88,20 @@ std::string patchToJson(const Patch& p) {
         to.add(t->type->inKeys[c.toIn]);
         o["color"] = c.color;
     }
+    if (doc.overflowed()) return {};
+    // A failed std::string growth aborts (no exceptions): check a block of that size exists first.
+    const size_t n = measureJson(doc);
+    void* probe = malloc(n + 64);
+    if (!probe) return {};
+    free(probe);
     std::string s;
+    s.reserve(n);
     serializeJson(doc, s);
     return s;
 }
 
 LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budget) {
-    LoadReport rep{LoadError::None, 0, 0};
+    LoadReport rep{LoadError::None, 0, 0, nullptr};
     if (json.size() > kMaxPatchJson) {
         rep.error = LoadError::BadJson;
         return rep;
@@ -105,9 +113,13 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
     JsonObject fc = filter["cables"][0].to<JsonObject>();
     for (const char* k : {"from", "to", "color"}) fc[k] = true;
     JsonDocument doc;
-    if (deserializeJson(doc, json, DeserializationOption::Filter(filter),
-                        DeserializationOption::NestingLimit(6)) != DeserializationError::Ok ||
-        !doc.is<JsonObject>() ||
+    const DeserializationError de = deserializeJson(doc, json, DeserializationOption::Filter(filter),
+                                                    DeserializationOption::NestingLimit(6));
+    if (de == DeserializationError::NoMemory || filter.overflowed()) {
+        rep.error = LoadError::NoMemory;
+        return rep;
+    }
+    if (de != DeserializationError::Ok || !doc.is<JsonObject>() ||
         !doc["format"].is<int>()) {
         rep.error = LoadError::BadJson;
         return rep;
@@ -132,8 +144,12 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
             continue;
         }
         const int id = m["id"].as<int>(), page = m["page"].as<int>(), cell = m["cell"].as<int>();
+        if (budget && !budget->canAdd(scratch, *t).ok) {
+            if (!rep.skippedType) rep.skippedType = t->name;
+            rep.skippedModules++;
+            continue;
+        }
         if (id < 0 || id > kMaxStoredId || page < 0 || page >= kPages || cell < 0 || cell >= kCellsPerPage ||
-            (budget && !budget->canAdd(scratch, *t).ok) ||
             scratch.addModuleWithId(static_cast<uint16_t>(id), *t, static_cast<uint8_t>(page),
                                     static_cast<uint8_t>(cell)) != PatchError::None) {
             rep.skippedModules++;

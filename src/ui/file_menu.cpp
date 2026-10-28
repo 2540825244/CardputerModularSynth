@@ -29,7 +29,8 @@ void run(UiController& ui) {
             return;
         }
         const std::string json = patchToJson(ui.patch());  // once: ~16 KB on a tight heap
-        if (!patchFits(json)) ui.toast("PATCH TOO BIG", ui.now());
+        if (json.empty()) ui.toast("NO RAM", ui.now());
+        else if (!patchFits(json)) ui.toast("PATCH TOO BIG", ui.now());
         else if (ui.storage().write(path.c_str(), json)) ui.toast("SAVED", ui.now());
         else ui.toast("SAVE FAILED", ui.now());
     } else {

@@ -29,6 +29,12 @@ class Engine {
     // block count too.
     Refusal canAdd(const Patch&, const ModuleTypeInfo&) const;
     Refusal canAddLive(const Patch&, const ModuleTypeInfo&) const;
+    struct Live {
+        uint32_t cycles;   // measured load, cycles per sample
+        uint32_t largest;  // largest free heap block (UINT32_MAX when unknown)
+    };
+    Live live() const;  // read once per frame when checking many types (the heap walk takes a lock)
+    Refusal canAddLive(const Patch&, const ModuleTypeInfo&, const Live&) const;
     uint32_t costOf(const ModuleTypeInfo&) const;
     uint32_t measuredCost(const ModuleTypeInfo&) const;  // 0 = not run yet
     void setCycleCounter(CycleFn f) { cycles_ = f; }

@@ -31,15 +31,20 @@ Refusal Engine::canAdd(const Patch& p, const ModuleTypeInfo& t) const {
     return {true, nullptr};
 }
 
-Refusal Engine::canAddLive(const Patch& p, const ModuleTypeInfo& t) const {
+Engine::Live Engine::live() const {
+    return {(uint32_t)(cpuLoad() * (float)kCyclesPerSample), largestBlock_ ? largestBlock_() : UINT32_MAX};
+}
+
+Refusal Engine::canAddLive(const Patch& p, const ModuleTypeInfo& t) const { return canAddLive(p, t, live()); }
+
+Refusal Engine::canAddLive(const Patch& p, const ModuleTypeInfo& t, const Live& l) const {
     const Refusal r = canAdd(p, t);
     if (!r.ok) return r;
     // The costs miss the engine's own work (cables, mixing) and anything not measured yet.
-    const uint32_t live = (uint32_t)(cpuLoad() * (float)kCyclesPerSample);
-    if (live + costOf(t) > kCpuBudget) return {false, "NO CPU"};
-    // Free heap can be plenty while no single block fits (GRD wants 16 KB in one piece).
+    if (l.cycles + costOf(t) > kCpuBudget) return {false, "NO CPU"};
+    // Free heap can be plenty while no single block fits (GRD wants ~30 KB in one piece).
     const uint32_t big = t.largestAlloc ? t.largestAlloc : t.ramBytes;
-    if (largestBlock_ && largestBlock_() < big + 1024) return {false, "NO RAM"};
+    if (l.largest < big + 1024) return {false, "NO RAM"};
     return {true, nullptr};
 }
 

@@ -57,6 +57,7 @@ void drawDetails(const ModuleTypeInfo& t, const Refusal& r, uint32_t cpuUsed, ui
 }  // namespace
 
 void drawPlaceView(const UiState& s, const Patch& p, Engine& e) {
+    const Engine::Live live = e.live();  // once per frame, not per tile
     int n = 0;
     const ModuleTypeInfo* const* types = allTypes(&n);
     for (int row = 1; row < kGridRows; row++)
@@ -66,14 +67,13 @@ void drawPlaceView(const UiState& s, const Patch& p, Engine& e) {
                 emptyCell(col, row, nullptr, false);
                 continue;
             }
-            moduleTile(*types[t], col, row, !e.canAddLive(p, *types[t]).ok, 0);
+            moduleTile(*types[t], col, row, !e.canAddLive(p, *types[t], live).ok, 0);
             if (t == s.placeType) outline(col, row, PAccent);
         }
     if (s.placeType >= 0 && s.placeType < n) {
-        const uint32_t live = (uint32_t)(e.cpuLoad() * (float)kCyclesPerSample);
         const uint32_t est = e.estimatedCycles();
-        drawDetails(*types[s.placeType], e.canAddLive(p, *types[s.placeType]), est > live ? est : live,
-                    e.costOf(*types[s.placeType]));
+        drawDetails(*types[s.placeType], e.canAddLive(p, *types[s.placeType], live),
+                    est > live.cycles ? est : live.cycles, e.costOf(*types[s.placeType]));
     } else {
         static const char* const kTitles[] = {"SOURCES", "MODULATORS", "PROCESSORS", "EFFECTS", "UTILITIES"};
         cv.setFont(&fonts::Font0);

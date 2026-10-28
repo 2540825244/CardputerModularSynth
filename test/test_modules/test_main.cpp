@@ -1479,6 +1479,30 @@ void test_grd_timbre_cv_heard_at_default_amount() {  // review r2: TMA 0 used to
     TEST_ASSERT_TRUE(d / a.size() > 0.1);
 }
 
+void test_grd_short_triggers_at_block_edges() {  // review r3: pulses between chunks were lost
+    static float tr[kBlock], z[kBlock];
+    for (int at = 0; at < 12; at++) {
+        Module* m = kGrdType.create();
+        for (int i = 0; i < kGrdType.numParams; i++) m->setParam(i, kGrdType.params[i].def);
+        m->setParam(0, 13.f);  // BD: silent until triggered
+        m->setParam(11, 2.f);  // VCA DRN: only Plaits decides the level
+        const float* ins[kMaxIns] = {z, tr, z, z, z, z, z, z, z};
+        bool c[kMaxIns] = {false, true};
+        double sum = 0;
+        for (int b = 0; b < 60; b++) {
+            constBlock(tr, 0.f);
+            if (b == 7) tr[at] = tr[at + 1] = 5.f;  // a 2-sample pulse
+            m->process(ins, c);
+            if (b > 7)
+                for (int k = 0; k < kBlock; k++) sum += fabs(m->out(0)[k]);
+        }
+        char msg[24];
+        snprintf(msg, sizeof msg, "pulse at %d", at);
+        TEST_ASSERT_TRUE_MESSAGE(sum > 10.0, msg);
+        delete m;
+    }
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -1560,6 +1584,7 @@ int main() {
     RUN_TEST(test_sco_tuner);
     RUN_TEST(test_grd_every_engine_makes_sound);
     RUN_TEST(test_grd_voice_env_and_filter);
+    RUN_TEST(test_grd_short_triggers_at_block_edges);
     RUN_TEST(test_grd_timbre_cv_heard_at_default_amount);
     RUN_TEST(test_grd_pitch_tracks);
     return UNITY_END();

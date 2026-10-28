@@ -115,7 +115,7 @@ void sideKey(UiController& ui, const KeyEvent& e) {
     const bool down = e.type == KeyEvent::Down;
     if (e.side == Side::Space) {
         // The release is handled by UiController::handle, whatever view is active by then.
-        if (down)
+        if (down && s.latchedBit < 0)  // a latched drone keeps playing: no audition over it
             if (KeysModule* k = ui.keysInstance()) {
                 k->noteOn(ui.lastNote);
                 ui.auditioning = true;

@@ -24,22 +24,19 @@ void setParam(UiController& ui, const ModuleRec& m, uint8_t idx, float v) {
     ui.engine().setParam(m.id, idx, v);
 }
 
-// The latched note's grid bit, or -1.
-int gLatchedBit = -1;
-
 }  // namespace
 
 void keysAllNotesOff(UiController& ui) {
     ui.notes.clear();
     ui.mut().keysHeld = 0;
-    gLatchedBit = -1;
+    ui.mut().latchedBit = -1;
     if (KeysModule* k = static_cast<KeysModule*>(ui.engine().instance(ui.mut().openId))) k->gateOff();
 }
 
 void keysLeavePage(UiController& ui) {
     // A latched note is a drone to tweak other modules over: it keeps sounding. Only the same
     // key, DEL (panic), a layout change or LATCH OFF release it.
-    if (gLatchedBit < 0) keysAllNotesOff(ui);
+    if (ui.state().latchedBit < 0) keysAllNotesOff(ui);
 }
 
 int keysNoteFor(const ModuleRec& m, int row, int col) {
@@ -64,11 +61,11 @@ void playKey(UiController& ui, const KeyEvent& e) {
         const bool latch = m->params[kLatchParam] >= 0.5f;
         if (latch) {  // a tap holds its note until another key (moves it) or the same key (stops)
             if (e.type != KeyEvent::Down) return;
-            if (gLatchedBit == bit) {
+            if (s.latchedBit == bit) {
                 keysAllNotesOff(ui);
                 return;
             }
-            gLatchedBit = bit;
+            s.latchedBit = (int8_t)bit;
             s.keysHeld = 1ull << bit;
             ui.lastNote = note;
             k->noteOn(note);

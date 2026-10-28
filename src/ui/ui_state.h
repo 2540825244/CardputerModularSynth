@@ -39,6 +39,7 @@ struct UiState {
     bool dirty;
     uint32_t lastEditMs;
     uint64_t keysHeld;  // KEYS play page: bit (3-row)*12+col per held note key
+    int8_t latchedBit = -1;  // KEYS latch: the held note's grid bit, -1 = none
     // Key feedback for the renderer.
     uint8_t sideHeld;          // bit (int)Side per side key held now
     uint32_t sideDownMs[8];    // last Down of each side key

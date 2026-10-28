@@ -1853,6 +1853,17 @@ void test_new_patch_keeps_ids_fresh() {
     TEST_ASSERT_TRUE(gPatch.findAt(0, 13)->id > old);  // never an id an undo could restore
 }
 
+void test_latch_cleared_by_new_patch() {  // review r3: a stale latch bit ate the next tap
+    Fx f;
+    openKeysPlay(f);
+    f.side(Side::Backslash);
+    f.tap(0, 3);
+    TEST_ASSERT_TRUE(f.ui.state().latchedBit >= 0);
+    f.side(Side::Esc);
+    f.ui.newPatch();
+    TEST_ASSERT_EQUAL(-1, f.ui.state().latchedBit);
+}
+
 // ---- v1.2 review round 1 ----
 void test_rollover_is_not_a_chord() {
     Fx f;
@@ -2034,6 +2045,7 @@ int main() {
     RUN_TEST(test_ctrl_space_octave);
     RUN_TEST(test_latch_holds);
     RUN_TEST(test_new_patch_keeps_ids_fresh);
+    RUN_TEST(test_latch_cleared_by_new_patch);
     RUN_TEST(test_rollover_is_not_a_chord);
     RUN_TEST(test_chord_pins_refused_leaves_no_carry);
     RUN_TEST(test_play_page_ignores_unseen_release);

@@ -125,12 +125,27 @@ void UiController::validate() {
         s_.keysHeld = 0;
     }
     if (s_.moveFromId >= 0 && !patch_.find((uint16_t)s_.moveFromId)) s_.moveFromId = -1;
+    if (s_.latchedBit >= 0 && !keysInstance()) {  // KEYS deleted, or undone away
+        s_.latchedBit = -1;
+        s_.keysHeld = 0;
+    }
 }
 
 void UiController::tick(uint32_t nowMs) {
     if (s_.toast[0] && (int32_t)(nowMs - s_.toastUntilMs) >= 0) s_.toast[0] = 0;
     now_ = nowMs;
     engine_.collect();
+    // Measured load near the deadline (GRD switched to a heavy engine after it was placed): say so
+    // once per episode.
+    if (engine_.cpuLoad() < 0.95f) {
+        cpuFullSinceMs_ = 0;
+        cpuFullWarned_ = false;
+    } else if (!cpuFullSinceMs_) {
+        cpuFullSinceMs_ = nowMs | 1u;
+    } else if (!cpuFullWarned_ && nowMs - cpuFullSinceMs_ >= 500) {
+        toast("CPU FULL", nowMs);
+        cpuFullWarned_ = true;
+    }
     // A module in the patch that could not be created (no heap block) makes no sound: say so.
     // 300 ms first: a DLY swap is missing until the audio thread lets go of the old one.
     if (engine_.missing() == 0) {
@@ -146,6 +161,12 @@ void UiController::tick(uint32_t nowMs) {
     if (!s_.dirty || (int32_t)(nowMs - s_.lastEditMs) < 2000) return;
     if (autosaveBackoff_ && (int32_t)(nowMs - autosaveRetryMs_) < 0) return;
     const std::string json = patchToJson(patch_);
+    if (json.empty()) {  // out of heap: keep dirty, try again later
+        if (!autosaveWarned_) toast("NO RAM", nowMs);
+        autosaveWarned_ = autosaveBackoff_ = true;
+        autosaveRetryMs_ = nowMs + 5000;
+        return;
+    }
     if (!patchFits(json)) {  // never write a file the loader would refuse
         if (!autosaveWarned_) toast("PATCH TOO BIG", nowMs);
         autosaveWarned_ = autosaveBackoff_ = true;
@@ -180,7 +201,9 @@ bool UiController::loadJson(const std::string& text, bool keepUndo, char* msg, s
     std::unique_ptr<Patch> loaded(new Patch());  // too big for the stack
     const LoadReport r = patchFromJson(text, *loaded, &engine_);
     if (r.error != LoadError::None) {
-        snprintf(msg, msgSize, r.error == LoadError::NewerFormat ? "NEWER FW" : "BAD FILE");
+        snprintf(msg, msgSize, r.error == LoadError::NewerFormat ? "NEWER FW"
+                               : r.error == LoadError::NoMemory  ? "NO RAM"
+                                                                 : "BAD FILE");
         return false;
     }
     if (keepUndo) undo_.push(patch_, 0);
@@ -196,6 +219,7 @@ bool UiController::loadJson(const std::string& text, bool keepUndo, char* msg, s
     s_.modPage = 0;
     notes.clear();
     s_.keysHeld = 0;
+    s_.latchedBit = -1;
     if (keepUndo) {
         s_.dirty = true;
         s_.lastEditMs = now_;
@@ -203,7 +227,10 @@ bool UiController::loadJson(const std::string& text, bool keepUndo, char* msg, s
         s_.dirty = false;
     }
     validate();
-    if (r.skippedModules > 0) snprintf(msg, msgSize, "SKIPPED %d", r.skippedModules);
+    // Budget skips name the type: a slot that loaded at boot can skip a module once its measured
+    // cost is known.
+    if (r.skippedModules > 0 && r.skippedType) snprintf(msg, msgSize, "SKIPPED %d %s", r.skippedModules, r.skippedType);
+    else if (r.skippedModules > 0) snprintf(msg, msgSize, "SKIPPED %d", r.skippedModules);
     else snprintf(msg, msgSize, "LOADED");
     return true;
 }
@@ -329,6 +356,7 @@ bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceK
     undo_.push(patch_, coalesceKey);
     fn(patch_, ctx);
     engine_.apply(patch_);
+    validate();  // the edit may have removed what the UI points at (KEYS with a latched note)
     s_.dirty = true;
     s_.lastEditMs = now_;
     if (coalesceKey) coalescedEdit_ = true;

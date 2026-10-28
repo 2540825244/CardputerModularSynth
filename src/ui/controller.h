@@ -89,7 +89,7 @@ class UiController {
     uint32_t tiltGen_ = 0;
     uint32_t now_ = 0;
     bool autosaveBackoff_ = false, autosaveWarned_ = false;
-    bool missingWarned_ = false;
-    uint32_t missingSinceMs_ = 0;
+    bool missingWarned_ = false, cpuFullWarned_ = false;
+    uint32_t missingSinceMs_ = 0, cpuFullSinceMs_ = 0;
     uint32_t autosaveRetryMs_ = 0;
 };

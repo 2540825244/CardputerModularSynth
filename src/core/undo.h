@@ -22,6 +22,7 @@ class UndoStack {
 };
 
 // kind: 0 param, 1 output amount, 2 input amount
+static_assert(kMaxParams <= 32 && kMaxIns <= 32, "paramKey packs idx into 5 bits");
 inline uint32_t paramKey(uint16_t id, uint8_t idx, uint8_t kind) {
     return (uint32_t(id) << 7 | uint32_t(idx) << 2 | uint32_t(kind)) + 1;
 }
