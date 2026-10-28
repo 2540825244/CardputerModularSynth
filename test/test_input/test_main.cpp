@@ -1,4 +1,5 @@
 #include <unity.h>
+#include "ui/gesture.h"
 #include "ui/key_input.h"
 
 void setUp() {}
@@ -84,6 +85,117 @@ void test_chord_events() {
     TEST_ASSERT_TRUE(grid);
 }
 
+// ---- gesture mapper ----
+static Action A[2];
+static KeyEvent G(KeyEvent::Type t, int c, int r) {
+    KeyEvent e{};
+    e.type = t;
+    e.grid = true;
+    e.col = (uint8_t)c;
+    e.row = (uint8_t)r;
+    return e;
+}
+static KeyEvent S(KeyEvent::Type t, Side s) {
+    KeyEvent e{};
+    e.type = t;
+    e.side = s;
+    return e;
+}
+
+void test_tap_selects_only() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Down, 2, 1), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Select, A[0].act);
+    TEST_ASSERT_EQUAL(14, A[0].cell);
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Up, 2, 1), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Key, A[0].act);
+    TEST_ASSERT_EQUAL(KeyEvent::Up, A[0].key.type);
+}
+
+void test_fn_tap_selects_and_activates() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(2, g.map(G(KeyEvent::Down, 2, 1), true, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Select, A[0].act);
+    TEST_ASSERT_EQUAL(14, A[0].cell);
+    TEST_ASSERT_EQUAL(Act::Activate, A[1].act);
+    TEST_ASSERT_EQUAL(14, A[1].cell);
+}
+
+void test_hold_activates() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Down, 0, 3), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Select, A[0].act);
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Hold, 0, 3), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Activate, A[0].act);
+    TEST_ASSERT_EQUAL(36, A[0].cell);
+}
+
+void test_fn_down_then_hold_activates_once() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(2, g.map(G(KeyEvent::Down, 5, 2), true, false, false, A));
+    TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 5, 2), true, false, false, A));
+    g.map(G(KeyEvent::Up, 5, 2), false, false, false, A);
+    // the next press of the same key is a fresh gesture
+    g.map(G(KeyEvent::Down, 5, 2), false, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Hold, 5, 2), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Activate, A[0].act);
+}
+
+void test_ctrl_hold_does_not_activate() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Down, 1, 1), false, true, false, A));
+    TEST_ASSERT_EQUAL(Act::Select, A[0].act);
+    TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 1, 1), false, true, false, A));
+}
+
+void test_enter_tap_activates_selection() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(0, g.map(S(KeyEvent::Down, Side::Enter), false, false, false, A));
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Enter), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Activate, A[0].act);
+    TEST_ASSERT_EQUAL(-1, A[0].cell);
+}
+
+void test_enter_hold_sweeps() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(0, g.map(S(KeyEvent::Down, Side::Enter), false, false, false, A));
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Hold, Side::Enter), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Sweep, A[0].act);
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Enter), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::SweepEnd, A[0].act);
+    // a later tap is a plain activate again
+    g.map(S(KeyEvent::Down, Side::Enter), false, false, false, A);
+    g.map(S(KeyEvent::Up, Side::Enter), false, false, false, A);
+    TEST_ASSERT_EQUAL(Act::Activate, A[0].act);
+}
+
+void test_raw_mode_passes_everything() {
+    GestureMapper g;
+    const KeyEvent evs[] = {G(KeyEvent::Down, 3, 2), G(KeyEvent::Hold, 3, 2), G(KeyEvent::Up, 3, 2),
+                            S(KeyEvent::Down, Side::Enter), S(KeyEvent::Up, Side::Enter)};
+    for (const KeyEvent& e : evs) {
+        TEST_ASSERT_EQUAL(1, g.map(e, true, false, true, A));
+        TEST_ASSERT_EQUAL(Act::Key, A[0].act);
+        TEST_ASSERT_EQUAL(e.type, A[0].key.type);
+    }
+}
+
+void test_side_keys_pass_through() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Down, Side::Tab), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Key, A[0].act);
+    TEST_ASSERT_EQUAL(Side::Tab, A[0].key.side);
+    TEST_ASSERT_EQUAL(-1, A[0].cell);
+}
+
+void test_reset_forgets_enter() {
+    GestureMapper g;
+    g.map(S(KeyEvent::Down, Side::Enter), false, false, false, A);
+    g.reset();
+    // an Enter release whose press belonged to another view does nothing
+    TEST_ASSERT_EQUAL(0, g.map(S(KeyEvent::Up, Side::Enter), false, false, false, A));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_mapping);
@@ -91,5 +203,15 @@ int main() {
     RUN_TEST(test_hold_once);
     RUN_TEST(test_chord);
     RUN_TEST(test_chord_events);
+    RUN_TEST(test_tap_selects_only);
+    RUN_TEST(test_fn_tap_selects_and_activates);
+    RUN_TEST(test_hold_activates);
+    RUN_TEST(test_fn_down_then_hold_activates_once);
+    RUN_TEST(test_ctrl_hold_does_not_activate);
+    RUN_TEST(test_enter_tap_activates_selection);
+    RUN_TEST(test_enter_hold_sweeps);
+    RUN_TEST(test_raw_mode_passes_everything);
+    RUN_TEST(test_side_keys_pass_through);
+    RUN_TEST(test_reset_forgets_enter);
     return UNITY_END();
 }
