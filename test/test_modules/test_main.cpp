@@ -13,6 +13,8 @@
 #include "core/modules/dly.h"
 #include "core/modules/mix.h"
 #include "core/modules/atn.h"
+#include "core/modules/clk.h"
+#include "core/modules/snh.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -47,6 +49,8 @@ void test_registry() {
     TEST_ASSERT_NULL(findType("nope"));
     TEST_ASSERT_TRUE(findType("mix") == &kMixType);
     TEST_ASSERT_TRUE(findType("atn") == &kAtnType);
+    TEST_ASSERT_TRUE(findType("snh") == &kSnhType);
+    TEST_ASSERT_TRUE(findType("clk") == &kClkType);
     int n = 0;
     const ModuleTypeInfo* const* t = allTypes(&n);
     TEST_ASSERT_TRUE(n >= 2);
@@ -520,6 +524,135 @@ void test_atn_no_input_is_dc() {
     delete m;
 }
 
+void test_snh_holds_on_trigger() {
+    Module* m = kSnhType.create();
+    float in[kBlock], trig[kBlock];
+    const float* ins[2] = {in, trig};
+    const bool conn[2] = {true, true};
+    for (int b = 0; b < 7; b++) {
+        constBlock(in, (float)b);
+        constBlock(trig, b >= 3 ? 5.f : 0.f);
+        m->process(ins, conn);
+        if (b >= 3) TEST_ASSERT_FLOAT_WITHIN(1e-4f, 3.f, m->out(0)[kBlock - 1]);
+    }
+    delete m;
+}
+
+void test_snh_random_without_input() {
+    Module* m = kSnhType.create();
+    float trig[kBlock];
+    const float* ins[2] = {nullptr, trig};
+    const bool conn[2] = {false, true};
+    float v[4];
+    for (int k = 0; k < 4; k++) {
+        constBlock(trig, 0.f);
+        m->process(ins, conn);
+        constBlock(trig, 5.f);
+        m->process(ins, conn);
+        v[k] = m->out(0)[kBlock - 1];
+        TEST_ASSERT_TRUE(v[k] >= -5.f && v[k] <= 5.f);
+    }
+    TEST_ASSERT_FALSE(v[0] == v[1] && v[1] == v[2] && v[2] == v[3]);
+    delete m;
+}
+
+void test_snh_slew() {
+    Module* m = kSnhType.create();
+    m->setParam(0, 100.f);  // SLW ms
+    float in[kBlock], trig[kBlock];
+    constBlock(in, 5.f);
+    constBlock(trig, 5.f);
+    const float* ins[2] = {in, trig};
+    const bool conn[2] = {true, true};
+    m->process(ins, conn);
+    m->process(ins, conn);  // ~1.3 ms after the hold
+    const float y = m->out(0)[kBlock - 1];
+    TEST_ASSERT_TRUE(y > 0.f && y < 5.f);
+    delete m;
+}
+
+void test_snh_holds_without_trigger() {
+    Module* m = kSnhType.create();
+    float in[kBlock];
+    constBlock(in, 4.f);
+    const float* ins[2] = {in, nullptr};
+    const bool conn[2] = {true, false};
+    TEST_ASSERT_EQUAL_FLOAT(0.f, settle(*m, ins, conn));
+    delete m;
+}
+
+// Sample indices where out(o) rises above 2.5 V.
+static std::vector<long> rises(Module& m, const float* const* ins, const bool* conn, int o, int nBlocks) {
+    std::vector<long> r;
+    float prev = 0.f;
+    for (int b = 0; b < nBlocks; b++) {
+        m.process(ins, conn);
+        for (int i = 0; i < kBlock; i++) {
+            const float v = m.out(o)[i];
+            if (prev < 2.5f && v >= 2.5f) r.push_back((long)b * kBlock + i);
+            prev = v;
+        }
+    }
+    return r;
+}
+
+void test_clk_120bpm_period() {
+    Module* m = kClkType.create();
+    const float* ins[2] = {nullptr, nullptr};
+    const bool conn[2] = {false, false};
+    const std::vector<long> r = rises(*m, ins, conn, 0, 24000 * 4 / kBlock);
+    TEST_ASSERT_TRUE(r.size() >= 4);
+    TEST_ASSERT_EQUAL(0, r[0]);  // starts high
+    for (size_t i = 1; i < r.size(); i++) TEST_ASSERT_INT_WITHIN(1, 24000, r[i] - r[i - 1]);
+    delete m;
+}
+
+void test_clk_div3() {
+    Module* m = kClkType.create();
+    m->setParam(0, 300.f);  // BPM: 9600 samples per beat
+    m->setParam(1, 2.f);    // DIV /3
+    const float* ins[2] = {nullptr, nullptr};
+    const bool conn[2] = {false, false};
+    Module* ref = kClkType.create();
+    ref->setParam(0, 300.f);
+    const std::vector<long> base = rises(*ref, ins, conn, 0, 9600 * 9 / kBlock);
+    const std::vector<long> div = rises(*m, ins, conn, 1, 9600 * 9 / kBlock);
+    TEST_ASSERT_EQUAL(9, (int)base.size());
+    TEST_ASSERT_EQUAL(3, (int)div.size());
+    for (size_t i = 0; i < div.size(); i++) TEST_ASSERT_EQUAL(base[i * 3], div[i]);
+    delete m;
+    delete ref;
+}
+
+void test_clk_external_clock() {
+    Module* m = kClkType.create();
+    float clk[kBlock];
+    const float* ins[2] = {clk, nullptr};
+    const bool conn[2] = {true, false};
+    for (int b = 0; b < 12; b++) {
+        const bool high = (b / 2) % 2 == 1;
+        constBlock(clk, high ? 5.f : 0.f);
+        m->process(ins, conn);
+        for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(high ? 5.f : 0.f, m->out(0)[i]);
+    }
+    delete m;
+}
+
+void test_clk_reset() {
+    Module* m = kClkType.create();  // 120 BPM: low from sample 12000 to 24000
+    float rst[kBlock];
+    const float* ins[2] = {nullptr, rst};
+    const bool conn[2] = {false, true};
+    constBlock(rst, 0.f);
+    for (int b = 0; b < 16000 / kBlock; b++) m->process(ins, conn);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, m->out(0)[kBlock - 1]);
+    constBlock(rst, 5.f);
+    m->process(ins, conn);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, m->out(0)[0]);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, m->out(1)[0]);  // the divider restarts too
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -549,5 +682,13 @@ int main() {
     RUN_TEST(test_mix_unconnected_silent);
     RUN_TEST(test_atn_inverts_and_offsets);
     RUN_TEST(test_atn_no_input_is_dc);
+    RUN_TEST(test_snh_holds_on_trigger);
+    RUN_TEST(test_snh_random_without_input);
+    RUN_TEST(test_snh_slew);
+    RUN_TEST(test_snh_holds_without_trigger);
+    RUN_TEST(test_clk_120bpm_period);
+    RUN_TEST(test_clk_div3);
+    RUN_TEST(test_clk_external_clock);
+    RUN_TEST(test_clk_reset);
     return UNITY_END();
 }

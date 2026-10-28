@@ -28,6 +28,8 @@ void drawIcon(Icon ic, int x, int y, uint8_t color) {
         case Icon::Out: i = Ic::Out; break;
         case Icon::Mix: i = Ic::Mix; break;
         case Icon::Atn: i = Ic::Atn; break;
+        case Icon::Snh: i = Ic::Snh; break;
+        case Icon::Clk: i = Ic::Clk; break;
         default: break;
     }
     drawIcon(i, x, y, color);

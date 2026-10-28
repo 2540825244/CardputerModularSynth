@@ -4,9 +4,11 @@
 #include "modules/env.h"
 #include "modules/keys.h"
 #include "modules/atn.h"
+#include "modules/clk.h"
 #include "modules/lfo.h"
 #include "modules/mix.h"
 #include "modules/out.h"
+#include "modules/snh.h"
 #include "modules/osc.h"
 #include "modules/vca.h"
 #include "modules/vcf.h"
@@ -23,6 +25,8 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kOutType,
     &kMixType,
     &kAtnType,
+    &kSnhType,
+    &kClkType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {
