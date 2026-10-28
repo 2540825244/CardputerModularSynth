@@ -3,7 +3,9 @@
 #include "modules/dly.h"
 #include "modules/env.h"
 #include "modules/keys.h"
+#include "modules/atn.h"
 #include "modules/lfo.h"
+#include "modules/mix.h"
 #include "modules/out.h"
 #include "modules/osc.h"
 #include "modules/vca.h"
@@ -19,6 +21,8 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kLfoType,
     &kDlyType,
     &kOutType,
+    &kMixType,
+    &kAtnType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {

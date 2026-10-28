@@ -5,7 +5,7 @@
 #include "units.h"
 
 enum class Category : uint8_t { Source, Modulator, Processor };  // bar colour; IO counts as Processor
-enum class Icon : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out };
+enum class Icon : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, Mix, Atn, Snh, Clk, Mux, Dmx, Tilt };
 enum class Drawing : uint8_t { None, FilterCurve, Envelope };  // module-view drawing at cols 5-11, rows 2-4
 
 class Module;

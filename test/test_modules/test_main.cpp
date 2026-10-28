@@ -11,6 +11,8 @@
 #include "core/modules/keys.h"
 #include "core/modules/out.h"
 #include "core/modules/dly.h"
+#include "core/modules/mix.h"
+#include "core/modules/atn.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -43,6 +45,8 @@ void test_registry() {
     TEST_ASSERT_TRUE(findType("osc") == &kOscType);
     TEST_ASSERT_TRUE(findType("vca") == &kVcaType);
     TEST_ASSERT_NULL(findType("nope"));
+    TEST_ASSERT_TRUE(findType("mix") == &kMixType);
+    TEST_ASSERT_TRUE(findType("atn") == &kAtnType);
     int n = 0;
     const ModuleTypeInfo* const* t = allTypes(&n);
     TEST_ASSERT_TRUE(n >= 2);
@@ -469,6 +473,53 @@ void test_dly_mix_smoothed() {
     delete m;
 }
 
+// ---- v1.1 utilities ----
+static float settle(Module& m, const float* const* ins, const bool* conn, int nBlocks = 40) {
+    for (int b = 0; b < nBlocks; b++) m.process(ins, conn);
+    return m.out(0)[kBlock - 1];
+}
+
+void test_mix_sums_levels() {
+    Module* m = kMixType.create();
+    float a[kBlock], c[kBlock];
+    constBlock(a, 1.f);
+    constBlock(c, 2.f);
+    m->setParam(2, 0.5f);  // L3
+    const float* ins[4] = {a, nullptr, c, nullptr};
+    const bool conn[4] = {true, false, true, false};
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 2.f, settle(*m, ins, conn));
+    delete m;
+}
+
+void test_mix_unconnected_silent() {
+    Module* m = kMixType.create();
+    const float* ins[4] = {nullptr, nullptr, nullptr, nullptr};
+    const bool conn[4] = {false, false, false, false};
+    TEST_ASSERT_EQUAL_FLOAT(0.f, settle(*m, ins, conn));
+    delete m;
+}
+
+void test_atn_inverts_and_offsets() {
+    Module* m = kAtnType.create();
+    float a[kBlock];
+    constBlock(a, 2.f);
+    m->setParam(0, -0.5f);  // AMT
+    m->setParam(1, 1.f);    // OFS
+    const float* ins[1] = {a};
+    const bool conn[1] = {true};
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.f, settle(*m, ins, conn));
+    delete m;
+}
+
+void test_atn_no_input_is_dc() {
+    Module* m = kAtnType.create();
+    m->setParam(1, -3.f);
+    const float* ins[1] = {nullptr};
+    const bool conn[1] = {false};
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, -3.f, settle(*m, ins, conn));
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -494,5 +545,9 @@ int main() {
     RUN_TEST(test_dly_feedback_bounded);
     RUN_TEST(test_dly_tail_decays_to_zero);
     RUN_TEST(test_dly_mix_smoothed);
+    RUN_TEST(test_mix_sums_levels);
+    RUN_TEST(test_mix_unconnected_silent);
+    RUN_TEST(test_atn_inverts_and_offsets);
+    RUN_TEST(test_atn_no_input_is_dc);
     return UNITY_END();
 }

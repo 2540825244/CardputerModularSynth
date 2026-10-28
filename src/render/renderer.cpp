@@ -26,6 +26,9 @@ void drawIcon(Icon ic, int x, int y, uint8_t color) {
         case Icon::Lfo: i = Ic::Lfo; break;
         case Icon::Dly: i = Ic::Dly; break;
         case Icon::Out: i = Ic::Out; break;
+        case Icon::Mix: i = Ic::Mix; break;
+        case Icon::Atn: i = Ic::Atn; break;
+        default: break;
     }
     drawIcon(i, x, y, color);
 }

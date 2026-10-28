@@ -65,6 +65,17 @@ void test_format() {
     TEST_ASSERT_EQUAL_STRING("SAW", b);
 }
 
+void test_format_volts() {
+    const ParamSpec ofs = {"ofs", "OFS", -5.f, 5.f, 0.f, Curve::Lin, Unit::Volts, nullptr};
+    char b[16];
+    paramFormat(ofs, 2.5f, b, sizeof b, true);
+    TEST_ASSERT_EQUAL_STRING("+2.50V", b);
+    paramFormat(ofs, 2.5f, b, sizeof b, false);
+    TEST_ASSERT_EQUAL_STRING("+2.5", b);
+    paramFormat(ofs, -0.f, b, sizeof b, true);
+    TEST_ASSERT_EQUAL_STRING("+0.00V", b);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_log_roundtrip);
@@ -73,5 +84,6 @@ int main() {
     RUN_TEST(test_fine_steps);
     RUN_TEST(test_clamp_out_of_range);
     RUN_TEST(test_format);
+    RUN_TEST(test_format_volts);
     return UNITY_END();
 }

@@ -79,6 +79,7 @@ void paramFormat(const ParamSpec& s, float v, char* out, int len, bool longForm)
             snprintf(out, len, "%s", s.enumNames ? s.enumNames[i] : "?");
             break;
         }
+        case Unit::Volts: snprintf(out, len, longForm ? "%+.2fV" : "%+.1f", (double)(v + 0.f)); break;
         default: snprintf(out, len, "%.2f", (double)v); break;
     }
 }
