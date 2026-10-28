@@ -18,7 +18,11 @@ Engine::~Engine() {
 
 Refusal Engine::canAdd(const Patch& p, const ModuleTypeInfo& t) const {
     const int have = p.countOfType(t);
-    if (&t == &kDlyType && have >= kDelaySlots) return {false, "NO DELAY"};
+    if (t.poolSlots) {
+        int used = 0;
+        for (int i = 0; i < p.moduleCount(); i++) used += p.moduleAt(i).type->poolSlots;
+        if (used + t.poolSlots > kDelaySlots) return {false, "NO BUFFER"};
+    }
     if (t.maxInstances && have >= t.maxInstances) return {false, "MAX 1"};
     uint32_t cycles = t.cpuCycles;
     for (int i = 0; i < p.moduleCount(); i++) cycles += p.moduleAt(i).type->cpuCycles;

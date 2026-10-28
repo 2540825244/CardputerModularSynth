@@ -1,6 +1,7 @@
 #include "registry.h"
 #include <cstring>
 #include "modules/dly.h"
+#include "modules/fx.h"
 #include "modules/dmx.h"
 #include "modules/env.h"
 #include "modules/keys.h"
@@ -33,6 +34,13 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kMuxType,
     &kDmxType,
     &kTiltType,
+    // v1.2 effects
+    &kRevType,
+    &kChoType,
+    &kFlgType,
+    &kPhaType,
+    &kTrmType,
+    &kPshType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {

@@ -46,7 +46,9 @@ void drawIcon(Icon ic, int x, int y, uint8_t color) {
         case Icon::Mux: i = Ic::Mux; break;
         case Icon::Dmx: i = Ic::Dmx; break;
         case Icon::Tilt: i = Ic::Tilt; break;
-        default: break;
+        default:  // v1.2 icons: Icon::Rev.. and Ic::MRev.. are in the same order
+            if ((int)ic >= (int)Icon::Rev) i = (Ic)((int)Ic::MRev + ((int)ic - (int)Icon::Rev));
+            break;
     }
     drawIcon(i, x, y, color);
 }

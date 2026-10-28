@@ -5,7 +5,7 @@
 #include "units.h"
 
 enum class Category : uint8_t { Source, Modulator, Processor, Effect, Utility };  // place-menu page, bar colour
-enum class Icon : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, Mix, Atn, Snh, Clk, Mux, Dmx, Tilt };
+enum class Icon : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, Mix, Atn, Snh, Clk, Mux, Dmx, Tilt, Rev, Fx, Psh, Fold, Drive, Crush, Ring, Noise, Drum, Hat, String, Bell, Seq, Steps, Euclid, Quant, Logic, Dice, Chaos, Knob, Scope, Grind, Slew, Lpg, Fm, Saw };
 enum class Drawing : uint8_t { None, FilterCurve, Envelope };  // module-view drawing at cols 5-11, rows 2-4
 
 class Module;
@@ -54,6 +54,7 @@ struct ModuleTypeInfo {
     Module* (*create)();    // UI thread; nullptr result = resource unavailable
     const PageDef* pages = nullptr;  // nullptr: automatic pages (see src/ui/layout.h)
     uint8_t numPages = 0;
+    uint8_t poolSlots = 0;  // big buffers taken from delay_pool (DLY, REV): canAdd refuses past the pool
 };
 
 class Module {

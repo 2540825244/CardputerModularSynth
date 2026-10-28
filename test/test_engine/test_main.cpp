@@ -236,7 +236,7 @@ void test_budget() {
     add(p, kDlyType, 3);
     r = eng.canAdd(p, kDlyType);
     TEST_ASSERT_FALSE(r.ok);
-    TEST_ASSERT_EQUAL_STRING("NO DELAY", r.reason);
+    TEST_ASSERT_EQUAL_STRING("NO BUFFER", r.reason);
 
     // CPU: fill with expensive test modules
     Patch q;

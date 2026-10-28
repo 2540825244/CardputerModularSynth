@@ -9,7 +9,7 @@
 using HeapFreeFn = uint32_t (*)();
 struct Refusal {
     bool ok;
-    const char* reason;  // "NO CPU", "NO RAM", "NO DELAY", "MAX 1"
+    const char* reason;  // "NO CPU", "NO RAM", "NO BUFFER", "MAX 1"
 };
 
 constexpr uint32_t kCpuBudget = 4000;  // cycles per sample

@@ -3,6 +3,9 @@
 #include <cstring>
 #include <vector>
 #include "core/registry.h"
+#include "core/engine.h"
+#include "core/patch_io.h"
+#include <cstdio>
 #include "core/modules/osc.h"
 #include "core/modules/vca.h"
 #include "core/modules/vcf.h"
@@ -19,6 +22,7 @@
 #include "core/modules/mux.h"
 #include "core/modules/selector.h"
 #include "core/modules/tilt.h"
+#include "core/modules/fx.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -411,8 +415,8 @@ void test_dly_echo() {
     m->setParam(2, 1.f);
     float in[kBlock] = {};
     in[0] = 5.f;
-    const float* ins[2] = {in, nullptr};
-    const bool conn[2] = {true, false};
+    const float* ins[3] = {in, nullptr, nullptr};
+    const bool conn[3] = {true, false, false};
     int peakAt = -1;
     float peak = 0.f;
     for (int b = 0; b < 200; b++) {  // 6400 samples
@@ -433,8 +437,8 @@ void test_dly_feedback_bounded() {
     m->setParam(1, 0.95f);
     m->setParam(2, 1.f);
     float in[kBlock], ph = 0.f;
-    const float* ins[2] = {in, nullptr};
-    const bool conn[2] = {true, false};
+    const float* ins[3] = {in, nullptr, nullptr};
+    const bool conn[3] = {true, false, false};
     for (int b = 0; b < 15000; b++) {  // 10 s
         for (int i = 0; i < kBlock; i++) {
             in[i] = 10.f * sinf(6.2831853f * ph);
@@ -454,8 +458,8 @@ void test_dly_tail_decays_to_zero() {
     m->setParam(2, 1.f);
     float in[kBlock] = {};
     in[0] = 5.f;
-    const float* ins[2] = {in, nullptr};
-    const bool conn[2] = {true, false};
+    const float* ins[3] = {in, nullptr, nullptr};
+    const bool conn[3] = {true, false, false};
     for (int b = 0; b < 30 * 48000 / kBlock; b++) {  // 30 s
         m->process(ins, conn);
         in[0] = 0.f;
@@ -474,8 +478,8 @@ void test_dly_mix_smoothed() {
     m->setParam(2, 0.f);
     float in[kBlock];
     for (int i = 0; i < kBlock; i++) in[i] = 4.f;
-    const float* ins[2] = {in, nullptr};
-    const bool conn[2] = {true, false};
+    const float* ins[3] = {in, nullptr, nullptr};
+    const bool conn[3] = {true, false, false};
     m->process(ins, conn);
     m->setParam(2, 1.f);  // wet is silent, so mix 0 -> 1 must fade the dry out, not cut
     m->process(ins, conn);
@@ -534,8 +538,8 @@ void test_atn_no_input_is_dc() {
 void test_snh_holds_on_trigger() {
     Module* m = kSnhType.create();
     float in[kBlock], trig[kBlock];
-    const float* ins[2] = {in, trig};
-    const bool conn[2] = {true, true};
+    const float* ins[3] = {in, trig, nullptr};
+    const bool conn[3] = {true, true, false};
     for (int b = 0; b < 7; b++) {
         constBlock(in, (float)b);
         constBlock(trig, b >= 3 ? 5.f : 0.f);
@@ -548,8 +552,8 @@ void test_snh_holds_on_trigger() {
 void test_snh_random_without_input() {
     Module* m = kSnhType.create();
     float trig[kBlock];
-    const float* ins[2] = {nullptr, trig};
-    const bool conn[2] = {false, true};
+    const float* ins[3] = {nullptr, trig, nullptr};
+    const bool conn[3] = {false, true, false};
     float v[4];
     for (int k = 0; k < 4; k++) {
         constBlock(trig, 0.f);
@@ -569,8 +573,8 @@ void test_snh_slew() {
     float in[kBlock], trig[kBlock];
     constBlock(in, 5.f);
     constBlock(trig, 5.f);
-    const float* ins[2] = {in, trig};
-    const bool conn[2] = {true, true};
+    const float* ins[3] = {in, trig, nullptr};
+    const bool conn[3] = {true, true, false};
     m->process(ins, conn);
     m->process(ins, conn);  // ~1.3 ms after the hold
     const float y = m->out(0)[kBlock - 1];
@@ -582,8 +586,8 @@ void test_snh_holds_without_trigger() {
     Module* m = kSnhType.create();
     float in[kBlock];
     constBlock(in, 4.f);
-    const float* ins[2] = {in, nullptr};
-    const bool conn[2] = {true, false};
+    const float* ins[3] = {in, nullptr, nullptr};
+    const bool conn[3] = {true, false, false};
     TEST_ASSERT_EQUAL_FLOAT(0.f, settle(*m, ins, conn));
     delete m;
 }
@@ -605,8 +609,8 @@ static std::vector<long> rises(Module& m, const float* const* ins, const bool* c
 
 void test_clk_120bpm_period() {
     Module* m = kClkType.create();
-    const float* ins[2] = {nullptr, nullptr};
-    const bool conn[2] = {false, false};
+    const float* ins[3] = {nullptr, nullptr, nullptr};
+    const bool conn[3] = {false, false, false};
     const std::vector<long> r = rises(*m, ins, conn, 0, 24000 * 4 / kBlock);
     TEST_ASSERT_TRUE(r.size() >= 4);
     TEST_ASSERT_EQUAL(0, r[0]);  // starts high
@@ -618,8 +622,8 @@ void test_clk_div3() {
     Module* m = kClkType.create();
     m->setParam(0, 300.f);  // BPM: 9600 samples per beat
     m->setParam(1, 2.f);    // DIV /3
-    const float* ins[2] = {nullptr, nullptr};
-    const bool conn[2] = {false, false};
+    const float* ins[3] = {nullptr, nullptr, nullptr};
+    const bool conn[3] = {false, false, false};
     Module* ref = kClkType.create();
     ref->setParam(0, 300.f);
     const std::vector<long> base = rises(*ref, ins, conn, 0, 9600 * 9 / kBlock);
@@ -634,8 +638,8 @@ void test_clk_div3() {
 void test_clk_external_clock() {
     Module* m = kClkType.create();
     float clk[kBlock];
-    const float* ins[2] = {clk, nullptr};
-    const bool conn[2] = {true, false};
+    const float* ins[3] = {clk, nullptr, nullptr};
+    const bool conn[3] = {true, false, false};
     for (int b = 0; b < 12; b++) {
         const bool high = (b / 2) % 2 == 1;
         constBlock(clk, high ? 5.f : 0.f);
@@ -648,8 +652,8 @@ void test_clk_external_clock() {
 void test_clk_reset() {
     Module* m = kClkType.create();  // 120 BPM: low from sample 12000 to 24000
     float rst[kBlock];
-    const float* ins[2] = {nullptr, rst};
-    const bool conn[2] = {false, true};
+    const float* ins[3] = {nullptr, rst, nullptr};
+    const bool conn[3] = {false, true, false};
     constBlock(rst, 0.f);
     for (int b = 0; b < 16000 / kBlock; b++) m->process(ins, conn);
     TEST_ASSERT_EQUAL_FLOAT(0.f, m->out(0)[kBlock - 1]);
@@ -725,8 +729,8 @@ void test_dmx_routes() {
     float in[kBlock];
     constBlock(in, 1.f);
     m->setParam(0, 2.f);  // POS C
-    const float* ins[2] = {in, nullptr};
-    const bool conn[2] = {true, false};
+    const float* ins[3] = {in, nullptr, nullptr};
+    const bool conn[3] = {true, false, false};
     for (int b = 0; b < 40; b++) m->process(ins, conn);
     TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.f, m->out(0)[kBlock - 1]);
     TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.f, m->out(1)[kBlock - 1]);
@@ -775,8 +779,8 @@ void test_tilt_module_smooths() {
 void test_clk_reset_while_high_retriggers() {
     Module* m = kClkType.create();  // 120 BPM: high for samples 0..11999
     float rst[kBlock];
-    const float* ins[2] = {nullptr, rst};
-    const bool conn[2] = {false, true};
+    const float* ins[3] = {nullptr, rst, nullptr};
+    const bool conn[3] = {false, true, false};
     constBlock(rst, 0.f);
     for (int b = 0; b < 6000 / kBlock; b++) m->process(ins, conn);
     TEST_ASSERT_EQUAL_FLOAT(5.f, m->out(0)[kBlock - 1]);
@@ -809,6 +813,151 @@ void test_selector_cv_hysteresis() {
 
 void test_tilt_smooth_minimum() {
     TEST_ASSERT_TRUE(kTiltType.params[1].min >= 5.f);
+}
+
+
+// ---- v1.2: every registered type ----
+// Feeds silence, then +-5 V noise on every input with a gate on the even inputs, for 200 blocks;
+// every output must stay finite and within +-25 V (the engine clamps at 50).
+void test_all_types_sane() {
+    int n = 0;
+    const ModuleTypeInfo* const* types = allTypes(&n);
+    static float bufs[kMaxIns][kBlock];
+    const float* ins[kMaxIns];
+    bool conn[kMaxIns];
+    uint32_t rng = 12345;
+    for (int t = 0; t < n; t++) {
+        Module* m = types[t]->create();
+        TEST_ASSERT_NOT_NULL_MESSAGE(m, types[t]->id);
+        for (int p = 0; p < types[t]->numParams; p++) m->setParam(p, types[t]->params[p].def);
+        for (int i = 0; i < kMaxIns; i++) {
+            ins[i] = bufs[i];
+            conn[i] = false;
+        }
+        for (int b = 0; b < 400; b++) {
+            const bool live = b >= 100;
+            for (int i = 0; i < kMaxIns; i++) {
+                conn[i] = live && i < types[t]->numIns;
+                for (int k = 0; k < kBlock; k++) {
+                    rng = rng * 1664525u + 1013904223u;
+                    const float noise = ((float)(rng >> 8) / 16777216.f * 2.f - 1.f) * 5.f;
+                    bufs[i][k] = (i % 2 == 0) ? (((b / 8) % 2) ? 5.f : 0.f) : noise;
+                }
+            }
+            m->process(ins, conn);
+            for (int o = 0; o < types[t]->numOuts; o++)
+                for (int k = 0; k < kBlock; k++) {
+                    const float v = m->out(o)[k];
+                    if (!std::isfinite(v) || fabsf(v) > 25.f) {
+                        char msg[64];
+                        snprintf(msg, sizeof msg, "%s out %d block %d = %f", types[t]->id, o, b, (double)v);
+                        TEST_FAIL_MESSAGE(msg);
+                    }
+                }
+            if (const float* mo = m->masterOut())
+                for (int k = 0; k < kBlock; k++) TEST_ASSERT_TRUE_MESSAGE(std::isfinite(mo[k]), types[t]->id);
+        }
+        delete m;
+    }
+}
+
+void test_all_types_round_trip() {
+    int n = 0;
+    const ModuleTypeInfo* const* types = allTypes(&n);
+    for (int t = 0; t < n; t++) {
+        Patch p;
+        uint16_t id = 0;
+        TEST_ASSERT_EQUAL(PatchError::None, p.addModule(*types[t], 0, 0, &id));
+        ModuleRec* r = p.find(id);
+        for (int k = 0; k < types[t]->numParams; k++) r->params[k] = paramCoarse(types[t]->params[k], 3);
+        Patch q;
+        TEST_ASSERT_EQUAL_MESSAGE((int)LoadError::None, (int)patchFromJson(patchToJson(p), q, nullptr).error, types[t]->id);
+        const ModuleRec* back = q.find(id);
+        TEST_ASSERT_NOT_NULL_MESSAGE(back, types[t]->id);
+        TEST_ASSERT_TRUE_MESSAGE(back->type == types[t], types[t]->id);
+        for (int k = 0; k < types[t]->numParams; k++)
+            TEST_ASSERT_FLOAT_WITHIN_MESSAGE(1e-4f * (1.f + fabsf(r->params[k])), r->params[k], back->params[k], types[t]->id);
+    }
+}
+
+void test_all_types_unique_keys() {
+    int n = 0;
+    const ModuleTypeInfo* const* t = allTypes(&n);
+    for (int i = 0; i < n; i++) {
+        TEST_ASSERT_TRUE_MESSAGE(t[i]->numParams <= kMaxParams, t[i]->id);
+        TEST_ASSERT_TRUE_MESSAGE(t[i]->numIns <= kMaxIns, t[i]->id);
+        TEST_ASSERT_TRUE_MESSAGE(t[i]->numOuts <= kMaxOuts, t[i]->id);
+        for (int a = 0; a < t[i]->numParams; a++) {
+            TEST_ASSERT_TRUE_MESSAGE(strlen(t[i]->params[a].label) <= 3, t[i]->params[a].key);
+            for (int b = a + 1; b < t[i]->numParams; b++)
+                TEST_ASSERT_TRUE_MESSAGE(strcmp(t[i]->params[a].key, t[i]->params[b].key) != 0, t[i]->id);
+        }
+        for (int a = 0; a < t[i]->numIns; a++) TEST_ASSERT_TRUE_MESSAGE(strlen(t[i]->inLabels[a]) <= 3, t[i]->id);
+        for (int a = 0; a < t[i]->numOuts; a++) TEST_ASSERT_TRUE_MESSAGE(strlen(t[i]->outLabels[a]) <= 3, t[i]->id);
+    }
+}
+
+
+// ---- v1.2 Task 8: effects ----
+static float rms(const std::vector<float>& v, size_t from = 0) {
+    double s = 0;
+    for (size_t i = from; i < v.size(); i++) s += (double)v[i] * v[i];
+    return (float)std::sqrt(s / (double)(v.size() - from));
+}
+
+void test_rev_tail_decays() {
+    Module* m = kRevType.create();
+    TEST_ASSERT_NOT_NULL(m);
+    static float b[kBlock];
+    const float* ins[1] = {b};
+    bool c[1] = {true};
+    for (int k = 0; k < kBlock; k++) b[k] = (k % 8 < 4) ? 5.f : -5.f;
+    for (int i = 0; i < 50; i++) m->process(ins, c);  // a burst
+    constBlock(b, 0.f);
+    std::vector<float> wet;
+    for (int i = 0; i < 1500; i++) {  // 1 s of tail
+        m->process(ins, c);
+        wet.insert(wet.end(), m->out(1), m->out(1) + kBlock);
+    }
+    const float early = rms(std::vector<float>(wet.begin(), wet.begin() + 4800));
+    const float late = rms(std::vector<float>(wet.end() - 4800, wet.end()));
+    TEST_ASSERT_TRUE(early > 0.05f);  // there is a tail
+    TEST_ASSERT_TRUE(late < early * 0.5f);  // and it decays
+    delete m;
+}
+
+void test_pool_shared_dly_rev() {
+    Engine eng([]() -> uint32_t { return 1000000; });
+    Patch p;
+    TEST_ASSERT_TRUE(eng.canAdd(p, kDlyType).ok);
+    p.addModule(kDlyType, 0, 0, nullptr);
+    TEST_ASSERT_TRUE(eng.canAdd(p, kRevType).ok);
+    p.addModule(kRevType, 0, 1, nullptr);
+    const Refusal r = eng.canAdd(p, kRevType);
+    TEST_ASSERT_FALSE(r.ok);
+    TEST_ASSERT_EQUAL_STRING("NO BUFFER", r.reason);
+    TEST_ASSERT_FALSE(eng.canAdd(p, kDlyType).ok);
+}
+
+void test_psh_octave_up() {
+    Module* m = kPshType.create();
+    m->setParam(0, 12.f);
+    m->setParam(2, 1.f);
+    static float b[kBlock];
+    const float* ins[2] = {b, b};
+    bool c[2] = {true, false};
+    float ph = 0.f;
+    std::vector<float> o;
+    for (int blk = 0; blk < 600; blk++) {
+        for (int k = 0; k < kBlock; k++) {
+            b[k] = 5.f * sinf(ph);
+            ph += 2.f * 3.14159265f * 220.f / kSampleRate;
+        }
+        m->process(ins, c);
+        if (blk > 100) o.insert(o.end(), m->out(0), m->out(0) + kBlock);
+    }
+    TEST_ASSERT_FLOAT_WITHIN(40.f, 440.f, crossingHz(o));
+    delete m;
 }
 
 int main() {
@@ -859,5 +1008,11 @@ int main() {
     RUN_TEST(test_clk_reset_while_high_retriggers);
     RUN_TEST(test_selector_cv_hysteresis);
     RUN_TEST(test_tilt_smooth_minimum);
+    RUN_TEST(test_all_types_sane);
+    RUN_TEST(test_all_types_round_trip);
+    RUN_TEST(test_all_types_unique_keys);
+    RUN_TEST(test_rev_tail_decays);
+    RUN_TEST(test_pool_shared_dly_rev);
+    RUN_TEST(test_psh_octave_up);
     return UNITY_END();
 }
