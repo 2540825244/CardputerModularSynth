@@ -24,6 +24,7 @@
 #include "core/modules/tilt.h"
 #include "core/modules/fx.h"
 #include "core/modules/proc.h"
+#include "core/modules/src.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -1103,6 +1104,79 @@ void test_slw_rise_time() {
     delete m;
 }
 
+
+// ---- v1.2 Task 10: sources ----
+// Runs `t` for `blocks` with nothing patched except a 5 V trigger on input `trigIn` in block 1.
+static std::vector<float> runTrig(const ModuleTypeInfo& t, int blocks, int trigIn = 0, const float* params = nullptr) {
+    Module* m = t.create();
+    if (params)
+        for (int i = 0; i < t.numParams; i++) m->setParam(i, params[i]);
+    static float tr[kBlock], z[kBlock];
+    const float* ins[kMaxIns] = {z, z, z, z, z, z, z, z};
+    bool c[kMaxIns] = {};
+    if (trigIn >= 0) {
+        ins[trigIn] = tr;
+        c[trigIn] = true;
+    }
+    std::vector<float> r;
+    for (int b = 0; b < blocks; b++) {
+        constBlock(tr, b == 1 ? 5.f : 0.f);
+        m->process(ins, c);
+        r.insert(r.end(), m->out(0), m->out(0) + kBlock);
+    }
+    delete m;
+    return r;
+}
+
+void test_noi_kinds_differ() {
+    float prev = -1.f;
+    for (int k = 0; k < 6; k++) {
+        const float p[] = {(float)k, 1000.f};
+        std::vector<float> v = runTrig(kNoiType, 100, 0, p);
+        const float r = rms(v);
+        TEST_ASSERT_TRUE(r > 0.01f);
+        TEST_ASSERT_TRUE(r != prev);
+        prev = r;
+    }
+}
+
+void test_kck_trig_makes_sound() {
+    std::vector<float> v = runTrig(kKckType, 300);
+    char msg[96];
+    auto pk = [](const std::vector<float>& x) { float m = 0.f; for (float y : x) m = fabsf(y) > m ? fabsf(y) : m; return m; };
+    snprintf(msg, sizeof msg, "kick rms %f pk %f snr pk %f hat pk %f str pk %f mdl pk %f", (double)rms(std::vector<float>(v.begin(), v.begin() + 2400)),
+             (double)pk(v), (double)pk(runTrig(kSnrType, 100)), (double)pk(runTrig(kHatType, 100)), (double)pk(runTrig(kStrType, 100)), (double)pk(runTrig(kMdlType, 100)));
+    TEST_ASSERT_TRUE_MESSAGE(rms(std::vector<float>(v.begin(), v.begin() + 2400)) > 0.3f, msg);
+    TEST_ASSERT_TRUE_MESSAGE(pk(v) > 3.f && pk(runTrig(kHatType, 100)) > 3.f && pk(runTrig(kMdlType, 100)) < 7.f, msg);
+    TEST_ASSERT_TRUE(rms(std::vector<float>(v.end() - 480, v.end())) < 0.05f);
+    TEST_ASSERT_TRUE(rms(runTrig(kSnrType, 100)) > 0.05f);
+    TEST_ASSERT_TRUE(rms(runTrig(kHatType, 100)) > 0.05f);
+}
+
+void test_str_pluck_decays() {
+    std::vector<float> v = runTrig(kStrType, 1500);
+    const float early = rms(std::vector<float>(v.begin(), v.begin() + 4800));
+    const float late = rms(std::vector<float>(v.end() - 4800, v.end()));
+    TEST_ASSERT_TRUE(early > 0.1f);
+    TEST_ASSERT_TRUE(late < early * 0.3f);
+    TEST_ASSERT_TRUE(rms(runTrig(kMdlType, 300)) > 0.02f);
+}
+
+void test_ssw_pitch() {
+    const float p[] = {0.f, 0.f, 0.f, 0.f};  // no detune, no side saws: one saw at C4
+    std::vector<float> v = runTrig(kSswType, 300, -1, p);
+    TEST_ASSERT_FLOAT_WITHIN(261.63f * 0.02f, 261.63f, crossingHz(v));
+}
+
+void test_fmo_index_zero_is_sine() {
+    const float p[] = {0.f, 0.f, 2.f, 0.f};
+    std::vector<float> v = runTrig(kFmoType, 300, -1, p);
+    TEST_ASSERT_FLOAT_WITHIN(261.63f * 0.02f, 261.63f, crossingHz(v));
+    float mx = 0.f;
+    for (float x : v) mx = fabsf(x) > mx ? fabsf(x) : mx;
+    TEST_ASSERT_FLOAT_WITHIN(0.3f, 5.f, mx);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -1167,5 +1241,10 @@ int main() {
     RUN_TEST(test_dyn_reduces_loud);
     RUN_TEST(test_enf_tracks_level);
     RUN_TEST(test_slw_rise_time);
+    RUN_TEST(test_noi_kinds_differ);
+    RUN_TEST(test_kck_trig_makes_sound);
+    RUN_TEST(test_str_pluck_decays);
+    RUN_TEST(test_ssw_pitch);
+    RUN_TEST(test_fmo_index_zero_is_sine);
     return UNITY_END();
 }

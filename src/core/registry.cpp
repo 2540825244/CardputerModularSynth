@@ -3,6 +3,7 @@
 #include "modules/dly.h"
 #include "modules/fx.h"
 #include "modules/proc.h"
+#include "modules/src.h"
 #include "modules/dmx.h"
 #include "modules/env.h"
 #include "modules/keys.h"
@@ -54,6 +55,22 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kAwhType,
     &kEnfType,
     &kSlwType,
+    // v1.2 sources
+    &kNoiType,
+    &kVsoType,
+    &kSswType,
+    &kFmoType,
+    &kForType,
+    &kVosType,
+    &kZosType,
+    &kHrmType,
+    &kStrType,
+    &kMdlType,
+    &kResType,
+    &kKckType,
+    &kSnrType,
+    &kHatType,
+    &kPrtType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {
