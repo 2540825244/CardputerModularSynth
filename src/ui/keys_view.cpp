@@ -68,7 +68,7 @@ void playKey(UiController& ui, const KeyEvent& e) {
         keysAllNotesOff(ui);
         s.view = View::Patch;
     } else if (e.side == Side::Backslash) {
-        ui.undo();
+        ui.undoOrRedo();
     }
 }
 

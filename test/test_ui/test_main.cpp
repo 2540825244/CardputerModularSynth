@@ -1294,6 +1294,164 @@ void test_tab_flip_releases_notes() {
     f.up(0, 2);
 }
 
+
+// ---- v1.2 Task 3: gestures ----
+void test_chord_moves_without_opening() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    const uint16_t id = gPatch.findAt(0, 13)->id;
+    f.down(1, 1);
+    f.down(5, 3);
+    f.send(KeyEvent::Hold, true, 1, 1, Side::Esc);
+    f.up(5, 3);
+    f.up(1, 1);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_NULL(gPatch.findAt(0, 13));
+    TEST_ASSERT_EQUAL(id, gPatch.findAt(0, 41)->id);
+    TEST_ASSERT_EQUAL(41, f.ui.state().selCell);
+}
+
+void test_hold_then_press_opens_only() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.hold(1, 1);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    f.down(5, 3);
+    f.up(5, 3);
+    f.up(1, 1);
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(0, 13));
+    TEST_ASSERT_NULL(gPatch.findAt(0, 41));
+}
+
+void test_chord_swaps() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.place(TVcf, 2, 1);
+    const uint16_t o = gPatch.findAt(0, 13)->id, v = gPatch.findAt(0, 14)->id;
+    f.down(1, 1);
+    f.down(2, 1);
+    f.up(2, 1);
+    f.up(1, 1);
+    TEST_ASSERT_EQUAL(v, gPatch.findAt(0, 13)->id);
+    TEST_ASSERT_EQUAL(o, gPatch.findAt(0, 14)->id);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(o, gPatch.findAt(0, 13)->id);
+}
+
+void test_ctrl_after_select_moves() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.tap(1, 1);
+    f.side(Side::Ctrl);
+    TEST_ASSERT_EQUAL(gPatch.findAt(0, 13)->id, f.ui.state().moveFromId);
+    f.tap(5, 3);
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(0, 41));
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+    f.tap(5, 3);
+    f.side(Side::Ctrl);
+    f.side(Side::Ctrl);  // a second ctrl tap cancels
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+}
+
+void test_move_onto_module_swaps() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.place(TVcf, 2, 1);
+    const uint16_t o = gPatch.findAt(0, 13)->id;
+    f.tap(1, 1);
+    f.side(Side::Ctrl);
+    f.tap(2, 1);
+    TEST_ASSERT_EQUAL(o, gPatch.findAt(0, 14)->id);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+}
+
+void test_fn_target_copies() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    gPatch.find(gPatch.findAt(0, 13)->id)->params[0] = 1.f;
+    f.tap(1, 1);
+    f.side(Side::Ctrl);
+    f.sideDown(Side::Fn);
+    f.tap(6, 3);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(0, 13));
+    const ModuleRec* c = gPatch.findAt(0, 42);
+    TEST_ASSERT_NOT_NULL(c);
+    TEST_ASSERT_TRUE(c->type == &kOscType);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, c->params[0]);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);  // the fn+tap did not also open it
+    TEST_ASSERT_EQUAL(-1, f.ui.state().moveFromId);
+}
+
+void test_fn_tap_releases_carry() {
+    Fx f;
+    uint16_t id = openModule(f, TOsc, 0, 0);
+    (void)id;
+    f.sideDown(Side::Fn);
+    f.tap(0, 3);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    f.side(Side::Esc);  // to the patch view, still carrying
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    f.side(Side::Fn);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+}
+
+void test_fn_pin_still_drops() {
+    Fx f;
+    f.place(TVcf, 1, 1);
+    uint16_t o = openModule(f, TOsc, 0, 0);
+    f.sideDown(Side::Fn);
+    f.tap(0, 3);
+    f.sideUp(Side::Fn);
+    f.side(Side::Esc);
+    f.tap(1, 1);
+    f.side(Side::Enter);
+    f.sideDown(Side::Fn);
+    f.tap(0, 2);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    TEST_ASSERT_EQUAL(o, gPatch.cableAt(0).fromId);
+}
+
+void test_chord_pins_patch() {
+    Fx f;
+    uint16_t id = openModule(f, TVcf, 0, 0);
+    f.down(0, 3);  // OUT
+    f.down(1, 2);  // CUT in
+    f.up(1, 2);
+    f.up(0, 3);
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    TEST_ASSERT_EQUAL(id, gPatch.cableAt(0).fromId);
+    TEST_ASSERT_EQUAL(1, gPatch.cableAt(0).toIn);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+}
+
+void test_redo_fn_backslash() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    f.sideDown(Side::Fn);
+    f.side(Side::Backslash);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+void test_side_held_tracked() {
+    Fx f;
+    f.sideDown(Side::Del);
+    TEST_ASSERT_TRUE(f.ui.state().sideHeld & (1u << (int)Side::Del));
+    TEST_ASSERT_EQUAL(f.t, f.ui.state().sideDownMs[(int)Side::Del]);
+    f.sideUp(Side::Del);
+    TEST_ASSERT_FALSE(f.ui.state().sideHeld & (1u << (int)Side::Del));
+    f.down(3, 2);
+    TEST_ASSERT_EQUAL(27, f.ui.state().pressCell);
+    TEST_ASSERT_EQUAL(f.t, f.ui.state().pressMs);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1380,5 +1538,16 @@ int main() {
     RUN_TEST(test_keys_pages);
     RUN_TEST(test_fn_tab_previous_page);
     RUN_TEST(test_tab_flip_releases_notes);
+    RUN_TEST(test_chord_moves_without_opening);
+    RUN_TEST(test_hold_then_press_opens_only);
+    RUN_TEST(test_chord_swaps);
+    RUN_TEST(test_ctrl_after_select_moves);
+    RUN_TEST(test_move_onto_module_swaps);
+    RUN_TEST(test_fn_target_copies);
+    RUN_TEST(test_fn_tap_releases_carry);
+    RUN_TEST(test_fn_pin_still_drops);
+    RUN_TEST(test_chord_pins_patch);
+    RUN_TEST(test_redo_fn_backslash);
+    RUN_TEST(test_side_held_tracked);
     return UNITY_END();
 }

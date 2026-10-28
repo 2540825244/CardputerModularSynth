@@ -34,6 +34,8 @@ class UiController {
     bool editValue(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey);
     void toast(const char* msg, uint32_t nowMs);  // 1500 ms
     bool undo();                                  // pop, apply; false if nothing to undo
+    bool redo();
+    bool undoOrRedo();  // `\`: undo, or redo with fn held; toasts when there is nothing to do
 
     // Used by the view files.
     UiState& mut() { return s_; }

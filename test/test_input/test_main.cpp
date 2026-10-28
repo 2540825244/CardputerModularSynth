@@ -225,6 +225,67 @@ void test_consume_swallows_hold_and_enter_release() {
     TEST_ASSERT_EQUAL(0, g.map(S(KeyEvent::Up, Side::Enter), false, false, false, A));
 }
 
+
+// ---- v1.2: chord and side taps ----
+void test_chord_emits_from_held() {
+    GestureMapper g;
+    g.map(G(KeyEvent::Down, 1, 1), false, false, false, A);
+    TEST_ASSERT_EQUAL(2, g.map(G(KeyEvent::Down, 4, 2), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Select, A[0].act);
+    TEST_ASSERT_EQUAL(28, A[0].cell);
+    TEST_ASSERT_EQUAL(Act::Chord, A[1].act);
+    TEST_ASSERT_EQUAL(13, A[1].from);
+    TEST_ASSERT_EQUAL(28, A[1].cell);
+}
+
+void test_chord_cancels_held_hold() {
+    GestureMapper g;
+    g.map(G(KeyEvent::Down, 1, 1), false, false, false, A);
+    g.map(G(KeyEvent::Down, 4, 2), false, false, false, A);
+    TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 1, 1), false, false, false, A));
+    TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 4, 2), false, false, false, A));
+}
+
+void test_no_chord_after_hold_fired() {
+    GestureMapper g;
+    g.map(G(KeyEvent::Down, 1, 1), false, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Hold, 1, 1), false, false, false, A));
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Down, 4, 2), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Select, A[0].act);
+}
+
+void test_side_tap_emitted() {
+    GestureMapper g;
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A));
+    TEST_ASSERT_EQUAL(2, g.map(S(KeyEvent::Up, Side::Fn), false, false, false, A));
+    TEST_ASSERT_EQUAL(Act::Key, A[0].act);
+    TEST_ASSERT_EQUAL(Act::SideTap, A[1].act);
+    TEST_ASSERT_TRUE(A[1].key.side == Side::Fn);
+    g.map(S(KeyEvent::Down, Side::Ctrl), false, false, false, A);
+    TEST_ASSERT_EQUAL(2, g.map(S(KeyEvent::Up, Side::Ctrl), false, false, false, A));
+    TEST_ASSERT_TRUE(A[1].key.side == Side::Ctrl);
+}
+
+void test_fn_with_grid_no_side_tap() {
+    GestureMapper g;
+    g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A);
+    g.map(G(KeyEvent::Down, 2, 2), true, false, false, A);
+    g.map(G(KeyEvent::Up, 2, 2), true, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Fn), false, false, false, A));
+    // same-frame chord: the grid Down arrives before the fn Down
+    g.map(G(KeyEvent::Down, 2, 2), true, false, false, A);
+    g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A);
+    g.map(G(KeyEvent::Up, 2, 2), true, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Fn), false, false, false, A));
+    // a long press is not a tap, nor is fn+tab
+    g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A);
+    g.map(S(KeyEvent::Hold, Side::Fn), true, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Fn), false, false, false, A));
+    g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A);
+    g.map(S(KeyEvent::Down, Side::Tab), true, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Fn), false, false, false, A));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_mapping);
@@ -245,5 +306,10 @@ int main() {
     RUN_TEST(test_reset_consumes_held_keys);
     RUN_TEST(test_reset_keeps_released_keys_fresh);
     RUN_TEST(test_consume_swallows_hold_and_enter_release);
+    RUN_TEST(test_chord_emits_from_held);
+    RUN_TEST(test_chord_cancels_held_hold);
+    RUN_TEST(test_no_chord_after_hold_fired);
+    RUN_TEST(test_side_tap_emitted);
+    RUN_TEST(test_fn_with_grid_no_side_tap);
     return UNITY_END();
 }

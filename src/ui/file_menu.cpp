@@ -42,10 +42,12 @@ bool fileViewAction(UiController& ui, const Action& a) {
                 s.fileSlot = -1;  // a slot picked to load is never saved over by one enter
             }
             else if (e.side == Side::Esc) s.view = View::Patch;
-            else if (e.side == Side::Backslash && !ui.undo()) ui.toast("NOTHING TO UNDO", ui.now());
+            else if (e.side == Side::Backslash) ui.undoOrRedo();
             break;
         }
-        case Act::SweepEnd: break;
+        case Act::SweepEnd:
+        case Act::Chord:
+        case Act::SideTap: break;
     }
     return false;
 }

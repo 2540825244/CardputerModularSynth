@@ -81,7 +81,9 @@ bool placeViewAction(UiController& ui, const Action& a) {
                 else s.view = View::Patch;
             }
             break;
-        case Act::SweepEnd: break;
+        case Act::SweepEnd:
+        case Act::Chord:
+        case Act::SideTap: break;
     }
     return false;
 }

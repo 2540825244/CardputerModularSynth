@@ -178,7 +178,7 @@ void sideKey(UiController& ui, const ModuleRec& m, const KeyEvent& e) {
             }
             break;
         case Side::Backslash:
-            ui.undo();
+            ui.undoOrRedo();
             if (!ui.patch().find(s.openId)) s.view = View::Patch;
             break;
         case Side::Esc: s.view = View::Patch; break;
@@ -226,6 +226,18 @@ bool moduleViewAction(UiController& ui, const Action& a) {
             break;
         }
         case Act::SweepEnd: ui.endTilt(); break;
+        case Act::Chord: {
+            // Hold a pin, press a pin of the other kind: patch them directly.
+            const CellRef from = cellAt(s, *m->type, a.from), to = cellAt(s, *m->type, a.cell);
+            const bool fromPin = from.kind == CellKind::In || from.kind == CellKind::Out;
+            const bool toPin = to.kind == CellKind::In || to.kind == CellKind::Out;
+            if (s.carry.active || !fromPin || !toPin || from.kind == to.kind) break;
+            pinAction(ui, *m, from.kind == CellKind::Out, from.index);
+            pinAction(ui, *m, to.kind == CellKind::Out, to.index);
+            s.modCell = a.cell;
+            return true;
+        }
+        case Act::SideTap: break;
         case Act::Key:
             if (!a.key.grid) sideKey(ui, *m, a.key);
             break;

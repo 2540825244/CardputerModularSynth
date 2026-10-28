@@ -13,6 +13,57 @@ void doMove(Patch& p, void* c) {
     const Cell* m = static_cast<Cell*>(c);
     p.moveModule(m->id, m->page, m->cell);
 }
+struct Pair {
+    uint16_t a, b;
+};
+void doSwap(Patch& p, void* c) {
+    const Pair* s = static_cast<Pair*>(c);
+    p.swapModules(s->a, s->b);
+}
+struct Copy {
+    uint16_t id;
+    uint8_t page, cell;
+    PatchError err;
+};
+void doCopy(Patch& p, void* c) {
+    Copy* k = static_cast<Copy*>(c);
+    k->err = p.copyModule(k->id, k->page, k->cell, nullptr);
+}
+
+// Moves module `id` to `cell` on the current page; onto another module it swaps the two.
+void moveTo(UiController& ui, uint16_t id, int cell) {
+    UiState& s = ui.mut();
+    const ModuleRec* at = ui.patch().findAt(s.page, (uint8_t)cell);
+    if (at && at->id == id) return;
+    if (at) {
+        Pair pr{id, at->id};
+        ui.edit(doSwap, &pr);
+    } else {
+        Cell c{id, s.page, (uint8_t)cell};
+        ui.edit(doMove, &c);
+    }
+    s.selCell = (int8_t)cell;
+}
+
+// Places a copy of module `id` at `cell` (params and amounts, no cables).
+void copyTo(UiController& ui, uint16_t id, int cell) {
+    UiState& s = ui.mut();
+    const ModuleRec* src = ui.patch().find(id);
+    if (!src) return;
+    if (ui.patch().findAt(s.page, (uint8_t)cell)) {
+        ui.toast("CELL TAKEN", ui.now());
+        return;
+    }
+    const Refusal r = ui.engine().canAdd(ui.patch(), *src->type);
+    if (!r.ok) {
+        ui.toast(r.reason, ui.now());
+        return;
+    }
+    Copy k{id, s.page, (uint8_t)cell, PatchError::None};
+    ui.edit(doCopy, &k);
+    if (k.err != PatchError::None) ui.toast(k.err == PatchError::MaxInstances ? "MAX 1" : "CAN'T COPY", ui.now());
+    else s.selCell = (int8_t)cell;
+}
 
 void openPlace(UiController& ui, int cell) {
     UiState& s = ui.mut();
@@ -28,14 +79,10 @@ bool select(UiController& ui, int cell) {
     UiState& s = ui.mut();
     const ModuleRec* m = ui.patch().findAt(s.page, (uint8_t)cell);
     if (s.moveFromId >= 0) {
-        if (m) {
-            ui.toast("CELL TAKEN", ui.now());
-        } else {
-            Cell c{(uint16_t)s.moveFromId, s.page, (uint8_t)cell};
-            ui.edit(doMove, &c);
-            s.moveFromId = -1;
-            s.selCell = (int8_t)cell;
-        }
+        const uint16_t id = (uint16_t)s.moveFromId;
+        s.moveFromId = -1;
+        if (ui.fnHeld()) copyTo(ui, id, cell);  // fn+target: a copy instead of a move
+        else moveTo(ui, id, cell);
         return true;
     }
     s.selCell = (int8_t)cell;
@@ -87,7 +134,7 @@ void sideKey(UiController& ui, const KeyEvent& e) {
         }
         case Side::Backslash:
             s.moveFromId = -1;
-            if (!ui.undo()) ui.toast("NOTHING TO UNDO", ui.now());
+            ui.undoOrRedo();
             break;
         case Side::Esc:
             if (s.moveFromId >= 0) {
@@ -102,11 +149,33 @@ void sideKey(UiController& ui, const KeyEvent& e) {
     }
 }
 
+// ctrl tapped alone: start moving the selected module, or cancel a pending move.
+void ctrlTap(UiController& ui) {
+    UiState& s = ui.mut();
+    if (s.moveFromId >= 0) {
+        s.moveFromId = -1;
+        return;
+    }
+    const ModuleRec* m = s.selCell >= 0 ? ui.patch().findAt(s.page, (uint8_t)s.selCell) : nullptr;
+    if (!m) return;
+    s.moveFromId = m->id;
+    ui.toast("MOVE: PICK A CELL", ui.now());
+}
+
 }  // namespace
 
 bool patchViewAction(UiController& ui, const Action& a) {
     switch (a.act) {
         case Act::Select: return select(ui, a.cell);
+        case Act::Chord: {
+            // Hold a module, press another cell: move it there (or swap with a module there).
+            const ModuleRec* m = ui.patch().findAt(ui.state().page, (uint8_t)a.from);
+            if (m && ui.state().moveFromId < 0) moveTo(ui, m->id, a.cell);
+            return true;
+        }
+        case Act::SideTap:
+            if (a.key.side == Side::Ctrl) ctrlTap(ui);
+            break;
         case Act::Activate:
         case Act::Sweep: activate(ui, a.cell >= 0 ? a.cell : ui.state().selCell); break;
         case Act::Key:

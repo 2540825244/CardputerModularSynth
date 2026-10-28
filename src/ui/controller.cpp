@@ -15,6 +15,7 @@ UiController::UiController(Patch& p, Engine& e, UndoStack& u, Storage& st)
     s_.moveFromId = -1;
     s_.placeType = -1;
     s_.fileSlot = -1;
+    s_.pressCell = -1;
 }
 
 const ViewDef& viewDef(View v) {
@@ -34,6 +35,15 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     if (!e.grid && e.side == Side::Fn) fn_ = e.type != KeyEvent::Up;
     if (!e.grid && e.side == Side::Ctrl) ctrl_ = e.type != KeyEvent::Up;
     coalescedEdit_ = false;
+    if (!e.grid) {
+        const uint8_t bit = (uint8_t)(1u << (int)e.side);
+        if (e.type == KeyEvent::Up) s_.sideHeld &= (uint8_t)~bit;
+        else s_.sideHeld |= bit;
+        if (e.type == KeyEvent::Down) s_.sideDownMs[(int)e.side] = nowMs;
+    } else if (e.type == KeyEvent::Down) {
+        s_.pressCell = (int8_t)cellOf(e);
+        s_.pressMs = nowMs;
+    }
     if (e.type == KeyEvent::Down) {
         // A second consecutive Esc cancels a carry and does nothing else; Del cancels it too.
         if (!e.grid && e.side == Side::Esc) {
@@ -61,13 +71,24 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     Action acts[2];
     const ViewDef& vd = viewDef(before);
     const int n = mapper_.map(e, fnHeld(), ctrlHeld() && vd.ctrlBlocksHold, vd.rawKeys || onPlayPage(), acts);
-    for (int i = 0; i < n && s_.view == before; i++)
+    for (int i = 0; i < n && s_.view == before; i++) {
+        // A lone fn tap drops a carried cable in every view (the fn slot is lit while carrying).
+        if (acts[i].act == Act::SideTap && acts[i].key.side == Side::Fn && s_.carry.active) {
+            s_.carry.active = false;
+            undo_.breakCoalescing();
+            continue;
+        }
         if (vd.onAction(*this, acts[i])) {
             mapper_.consume(e);
             break;
         }
+    }
     validate();
-    if (s_.view != before) mapper_.reset();
+    if (s_.view != before) {
+        mapper_.reset();
+        s_.prevView = before;
+        s_.viewMs = nowMs;
+    }
     if (tilt_.active && s_.view != View::Module) tilt_.active = false;
     if (auditioning && s_.view != View::Patch) releaseAudition();
     // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
@@ -238,6 +259,21 @@ bool UiController::undo() {
     s_.dirty = true;
     s_.lastEditMs = now_;
     return true;
+}
+
+bool UiController::redo() {
+    if (!undo_.redo(patch_)) return false;
+    engine_.apply(patch_);
+    s_.dirty = true;
+    s_.lastEditMs = now_;
+    return true;
+}
+
+bool UiController::undoOrRedo() {
+    const bool r = fnHeld();
+    if (r ? redo() : undo()) return true;
+    toast(r ? "NOTHING TO REDO" : "NOTHING TO UNDO", now_);
+    return false;
 }
 
 void UiController::toast(const char* msg, uint32_t nowMs) {
