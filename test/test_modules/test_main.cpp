@@ -15,6 +15,9 @@
 #include "core/modules/atn.h"
 #include "core/modules/clk.h"
 #include "core/modules/snh.h"
+#include "core/modules/dmx.h"
+#include "core/modules/mux.h"
+#include "core/modules/selector.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -51,6 +54,8 @@ void test_registry() {
     TEST_ASSERT_TRUE(findType("atn") == &kAtnType);
     TEST_ASSERT_TRUE(findType("snh") == &kSnhType);
     TEST_ASSERT_TRUE(findType("clk") == &kClkType);
+    TEST_ASSERT_TRUE(findType("mux") == &kMuxType);
+    TEST_ASSERT_TRUE(findType("dmx") == &kDmxType);
     int n = 0;
     const ModuleTypeInfo* const* t = allTypes(&n);
     TEST_ASSERT_TRUE(n >= 2);
@@ -653,6 +658,80 @@ void test_clk_reset() {
     delete m;
 }
 
+void test_selector_cv() {
+    Selector sel;
+    float v[kBlock];
+    const float cases[][3] = {{0, 0.f, 0}, {0, 2.f, 1}, {0, 4.f, 2}, {0, 6.f, 2}, {0, -1.f, 0}, {2, 2.f, 0}};
+    for (const auto& c : cases) {
+        constBlock(v, c[1]);
+        TEST_ASSERT_EQUAL((int)c[2], sel.index((int)c[0], false, v, 0));
+    }
+    TEST_ASSERT_EQUAL(1, sel.index(1, false, nullptr, 0));  // unpatched SEL: POS alone
+}
+
+void test_selector_step() {
+    Selector sel;
+    float lo[kBlock], hi[kBlock];
+    constBlock(lo, 0.f);
+    constBlock(hi, 5.f);
+    TEST_ASSERT_EQUAL(0, sel.index(0, true, lo, 0));
+    const int expect[] = {1, 2, 0};
+    for (int k = 0; k < 3; k++) {
+        TEST_ASSERT_EQUAL(expect[k], sel.index(0, true, hi, 0));
+        TEST_ASSERT_EQUAL(expect[k], sel.index(0, true, hi, 1));  // still high: no advance
+        sel.index(0, true, lo, 0);
+    }
+}
+
+void test_mux_picks_input() {
+    Module* m = kMuxType.create();
+    float a[kBlock], b[kBlock], c[kBlock];
+    constBlock(a, 1.f);
+    constBlock(b, 2.f);
+    constBlock(c, 3.f);
+    m->setParam(0, 1.f);  // POS B
+    const float* ins[4] = {a, b, c, nullptr};
+    const bool conn[4] = {true, true, true, false};
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 2.f, settle(*m, ins, conn));
+    TEST_ASSERT_EQUAL_FLOAT(1.f, m->monitor(0));
+    delete m;
+}
+
+void test_mux_switch_is_smooth() {
+    Module* m = kMuxType.create();
+    float a[kBlock], b[kBlock];
+    constBlock(a, 0.f);
+    constBlock(b, 1.f);
+    const float* ins[4] = {a, b, nullptr, nullptr};
+    const bool conn[4] = {true, true, false, false};
+    settle(*m, ins, conn);
+    m->setParam(0, 1.f);
+    float prev = m->out(0)[kBlock - 1];
+    for (int blk = 0; blk < 20; blk++) {
+        m->process(ins, conn);
+        for (int i = 0; i < kBlock; i++) {
+            TEST_ASSERT_TRUE(fabsf(m->out(0)[i] - prev) <= 0.2f);
+            prev = m->out(0)[i];
+        }
+    }
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 1.f, settle(*m, ins, conn));
+    delete m;
+}
+
+void test_dmx_routes() {
+    Module* m = kDmxType.create();
+    float in[kBlock];
+    constBlock(in, 1.f);
+    m->setParam(0, 2.f);  // POS C
+    const float* ins[2] = {in, nullptr};
+    const bool conn[2] = {true, false};
+    for (int b = 0; b < 40; b++) m->process(ins, conn);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.f, m->out(0)[kBlock - 1]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.f, m->out(1)[kBlock - 1]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 1.f, m->out(2)[kBlock - 1]);
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -690,5 +769,10 @@ int main() {
     RUN_TEST(test_clk_div3);
     RUN_TEST(test_clk_external_clock);
     RUN_TEST(test_clk_reset);
+    RUN_TEST(test_selector_cv);
+    RUN_TEST(test_selector_step);
+    RUN_TEST(test_mux_picks_input);
+    RUN_TEST(test_mux_switch_is_smooth);
+    RUN_TEST(test_dmx_routes);
     return UNITY_END();
 }

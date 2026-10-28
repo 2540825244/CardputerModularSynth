@@ -3,7 +3,7 @@
 
 // 12x12 1-bit icons, one uint16_t per row, bit 11 = leftmost pixel. Hand-drawn from the SVGs in
 // docs/design/mockups.html.
-enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Tilt, Mix, Atn, Snh, Clk, Count };
+enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Tilt, Mix, Atn, Snh, Clk, Mux, Dmx, Count };
 
 constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Keys
@@ -81,4 +81,10 @@ constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Clk (pulse train)
      0b000000000000, 0b000000000000, 0b000000000000, 0b111001110011, 0b101001010010, 0b101001010010,
      0b101001010010, 0b101001010010, 0b101111011110, 0b000000000000, 0b000000000000, 0b000000000000},
+    {// Mux (three inputs, a switch, one output)
+     0b000000000000, 0b111000000000, 0b000100000000, 0b000010000000, 0b111001000000, 0b000000111111,
+     0b000000000000, 0b000000000000, 0b111000000000, 0b000000000000, 0b000000000000, 0b000000000000},
+    {// Dmx (one input, a switch, three outputs)
+     0b000000000000, 0b000000000111, 0b000000000000, 0b000000000000, 0b111111000000, 0b000000100111,
+     0b000000010000, 0b000000001000, 0b000000000111, 0b000000000000, 0b000000000000, 0b000000000000},
 };

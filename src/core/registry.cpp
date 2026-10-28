@@ -1,12 +1,14 @@
 #include "registry.h"
 #include <cstring>
 #include "modules/dly.h"
+#include "modules/dmx.h"
 #include "modules/env.h"
 #include "modules/keys.h"
 #include "modules/atn.h"
 #include "modules/clk.h"
 #include "modules/lfo.h"
 #include "modules/mix.h"
+#include "modules/mux.h"
 #include "modules/out.h"
 #include "modules/snh.h"
 #include "modules/osc.h"
@@ -27,6 +29,8 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kAtnType,
     &kSnhType,
     &kClkType,
+    &kMuxType,
+    &kDmxType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {
