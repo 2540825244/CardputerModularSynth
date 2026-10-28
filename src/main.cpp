@@ -2,6 +2,7 @@
 #include <esp_heap_caps.h>
 #include <xtensa/hal.h>
 #include "core/engine.h"
+#include "core/modules/grd.h"
 #include "core/modules/tilt.h"
 #include "core/patch.h"
 #include "core/registry.h"
@@ -113,6 +114,8 @@ void setup() {
     gEngine.setLargestBlock(largestBlock);
     if (!audioBegin(gEngine)) Serial.println("audioBegin FAILED");
     printHeap("init");
+    Serial.printf("[grd] needs %u B: one block of %u + the rest\n", (unsigned)kGrdType.ramBytes,
+                  (unsigned)kGrdType.largestAlloc);
     xTaskCreatePinnedToCore(uiTask, "ui", 12288, nullptr, 1, nullptr, 0);
     vTaskDelete(nullptr);  // loop() never runs
 }

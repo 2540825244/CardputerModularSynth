@@ -460,6 +460,7 @@ input, and more keyboard layouts that switch without rewiring. **[owner]** How e
 - A module the patch holds but could not create toasts "NO RAM" (retried every ~130 ms).
 - Toasts: "CPU FULL" when the measured load stays above 95 % for 0.5 s; "NO RAM" when a save cannot get
   the heap (nothing is written: a truncated JSON would replace a good file); "SKIPPED n TYP" names the
-  type a load left out for budget. GRD is one heap block (object + Plaits buffer).
+  type a load left out for budget. GRD takes two heap blocks (16 KB Plaits buffer + ~11 KB object):
+  two fit a fragmented heap more often than one of ~28 KB.
 - KEYS: a latched note keeps sounding when you leave the Play page (space audition is off while latched). CHROMATIC starts at C3 again
   (v1.1's bottom row), so old patches keep their octave.

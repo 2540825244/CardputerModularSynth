@@ -76,21 +76,19 @@ const PageDef kGrdPages[] = {
 constexpr size_t kShared = 16384;            // Plaits' engine buffer
 constexpr int kChunk = (int)plaits::kBlockSize;  // Plaits' envelopes and LPG step once per 12 samples
 
-// One heap block: the object with Plaits' 16 KB buffer right behind it (two blocks could pass
-// the largest-block check and still fail the second allocation).
+// Two heap blocks, the 16 KB Plaits buffer and the ~11 KB object: on a fragmented heap two
+// blocks are found far more often than one of ~28 KB. canAddLive checks the bigger one; if the
+// second then fails, create() returns nullptr and the UI toasts "NO RAM".
 class Grd : public Module {
    public:
-    static void* operator new(size_t sz, const std::nothrow_t& nt) noexcept { return ::operator new(sz + kShared, nt); }
-    static void operator delete(void* p) noexcept { ::operator delete(p); }
-    static void operator delete(void* p, const std::nothrow_t&) noexcept { ::operator delete(p); }
-
-    Grd() : Module(kGrdType), shared_(reinterpret_cast<char*>(this) + sizeof(Grd)) {
+    explicit Grd(char* shared) : Module(kGrdType), shared_(shared) {
         stmlib::BufferAllocator a(shared_, kShared);
         voice_.Init(&a);
         lad_.Init(kSampleRate);
         env_.Init(kSampleRate);
         cutSlew_.setTimeMs(10.f, kSampleRate / 8.f);
     }
+    ~Grd() override { delete[] shared_; }
 
     void process(const float* const* ins, const bool* c) override {
         const int vca = (int)param(kVca), flt = (int)param(kFlt);
@@ -200,9 +198,15 @@ class Grd : public Module {
     bool seeded_ = false;
 };
 
-Module* create() { return new (std::nothrow) Grd(); }
+Module* create() {
+    char* shared = new (std::nothrow) char[kShared];
+    if (!shared) return nullptr;
+    Grd* g = new (std::nothrow) Grd(shared);
+    if (!g) delete[] shared;
+    return g;
+}
 
-constexpr uint32_t kOneBlock = sizeof(Grd) + kShared;
+constexpr uint32_t kLargest = sizeof(Grd) > kShared ? sizeof(Grd) : kShared;
 
 }  // namespace
 
@@ -216,4 +220,4 @@ const ModuleTypeInfo kGrdType = {
     22, kParams, 9, kInKeys, kInLabels, 4, kOutKeys, kOutLabels,
     // cpuCycles: a guess until measured on the device (Engine learns it); the engine can change
     // live, so a lower measurement never lowers it.
-    2400, kOneBlock + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kOneBlock, true};
+    2400, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kLargest, true};
