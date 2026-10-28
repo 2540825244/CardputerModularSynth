@@ -5,6 +5,7 @@
 #include "modules/proc.h"
 #include "modules/src.h"
 #include "modules/mod.h"
+#include "modules/grd.h"
 #include "modules/dmx.h"
 #include "modules/env.h"
 #include "modules/keys.h"
@@ -30,6 +31,7 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kLfoType,
     &kDlyType,
     &kOutType,
+    &kGrdType,  // after the v1 eight (tests index those); third on the Sources page
     &kMixType,
     &kAtnType,
     &kSnhType,

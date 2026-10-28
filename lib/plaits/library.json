@@ -1,0 +1,12 @@
+{
+  "name": "plaits",
+  "version": "1.2.0",
+  "description": "Mutable Instruments Plaits DSP (macro oscillator) with the stmlib parts it needs. MIT.",
+  "license": "MIT",
+  "build": {
+    "includeDir": ".",
+    "srcDir": ".",
+    "srcFilter": ["+<plaits/dsp/>", "+<plaits/resources.cc>", "+<stmlib/dsp/>", "+<stmlib/utils/>"],
+    "flags": ["-DTEST", "-Wno-unused-parameter", "-Wno-unused-variable", "-Wno-double-promotion"]
+  }
+}

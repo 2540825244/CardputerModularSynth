@@ -41,3 +41,10 @@ preset("TURING", {
     "r": ("rev", 16, {"size": 0.9, "decay": 0.7, "mix": 0.4}), "x": ("out", 17, {}),
 }, [("c", "out", "t", "clk"), ("t", "cv", "q", "in"), ("q", "out", "o", "pitch"), ("t", "gate", "o", "trig"),
     ("o", "out", "r", "in"), ("r", "out", "x", "in")])
+
+# v1.2 Task 13: GRD (Plaits / Grind)
+preset("GRIND", {
+    "k": ("keys", 12, {}), "g": ("grd", 13, {"eng": 0, "harm": 0.4, "timb": 0.5, "morph": 0.3, "decay": 0.6}),
+    "l": ("lfo", 25, {"wave": 0, "rate": 0.3}), "r": ("rev", 14, {"mix": 0.25}), "x": ("out", 15, {}),
+}, [("k", "pitch", "g", "pitch"), ("k", "gate", "g", "trig"), ("l", "out", "g", "timb", 0.3), ("g", "out", "r", "in"),
+    ("r", "out", "x", "in")])

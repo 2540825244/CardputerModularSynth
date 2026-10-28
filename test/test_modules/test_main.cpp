@@ -26,6 +26,7 @@
 #include "core/modules/proc.h"
 #include "core/modules/src.h"
 #include "core/modules/mod.h"
+#include "core/modules/grd.h"
 #include "core/scales.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
@@ -1338,6 +1339,59 @@ void test_sco_tuner() {
     delete m;
 }
 
+
+// ---- v1.2 Task 13: GRD ----
+void test_grd_every_engine_makes_sound() {
+    static float tr[kBlock], z[kBlock];
+    for (int e = 0; e < 24; e++) {
+        Module* m = kGrdType.create();
+        TEST_ASSERT_NOT_NULL(m);
+        for (int i = 0; i < kGrdType.numParams; i++) m->setParam(i, kGrdType.params[i].def);
+        m->setParam(0, (float)e);
+        const float* ins[kMaxIns] = {z, tr, z, z, z, z, z, z};
+        bool c[kMaxIns] = {false, true};
+        double sum = 0;
+        int n = 0;
+        for (int b = 0; b < 450; b++) {  // 300 ms, a trigger every 100 ms
+            constBlock(tr, (b % 150) < 4 ? 5.f : 0.f);
+            m->process(ins, c);
+            for (int k = 0; k < kBlock; k++) {
+                const float v = m->out(0)[k];
+                TEST_ASSERT_TRUE(std::isfinite(v));
+                if (b >= 30) {
+                    sum += (double)v * v;
+                    n++;
+                }
+            }
+        }
+        char msg[48];
+        snprintf(msg, sizeof msg, "engine %d (%s) rms %f", e, kGrdType.params[0].enumNames[e], std::sqrt(sum / n));
+        TEST_ASSERT_TRUE_MESSAGE(std::sqrt(sum / n) > 0.004, msg);  // 6OC default patch is quiet (~0.008)
+        delete m;
+    }
+}
+
+void test_grd_pitch_tracks() {
+    Module* m = kGrdType.create();
+    for (int i = 0; i < kGrdType.numParams; i++) m->setParam(i, kGrdType.params[i].def);
+    m->setParam(0, 2.f);   // FM
+    m->setParam(3, 0.f);   // harmonics: ratio 1
+    m->setParam(4, 0.f);   // timbre: no modulation -> a sine at the note
+    static float pit[kBlock], z[kBlock];
+    constBlock(pit, 0.f);
+    const float* ins[kMaxIns] = {pit, z, z, z, z, z, z, z};
+    bool c[kMaxIns] = {true};
+    std::vector<float> v;
+    for (int b = 0; b < 600; b++) {
+        m->process(ins, c);
+        if (b > 100) v.insert(v.end(), m->out(0), m->out(0) + kBlock);
+    }
+    TEST_ASSERT_FLOAT_WITHIN(261.63f * 0.03f, 261.63f, crossingHz(v));
+    TEST_ASSERT_EQUAL(8, grdEngineIndex(0));
+    TEST_ASSERT_EQUAL(0, grdEngineIndex(16));
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -1416,5 +1470,7 @@ int main() {
     RUN_TEST(test_lfo_old_waves_same);
     RUN_TEST(test_ad_loop);
     RUN_TEST(test_sco_tuner);
+    RUN_TEST(test_grd_every_engine_makes_sound);
+    RUN_TEST(test_grd_pitch_tracks);
     return UNITY_END();
 }
