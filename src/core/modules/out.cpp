@@ -43,6 +43,6 @@ void OutModule::process(const float* const* ins, const bool* connected) {
 }
 
 const ModuleTypeInfo kOutType = {
-    "out", "OUT", "Master out: speaker / line level", Category::Processor, Icon::Out,
+    "out", "OUT", "Master out, speaker/line level", Category::Utility, Icon::Out,
     Drawing::None, 3, kParams, 1, kInKeys, kInLabels, 0, nullptr, nullptr,
     15, sizeof(OutModule), 1, create};

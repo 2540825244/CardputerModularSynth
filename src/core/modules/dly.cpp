@@ -88,6 +88,6 @@ Module* create() {
 }  // namespace
 
 const ModuleTypeInfo kDlyType = {
-    "dly", "DLY", "Delay up to 1 s, feedback, time CV", Category::Processor, Icon::Dly,
+    "dly", "DLY", "Delay to 1 s with feedback", Category::Effect, Icon::Dly,
     Drawing::None, 3, kParams, 2, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     30, sizeof(Dly) + kBlock * sizeof(float), kDelaySlots, create};

@@ -29,7 +29,9 @@ const char* errText(PatchError e) {
 
 namespace {
 
-int typeAtCell(int cell) { return placeTypeAt((uint8_t)(cell / kGridCols), (uint8_t)(cell % kGridCols)); }
+int typeAtCell(const UiState& s, int cell) {
+    return placeTypeAt(s.placePage, (uint8_t)(cell / kGridCols), (uint8_t)(cell % kGridCols));
+}
 
 void place(UiController& ui) {
     UiState& s = ui.mut();
@@ -62,23 +64,28 @@ bool placeViewAction(UiController& ui, const Action& a) {
     UiState& s = ui.mut();
     switch (a.act) {
         case Act::Select: {
-            const int t = typeAtCell(a.cell);
+            const int t = typeAtCell(s, a.cell);
             if (t >= 0) s.placeType = (int8_t)t;
             break;
         }
         case Act::Activate:
         case Act::Sweep:
             if (a.cell >= 0) {
-                const int t = typeAtCell(a.cell);
+                const int t = typeAtCell(s, a.cell);
                 if (t < 0) break;
                 s.placeType = (int8_t)t;
             }
             place(ui);
             break;
         case Act::Key:
-            if (!a.key.grid && a.key.type == KeyEvent::Down && a.key.side == Side::Esc) {
+            if (a.key.grid || a.key.type != KeyEvent::Down) break;
+            if (a.key.side == Side::Esc) {
                 if (s.placeType >= 0) s.placeType = -1;
                 else s.view = View::Patch;
+            } else if (a.key.side == Side::Tab) {  // next / previous category page
+                const int n = placePageCount();
+                s.placePage = (uint8_t)((s.placePage + n + (ui.fnHeld() ? -1 : 1)) % n);
+                s.placeType = -1;
             }
             break;
         case Act::SweepEnd:

@@ -21,6 +21,7 @@ struct UiState {
     int16_t moveFromId; // ctrl-move pending: id, -1 none
     uint8_t placeCell;  // target of the place menu
     int8_t placeType;   // index into allTypes() whose details are shown, -1 = tile grid
+    uint8_t placePage;  // place menu: category page (kept between visits)
     Carry carry;
     uint8_t escPresses;
     char toast[24];

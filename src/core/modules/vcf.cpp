@@ -78,6 +78,6 @@ Module* create() { return new Vcf(); }
 }  // namespace
 
 const ModuleTypeInfo kVcfType = {
-    "vcf", "VCF", "LP/HP 12 dB SVF, 1V/OCT cutoff CV", Category::Processor, Icon::Vcf,
+    "vcf", "VCF", "12 dB LP/HP filter, cutoff CV", Category::Processor, Icon::Vcf,
     Drawing::FilterCurve, 4, kParams, 3, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     45, sizeof(Vcf) + kBlock * sizeof(float), 0, create};

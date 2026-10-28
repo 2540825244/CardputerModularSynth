@@ -80,6 +80,9 @@ SideIcons sideIcons(const UiState& s, const Patch& p, bool fnHeld) {
             break;
         case View::Place:
             set(r, Side::Esc, Ic::Back, "BACK");
+            snprintf(r.tabText, sizeof r.tabText, "%s", placePageName(s.placePage));
+            r.shown[(int)Side::Tab] = true;
+            r.name[(int)Side::Tab] = "CATEG";
             if (s.placeType >= 0) set(r, Side::Enter, Ic::Enter, "PLACE");
             break;
         case View::File:

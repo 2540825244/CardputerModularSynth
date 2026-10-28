@@ -76,9 +76,15 @@ struct Fx {
     void holdSide(Side s) { sideDown(s); send(KeyEvent::Hold, false, 0, 0, s); }
     void slot(int c) { tap(c, 0); side(Side::Enter); }  // file menu: select a slot, then do it
     // place-menu tile of type index `ty` (allTypes order)
-    void tileTap(int ty) { uint8_t r, c; placeCellOf(ty, &r, &c); tap(c, r); }
-    void tileHold(int ty) { uint8_t r, c; placeCellOf(ty, &r, &c); hold(c, r); }
-    void tileUp(int ty) { uint8_t r, c; placeCellOf(ty, &r, &c); up(c, r); }
+    // place-menu tile of type `ty`: flips to its category page with tab first
+    void tilePage(int ty, uint8_t* r, uint8_t* c) {
+        int pg = 0;
+        placeCellOf(ty, &pg, r, c);
+        for (int i = 0; i < 8 && ui.state().placePage != pg; i++) side(Side::Tab);
+    }
+    void tileTap(int ty) { uint8_t r, c; tilePage(ty, &r, &c); tap(c, r); }
+    void tileHold(int ty) { uint8_t r, c; tilePage(ty, &r, &c); hold(c, r); }
+    void tileUp(int ty) { uint8_t r, c; tilePage(ty, &r, &c); up(c, r); }
     // place type `ty` at (c,r) on the current page via fn+cell
     void place(int ty, int c, int r) {
         sideDown(Side::Fn);
@@ -1073,45 +1079,68 @@ void test_keys_settings_enter_is_do_it() {
     TEST_ASSERT_TRUE(f.ui.state().view == View::Module && f.ui.state().modPage == 1);
 }
 
-// ---- v1.1: place menu by category ----
-void test_place_type_at_by_category() {
-    TEST_ASSERT_EQUAL(TKeys, placeTypeAt(1, 0));
-    TEST_ASSERT_EQUAL(TOsc, placeTypeAt(1, 1));
-    TEST_ASSERT_EQUAL(TEnv, placeTypeAt(2, 0));
-    TEST_ASSERT_EQUAL(TLfo, placeTypeAt(2, 1));
-    TEST_ASSERT_EQUAL(TVcf, placeTypeAt(3, 0));
-    TEST_ASSERT_EQUAL(TOut, placeTypeAt(3, 3));
-    TEST_ASSERT_EQUAL(-1, placeTypeAt(1, 5));
-    TEST_ASSERT_EQUAL(-1, placeTypeAt(0, 0));
-    TEST_ASSERT_EQUAL(-1, placeTypeAt(4, 0));
+// ---- v1.2: place menu, one page per category ----
+void test_place_pages_by_category() {
+    TEST_ASSERT_EQUAL(5, placePageCount());
+    TEST_ASSERT_EQUAL(TKeys, placeTypeAt(0, 1, 0));
+    TEST_ASSERT_EQUAL(TOsc, placeTypeAt(0, 1, 1));
+    TEST_ASSERT_EQUAL(TEnv, placeTypeAt(1, 1, 0));
+    TEST_ASSERT_EQUAL(TLfo, placeTypeAt(1, 1, 1));
+    TEST_ASSERT_EQUAL(TVcf, placeTypeAt(2, 1, 0));
+    TEST_ASSERT_EQUAL(TDly, placeTypeAt(3, 1, 0));
+    TEST_ASSERT_EQUAL(TOut, placeTypeAt(4, 1, 0));
+    TEST_ASSERT_EQUAL(-1, placeTypeAt(0, 0, 0));
+    TEST_ASSERT_EQUAL(-1, placeTypeAt(0, 4, 0));
+    TEST_ASSERT_EQUAL(-1, placeTypeAt(5, 1, 0));
 }
 
 void test_place_cell_of_inverts() {
     int n = 0;
     allTypes(&n);
     for (int i = 0; i < n; i++) {
+        int pg = 0;
         uint8_t r = 0, c = 0;
-        TEST_ASSERT_TRUE(placeCellOf(i, &r, &c));
-        TEST_ASSERT_EQUAL(i, placeTypeAt(r, c));
+        TEST_ASSERT_TRUE(placeCellOf(i, &pg, &r, &c));
+        TEST_ASSERT_EQUAL(i, placeTypeAt(pg, r, c));
     }
+    int pg;
     uint8_t r, c;
-    TEST_ASSERT_FALSE(placeCellOf(n, &r, &c));
-    TEST_ASSERT_FALSE(placeCellOf(-1, &r, &c));
+    TEST_ASSERT_FALSE(placeCellOf(n, &pg, &r, &c));
+    TEST_ASSERT_FALSE(placeCellOf(-1, &pg, &r, &c));
 }
 
-void test_place_menu_row2_tile() {
+void test_place_tab_flips_category() {
     Fx f;
     f.sideDown(Side::Fn);
     f.tap(2, 1);
     f.sideUp(Side::Fn);
-    f.tap(0, 2);
+    TEST_ASSERT_EQUAL(0, f.ui.state().placePage);
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(1, f.ui.state().placePage);
+    f.tap(0, 1);
     TEST_ASSERT_EQUAL(TEnv, f.ui.state().placeType);
     f.tap(5, 0);  // the top row holds the details: no tile there
     TEST_ASSERT_EQUAL(TEnv, f.ui.state().placeType);
+    f.sideDown(Side::Fn);
+    f.side(Side::Tab);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(0, f.ui.state().placePage);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().placeType);  // a page flip clears the details
+    f.side(Side::Tab);
+    f.tap(0, 1);
     f.side(Side::Enter);
     const ModuleRec* m = gPatch.findAt(0, 14);
     TEST_ASSERT_NOT_NULL(m);
     TEST_ASSERT_TRUE(m->type == &kEnvType);
+}
+
+void test_all_blurbs_short() {
+    int n = 0;
+    const ModuleTypeInfo* const* t = allTypes(&n);
+    for (int i = 0; i < n; i++) {
+        TEST_ASSERT_TRUE_MESSAGE(strlen(t[i]->blurb) <= 32, t[i]->id);
+        TEST_ASSERT_TRUE_MESSAGE(strlen(t[i]->name) <= 3, t[i]->id);
+    }
 }
 
 // ---- v1.1 review round 1 ----
@@ -1615,9 +1644,10 @@ int main() {
     RUN_TEST(test_file_hold_slot_loads);
     RUN_TEST(test_file_slot_cleared_on_open);
     RUN_TEST(test_keys_settings_enter_is_do_it);
-    RUN_TEST(test_place_type_at_by_category);
+    RUN_TEST(test_place_pages_by_category);
+    RUN_TEST(test_place_tab_flips_category);
+    RUN_TEST(test_all_blurbs_short);
     RUN_TEST(test_place_cell_of_inverts);
-    RUN_TEST(test_place_menu_row2_tile);
     RUN_TEST(test_carry_out_of_keys_settings);
     RUN_TEST(test_hold_enter_on_stepped_param_steps);
     RUN_TEST(test_file_tab_clears_slot);

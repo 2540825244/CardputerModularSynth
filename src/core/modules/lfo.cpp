@@ -50,6 +50,6 @@ Module* create() { return new Lfo(); }
 }  // namespace
 
 const ModuleTypeInfo kLfoType = {
-    "lfo", "LFO", "Sine/square, 0.01-40 Hz, rate CV", Category::Modulator, Icon::Lfo,
+    "lfo", "LFO", "Sine/square LFO, rate CV", Category::Modulator, Icon::Lfo,
     Drawing::None, 2, kParams, 1, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     12, sizeof(Lfo) + kBlock * sizeof(float), 0, create};

@@ -52,38 +52,36 @@ CellRef moduleCell(const ModuleTypeInfo& t, int page, uint8_t row, uint8_t col) 
     return c_;
 }
 
-namespace {
-uint8_t rowOf(Category c) {
-    switch (c) {
-        case Category::Source: return 1;
-        case Category::Modulator: return 2;
-        case Category::Processor: break;
-    }
-    return 3;
-}
-}  // namespace
+int placePageCount() { return 5; }
 
-int placeTypeAt(uint8_t row, uint8_t col) {
-    if (row < 1 || row > 3 || col >= kGridCols) return -1;
+const char* placePageName(int page) {
+    static const char* const kNames[] = {"SRC", "MOD", "PRC", "FX", "UTL"};
+    return page >= 0 && page < 5 ? kNames[page] : "";
+}
+
+int placeTypeAt(int page, uint8_t row, uint8_t col) {
+    if (row < 1 || row > 3 || col >= kGridCols || page < 0 || page >= placePageCount()) return -1;
+    const int want = (row - 1) * kGridCols + col;
     int n = 0;
     const ModuleTypeInfo* const* t = allTypes(&n);
     int k = 0;
     for (int i = 0; i < n; i++)
-        if (rowOf(t[i]->category) == row && k++ == col) return i;
+        if ((int)t[i]->category == page && k++ == want) return i;
     return -1;
 }
 
-bool placeCellOf(int typeIdx, uint8_t* row, uint8_t* col) {
+bool placeCellOf(int typeIdx, int* page, uint8_t* row, uint8_t* col) {
     int n = 0;
     const ModuleTypeInfo* const* t = allTypes(&n);
     if (typeIdx < 0 || typeIdx >= n) return false;
-    const uint8_t r = rowOf(t[typeIdx]->category);
+    const int pg = (int)t[typeIdx]->category;
     int k = 0;
     for (int i = 0; i < typeIdx; i++)
-        if (rowOf(t[i]->category) == r) k++;
-    if (k >= kGridCols) return false;
-    *row = r;
-    *col = (uint8_t)k;
+        if ((int)t[i]->category == pg) k++;
+    if (k >= 3 * kGridCols) return false;
+    *page = pg;
+    *row = (uint8_t)(1 + k / kGridCols);
+    *col = (uint8_t)(k % kGridCols);
     return true;
 }
 

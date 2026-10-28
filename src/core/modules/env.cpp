@@ -60,6 +60,6 @@ Module* create() { return new Env(); }
 }  // namespace
 
 const ModuleTypeInfo kEnvType = {
-    "env", "ENV", "ADSR 0-5V, gate + retrigger", Category::Modulator, Icon::Env,
+    "env", "ENV", "ADSR envelope with retrigger", Category::Modulator, Icon::Env,
     Drawing::Envelope, 4, kParams, 2, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     25, sizeof(Env) + kBlock * sizeof(float), 0, create};
