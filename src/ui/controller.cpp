@@ -131,6 +131,17 @@ void UiController::tick(uint32_t nowMs) {
     if (s_.toast[0] && (int32_t)(nowMs - s_.toastUntilMs) >= 0) s_.toast[0] = 0;
     now_ = nowMs;
     engine_.collect();
+    // A module in the patch that could not be created (no heap block) makes no sound: say so.
+    // 300 ms first: a DLY swap is missing until the audio thread lets go of the old one.
+    if (engine_.missing() == 0) {
+        missingSinceMs_ = 0;
+        missingWarned_ = false;
+    } else if (!missingSinceMs_) {
+        missingSinceMs_ = nowMs | 1u;
+    } else if (!missingWarned_ && nowMs - missingSinceMs_ >= 300) {
+        toast("NO RAM", nowMs);
+        missingWarned_ = true;
+    }
     if (tilt_.active) return;  // no autosave mid-gesture
     if (!s_.dirty || (int32_t)(nowMs - s_.lastEditMs) < 2000) return;
     if (autosaveBackoff_ && (int32_t)(nowMs - autosaveRetryMs_) < 0) return;
@@ -208,7 +219,13 @@ bool UiController::loadPreset(int i, bool keepUndo, char* msg, size_t msgSize) {
 }
 
 namespace {
-void doClear(Patch& p, void*) { p.clear(); }
+void doClear(Patch& p, void*) {
+    // Keep nextId: a new module must not reuse an id an undo could bring back (Engine::apply
+    // would hand it the old module's DSP state).
+    const uint16_t next = p.nextId;
+    p.clear();
+    p.nextId = next;
+}
 }  // namespace
 
 void UiController::newPatch() {

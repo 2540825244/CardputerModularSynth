@@ -58,7 +58,7 @@ void copyTo(UiController& ui, uint16_t id, int cell) {
         ui.toast("TOO MANY", ui.now());
         return;
     }
-    const Refusal r = ui.engine().canAdd(ui.patch(), *src->type);
+    const Refusal r = ui.engine().canAddLive(ui.patch(), *src->type);
     if (!r.ok) {
         ui.toast(r.reason, ui.now());
         return;

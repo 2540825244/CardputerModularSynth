@@ -11,14 +11,13 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 
-## Next step (as of 2026-10-28, session 3)
-v1.2 "feature complete" (plan `docs/superpowers/plans/2026-10-28-v1.2-feature-complete.md`, spec §14) is
-built on branch `feat/v1-firmware`: Tasks 1–13 done (pages everywhere, new gestures, input attenuverters,
-side-key feedback/help, ~45 new modules, GRD = Plaits in `lib/plaits`, KEYS layouts, presets, settings).
-Ledger with every ruling: `.superpowers/sdd/2026-10-28-v1.2-feature-complete/progress.md`.
-1. Owner flashes `dist/modsynth-v1.2-test.bin` and runs `dist/test-3-script.md` (it also covers the
-   unreported v1.1 items: tilt feel after the flip, first-boot audio). Watch for: GRD CPU (serial `cpu=`),
-   "NO RAM" refusals (static RAM is 265 KB of 327 KB), any crackle.
+## Next step (as of 2026-10-28, session 4)
+v1.2 "feature complete" (plan `docs/superpowers/plans/2026-10-28-v1.2-feature-complete.md`, spec §14 + §14.1) is
+built on branch `feat/v1-firmware`: Tasks 1–13 done, review rounds 1–2 fixed, GRD is now a whole Grind voice,
+and adding modules checks measured CPU. Ledger with every ruling: `.superpowers/sdd/2026-10-28-v1.2-feature-complete/progress.md`.
+1. Owner flashes `dist/modsynth-v1.2-test2.bin` and runs `dist/test-4-script.md` with the serial monitor on.
+   The `cost id=measured/estimate` lines give the real cpuCycles: put them into the type tables
+   (GRD = its worst engine). Also watch `stackHw ... audio=` (8 KB stack) and "NO RAM" toasts.
 2. Fix what the report finds, then Task 14: final whole-branch review, finish the branch.
 3. Execution mode: native, plus one persistent Opus reviewer agent. No other subagents.
    Automatic speaker/line switching stays manual (owner, 2026-10-28). USB MIDI host is deferred.

@@ -660,20 +660,20 @@ void test_play_notes() {
     float buf[kBlock];
     f.down(0, 3);
     f.eng.processBlock(buf);
-    TEST_ASSERT_EQUAL_FLOAT(36.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(48.f, k->monitor(0));
     TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
     f.down(4, 2);
     f.eng.processBlock(buf);
-    TEST_ASSERT_EQUAL_FLOAT(52.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(64.f, k->monitor(0));
     f.up(4, 2);
     f.eng.processBlock(buf);
-    TEST_ASSERT_EQUAL_FLOAT(36.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(48.f, k->monitor(0));
     TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
     f.up(0, 3);
     f.eng.processBlock(buf);
     f.eng.processBlock(buf);
     TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
-    TEST_ASSERT_EQUAL(52, f.ui.lastNote);
+    TEST_ASSERT_EQUAL(64, f.ui.lastNote);
 }
 
 void test_play_esc_notes_off() {
@@ -1740,9 +1740,9 @@ void test_bit_cell_tap_toggles() {
 
 // ---- v1.2 Task 12: KEYS layouts ----
 void test_chr_layout() {
-    TEST_ASSERT_EQUAL(36, keysNoteAt(kLayChr, 0, 0, 3, 0));
-    TEST_ASSERT_EQUAL(47, keysNoteAt(kLayChr, 0, 0, 3, 11));
-    TEST_ASSERT_EQUAL(72, keysNoteAt(kLayChr, 0, 0, 0, 0));
+    TEST_ASSERT_EQUAL(48, keysNoteAt(kLayChr, 0, 0, 3, 0));  // C3, as v1.1's bottom row
+    TEST_ASSERT_EQUAL(59, keysNoteAt(kLayChr, 0, 0, 3, 11));
+    TEST_ASSERT_EQUAL(84, keysNoteAt(kLayChr, 0, 0, 0, 0));
     TEST_ASSERT_EQUAL(-1, keysNoteAt(kLayChr, 0, 0, 4, 0));
 }
 
@@ -1825,16 +1825,33 @@ void test_latch_holds() {
     f.eng.processBlock(buf);
     f.eng.processBlock(buf);
     TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));  // still sounding after the release
-    TEST_ASSERT_EQUAL_FLOAT(36.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(48.f, k->monitor(0));
     f.tap(2, 3);  // another key moves the held note
     f.eng.processBlock(buf);
-    TEST_ASSERT_EQUAL_FLOAT(38.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(50.f, k->monitor(0));
+    f.side(Side::Esc);  // leaving the page keeps a latched note (a drone to tweak other modules over)
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
+    f.tap(0, 0);  // back to the Play page
+    f.side(Side::Enter);
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
     f.tap(2, 3);  // the same key again releases it
     f.eng.processBlock(buf);
     f.eng.processBlock(buf);
     TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
 }
 
+
+// ---- v1.2 review round 2 ----
+void test_new_patch_keeps_ids_fresh() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    const uint16_t old = gPatch.findAt(0, 13)->id;
+    f.ui.newPatch();
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    f.place(TOsc, 1, 1);
+    TEST_ASSERT_TRUE(gPatch.findAt(0, 13)->id > old);  // never an id an undo could restore
+}
 
 // ---- v1.2 review round 1 ----
 void test_rollover_is_not_a_chord() {
@@ -2016,6 +2033,7 @@ int main() {
     RUN_TEST(test_layout_switch_releases_notes);
     RUN_TEST(test_ctrl_space_octave);
     RUN_TEST(test_latch_holds);
+    RUN_TEST(test_new_patch_keeps_ids_fresh);
     RUN_TEST(test_rollover_is_not_a_chord);
     RUN_TEST(test_chord_pins_refused_leaves_no_carry);
     RUN_TEST(test_play_page_ignores_unseen_release);

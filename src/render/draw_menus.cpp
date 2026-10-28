@@ -21,7 +21,7 @@ void joinLabels(char* out, size_t n, const char* const* labels, int count) {
 }
 
 // Details of the selected type in the top-row band (rows 1-3 hold the tiles), in Font0.
-void drawDetails(const ModuleTypeInfo& t, const Refusal& r, uint32_t cpuUsed) {
+void drawDetails(const ModuleTypeInfo& t, const Refusal& r, uint32_t cpuUsed, uint32_t cost) {
     const int x = cellX(0), y = cellY(0), w = kGridW - 1;
     cv.fillRect(x, y, w, cellH(0), PEmpty);
     cv.setFont(&fonts::Font0);
@@ -41,11 +41,11 @@ void drawDetails(const ModuleTypeInfo& t, const Refusal& r, uint32_t cpuUsed) {
         cv.drawString(r.reason, x + 3, y + 22);
         return;
     }
-    // CPU: what this type would take of the budget, on top of what is used.
+    // CPU: what this type would take of the budget (measured once it has run), on top of what is used.
     const int bw = 60, bx = x + 3, by = y + 24;
     cv.drawRect(bx, by, bw, 5, PDim);
     const int used = (int)(bw * (float)cpuUsed / (float)kCpuBudget);
-    const int add = (int)(bw * (float)t.cpuCycles / (float)kCpuBudget) + 1;
+    const int add = (int)(bw * (float)cost / (float)kCpuBudget) + 1;
     cv.fillRect(bx, by, used > bw ? bw : used, 5, PDim);
     cv.fillRect(bx + used, by, used + add > bw ? bw - used : add, 5, PAccent);
     smallText("CPU", bx + bw + 9, by, PDim);
@@ -66,11 +66,14 @@ void drawPlaceView(const UiState& s, const Patch& p, Engine& e) {
                 emptyCell(col, row, nullptr, false);
                 continue;
             }
-            moduleTile(*types[t], col, row, !e.canAdd(p, *types[t]).ok, 0);
+            moduleTile(*types[t], col, row, !e.canAddLive(p, *types[t]).ok, 0);
             if (t == s.placeType) outline(col, row, PAccent);
         }
     if (s.placeType >= 0 && s.placeType < n) {
-        drawDetails(*types[s.placeType], e.canAdd(p, *types[s.placeType]), e.estimatedCycles());
+        const uint32_t live = (uint32_t)(e.cpuLoad() * (float)kCyclesPerSample);
+        const uint32_t est = e.estimatedCycles();
+        drawDetails(*types[s.placeType], e.canAddLive(p, *types[s.placeType]), est > live ? est : live,
+                    e.costOf(*types[s.placeType]));
     } else {
         static const char* const kTitles[] = {"SOURCES", "MODULATORS", "PROCESSORS", "EFFECTS", "UTILITIES"};
         cv.setFont(&fonts::Font0);

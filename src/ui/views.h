@@ -10,6 +10,7 @@ bool placeViewAction(UiController&, const Action&);
 bool moduleViewAction(UiController&, const Action&);
 bool keysPlayAction(UiController&, const Action&);  // a KEYS Play page (raw keys)
 void keysAllNotesOff(UiController&);
+void keysLeavePage(UiController&);  // esc / tab off the Play page: all off unless latched
 int keysNoteFor(const ModuleRec&, int row, int col);  // the play page's note under a cell, -1 none
 void flipPage(UiController&, const ModuleRec&, int dir);  // module view: tab / fn+tab
 bool fileViewAction(UiController&, const Action&);

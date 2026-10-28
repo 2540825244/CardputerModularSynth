@@ -216,6 +216,74 @@ void test_amount_inverts() {
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 5.f, gSinkIn);
 }
 
+// ---- review r2: measured costs ----
+static uint32_t gClock = 0;
+static uint32_t fakeClock() { return gClock += 32 * 100; }  // every module "takes" 100 cycles/sample
+static uint32_t tinyBlock() { return 2048; }
+
+void test_measured_cost_replaces_estimate() {
+    Engine eng(bigHeap);
+    eng.setCycleCounter(fakeClock);
+    Patch p;
+    add(p, kOscType, 0);
+    add(p, kOutType, 1);
+    eng.apply(p);
+    TEST_ASSERT_EQUAL_UINT32(0, eng.measuredCost(kOscType));
+    TEST_ASSERT_EQUAL_UINT32(kOscType.cpuCycles, eng.costOf(kOscType));
+    float buf[kBlock];
+    for (int i = 0; i < 400; i++) {
+        eng.processBlock(buf);
+        eng.collect();
+    }
+    TEST_ASSERT_UINT32_WITHIN(3, 100, eng.measuredCost(kOscType));
+    TEST_ASSERT_UINT32_WITHIN(3, 112, eng.costOf(kOscType));  // + 1/8 headroom
+    TEST_ASSERT_TRUE(eng.costsChanged());
+    TEST_ASSERT_FALSE(eng.costsChanged());
+    // A type whose cost varies live never drops below its estimate.
+    ModuleTypeInfo varies = kOscType;
+    varies.costVaries = true;
+    TEST_ASSERT_EQUAL_UINT32(kOscType.cpuCycles, eng.costOf(varies));  // not measured: estimate
+}
+
+void test_can_add_live() {
+    Engine eng(bigHeap);
+    Patch p;
+    TEST_ASSERT_TRUE(eng.canAddLive(p, kOscType).ok);
+    eng.setCpuLoad(0.79f);  // 3950 of the 5000 cycles: the costs alone would allow it
+    TEST_ASSERT_TRUE(eng.canAdd(p, kOscType).ok);
+    TEST_ASSERT_EQUAL_STRING("NO CPU", eng.canAddLive(p, kOscType).reason);
+    eng.setCpuLoad(0.f);
+    eng.setLargestBlock(tinyBlock);  // plenty free, but no single 16 KB block
+    ModuleTypeInfo big = kOscType;
+    big.largestAlloc = 16384;
+    TEST_ASSERT_EQUAL_STRING("NO RAM", eng.canAddLive(p, big).reason);
+    TEST_ASSERT_TRUE(eng.canAddLive(p, kOscType).ok);
+}
+
+static bool gRefuse = false;
+static int gCreates = 0;
+static Module* createMaybe() {
+    gCreates++;
+    return gRefuse ? nullptr : createDcSrc();
+}
+
+void test_refused_create_retried_slowly() {
+    ModuleTypeInfo flaky = kDcType;
+    flaky.create = createMaybe;
+    Engine eng(bigHeap);
+    Patch p;
+    p.addModule(flaky, 0, 0, nullptr);
+    gRefuse = true;
+    gCreates = 0;
+    TEST_ASSERT_EQUAL(1, eng.apply(p));
+    TEST_ASSERT_EQUAL(1, eng.missing());
+    for (int i = 0; i < 128; i++) eng.collect();
+    TEST_ASSERT_TRUE(gCreates <= 3);  // 1 in apply + every 64th collect
+    gRefuse = false;
+    for (int i = 0; i < 64; i++) eng.collect();
+    TEST_ASSERT_EQUAL(0, eng.missing());
+}
+
 void test_budget() {
     Patch p;
     Engine small(smallHeap);
@@ -399,6 +467,9 @@ int main() {
     RUN_TEST(test_remove_while_running);
     RUN_TEST(test_amount_inverts);
     RUN_TEST(test_budget);
+    RUN_TEST(test_measured_cost_replaces_estimate);
+    RUN_TEST(test_can_add_live);
+    RUN_TEST(test_refused_create_retried_slowly);
     RUN_TEST(test_apply_param_change_keeps_state);
     RUN_TEST(test_dly_replacement_retries);
     RUN_TEST(test_type_change_recreates);

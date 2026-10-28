@@ -441,3 +441,22 @@ input, and more keyboard layouts that switch without rewiring. **[owner]** How e
   **[owner: Grind macro]** DLY and REV share the two 96 KB buffers.
 - **Deferred:** USB MIDI host (needs the owner's powered OTG adapter to verify, and host mode drops
   the USB serial console).
+
+### 14.1 After review round 2 and the owner's first v1.2 run (2026-10-28)
+- **GRD is a whole Grind voice** **[owner: "grind is supposed to be an all in one with filters and
+  stuff"]**: Plaits -> 24 dB ladder (LP / HP / OFF, CUT, RES, FEG = ADS -> cutoff) -> VCA (ENV = the
+  ADS, LPG = Plaits' own low-pass gate, DRN = open), an ADS whose release is the decay (as on the
+  Grind), and a triangle LFO (rate, -> cutoff, -> timbre). New CUT input; ENV and LFO outputs; pages
+  MAIN / VOICE / MOD. With TRG unpatched the VCA is open, so a fresh GRD sounds. AUX stays raw Plaits.
+  The Grind's sequencer/arp is not in GRD: SEQ, TUR and KEYS cover it. **[Claude's call on the details]**
+- Patched CV on GRD's FM/TIM/MOR goes in at amount 1 (the input's attenuverter scales it); FMA/TMA/MMA
+  are the internal-envelope amounts. Plaits renders in its own 12-sample steps, so DEC times match.
+- Every module now has room for 22 params and 9 inputs (Patch ~5.3 KB, static RAM 275 of 327 KB).
+- **CPU guard** **[owner report: the bar topped off and audio distorted on adding GRD]**: the audio
+  thread measures each module's cycles; the cost of a type is its measured value + 1/8 once it has
+  run (GRD: never below its estimate, the engine changes live), else its estimate. Adding to the
+  running patch also needs measured load + cost <= budget, and a free heap block for the biggest
+  allocation. The serial log prints `cost id=measured/estimate` when a measurement rises.
+- A module the patch holds but could not create toasts "NO RAM" (retried every ~130 ms).
+- KEYS: a latched note keeps sounding when you leave the Play page. CHROMATIC starts at C3 again
+  (v1.1's bottom row), so old patches keep their octave.

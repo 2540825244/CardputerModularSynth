@@ -37,7 +37,7 @@ void place(UiController& ui) {
     UiState& s = ui.mut();
     if (s.placeType < 0) return;
     const ModuleTypeInfo& t = *allTypes(nullptr)[s.placeType];
-    const Refusal r = ui.engine().canAdd(ui.patch(), t);
+    const Refusal r = ui.engine().canAddLive(ui.patch(), t);
     if (!r.ok) {
         ui.toast(r.reason, ui.now());
         return;

@@ -24,9 +24,13 @@ void run(UiController& ui) {
     if (s.fileSlot >= kSlots) return;
     const std::string path = slotPath(s.fileSlot + 1);
     if (s.filePage == kSave) {
-        if (!ui.storage().available()) ui.toast("NO SD", ui.now());
-        else if (!patchFits(patchToJson(ui.patch()))) ui.toast("PATCH TOO BIG", ui.now());
-        else if (ui.storage().write(path.c_str(), patchToJson(ui.patch()))) ui.toast("SAVED", ui.now());
+        if (!ui.storage().available()) {
+            ui.toast("NO SD", ui.now());
+            return;
+        }
+        const std::string json = patchToJson(ui.patch());  // once: ~16 KB on a tight heap
+        if (!patchFits(json)) ui.toast("PATCH TOO BIG", ui.now());
+        else if (ui.storage().write(path.c_str(), json)) ui.toast("SAVED", ui.now());
         else ui.toast("SAVE FAILED", ui.now());
     } else {
         ui.loadFile(path.c_str(), true, msg, sizeof msg);

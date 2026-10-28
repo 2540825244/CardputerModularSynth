@@ -34,6 +34,6 @@ int keysNoteAt(int layout, int scale, int root, int row, int col) {
         }
         case kLay4th: return 36 + 5 * up + col;
         case kLayPad: return 36 + (col / 4) * 16 + up * 4 + col % 4;
-        default: return 36 + 12 * up + col;  // chromatic, 4 octaves
+        default: return 48 + 12 * up + col;  // chromatic, 4 octaves from C3 (v1.1 played C3 bottom row)
     }
 }

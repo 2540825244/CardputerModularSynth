@@ -256,12 +256,16 @@ uint32_t renderSpriteBytes() { return g_spriteBytes; }
 void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint32_t nowMs, bool fnHeld) {
     if (!g_ready) return;
     using namespace rd;
-    // File-slot presence is cached: refreshed on entering the file view and when a toast appears.
+    // File-slot presence is cached: all slots on entering the file view (36 SD lookups), then
+    // only the slot a SAVE just wrote (nothing else adds or removes a file).
     static bool filled[kSlots];
     static View lastView = View::Patch;
     static uint32_t lastToast = 0;
-    if (s.view == View::File && (lastView != View::File || (s.toast[0] && s.toastUntilMs != lastToast))) {
+    if (s.view == View::File && lastView != View::File) {
         for (int i = 0; i < kSlots; i++) filled[i] = st.exists(slotPath(i + 1).c_str());
+    } else if (s.view == View::File && s.toast[0] && s.toastUntilMs != lastToast && !strcmp(s.toast, "SAVED") &&
+               s.fileSlot >= 0 && s.fileSlot < kSlots) {
+        filled[s.fileSlot] = true;
     }
     lastView = s.view;
     lastToast = s.toastUntilMs;

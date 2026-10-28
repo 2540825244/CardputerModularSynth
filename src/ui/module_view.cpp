@@ -148,7 +148,7 @@ void flipPage(UiController& ui, const ModuleRec& m, int dir) {
     const int n = modulePageCount(*m.type);
     ui.endTilt();
     if (n <= 1) return;
-    if (ui.onPlayPage()) keysAllNotesOff(ui);
+    if (ui.onPlayPage()) keysLeavePage(ui);
     s.modPage = (uint8_t)((s.modPage + n + dir) % n);
     s.modCell = -1;
 }

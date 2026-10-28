@@ -7,12 +7,14 @@
 #include "program.h"
 
 using HeapFreeFn = uint32_t (*)();
+using CycleFn = uint32_t (*)();  // free-running cycle counter (device: CCOUNT)
 struct Refusal {
     bool ok;
     const char* reason;  // "NO CPU", "NO RAM", "NO BUFFER", "MAX 1"
 };
 
-constexpr uint32_t kCpuBudget = 4000;  // cycles per sample
+constexpr uint32_t kCpuBudget = 4000;          // cycles per sample the modules may take
+constexpr uint32_t kCyclesPerSample = 5000;    // 240 MHz / 48 kHz: what the measured load is relative to
 constexpr uint32_t kRamReserve = 24 * 1024;
 
 class Engine {
@@ -22,7 +24,17 @@ class Engine {
     Engine(const Engine&) = delete;
     Engine& operator=(const Engine&) = delete;
 
+    // canAdd: against the per-type costs (measured once a type has run, else its estimate).
+    // canAddLive: adding to the running patch, so the measured load and the largest free heap
+    // block count too.
     Refusal canAdd(const Patch&, const ModuleTypeInfo&) const;
+    Refusal canAddLive(const Patch&, const ModuleTypeInfo&) const;
+    uint32_t costOf(const ModuleTypeInfo&) const;
+    uint32_t measuredCost(const ModuleTypeInfo&) const;  // 0 = not run yet
+    void setCycleCounter(CycleFn f) { cycles_ = f; }
+    void setLargestBlock(HeapFreeFn f) { largestBlock_ = f; }
+    int missing() const { return missing_; }  // modules in the patch with no instance (no RAM)
+    bool costsChanged();  // true once after a measured cost rose (device: print them)
     // UI thread. Returns the number of modules that could not be instantiated (resource pool
     // held by a retired module); collect() retries those.
     int apply(const Patch&);
@@ -36,7 +48,7 @@ class Engine {
 
     void setCpuLoad(float l) { cpuLoad_.store(l, std::memory_order_relaxed); }
     float cpuLoad() const { return cpuLoad_.load(std::memory_order_relaxed); }
-    uint32_t estimatedCycles() const;
+    uint32_t estimatedCycles() const;  // the running patch, from costOf()
 
    private:
     struct Inst {
@@ -54,8 +66,20 @@ class Engine {
     int instantiateAll(const Patch&);  // creates missing, pushes params; returns # missing
     void publish(uint32_t gen);
 
+    struct Learned {
+        const ModuleTypeInfo* t;
+        uint32_t cycles;  // session max of the instances' smoothed per-sample cost
+    };
+    void learnCosts();
+
     HeapFreeFn heapFree_;
+    HeapFreeFn largestBlock_ = nullptr;
+    CycleFn cycles_ = nullptr;
     // UI-thread state
+    std::vector<Learned> learned_;
+    bool costsChanged_ = false;
+    int missing_ = 0;
+    uint32_t collects_ = 0, retryTick_ = 0;
     Patch patch_;
     std::vector<Inst> insts_;
     std::vector<Retired> retired_;

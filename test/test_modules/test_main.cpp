@@ -1171,6 +1171,23 @@ void test_ssw_pitch() {
     TEST_ASSERT_FLOAT_WITHIN(261.63f * 0.02f, 261.63f, crossingHz(v));
 }
 
+void test_vso_pitch() {  // review r2: VSO was stuck at 220 Hz with SYNC off
+    const float c4[] = {0.f, 0.f, 0.f, 0.5f, 0.f, 2.f};
+    TEST_ASSERT_FLOAT_WITHIN(261.63f * 0.02f, 261.63f, crossingHz(runTrig(kVsoType, 300, -1, c4)));
+    const float c5[] = {1.f, 0.f, 0.f, 0.5f, 0.f, 2.f};
+    TEST_ASSERT_FLOAT_WITHIN(523.25f * 0.02f, 523.25f, crossingHz(runTrig(kVsoType, 300, -1, c5)));
+    // SYNC: the reset rate (master) is the note, so the period stays C4's.
+    const float sy[] = {0.f, 0.f, 0.f, 0.5f, 1.f, 1.5f};
+    std::vector<float> v = runTrig(kVsoType, 300, -1, sy);
+    const int per = (int)lroundf(kSampleRate / 261.63f);
+    double diff = 0, ref = 0;
+    for (size_t i = 4000; i + per < v.size(); i++) {
+        diff += fabs(v[i] - v[i + per]);
+        ref += fabs(v[i]);
+    }
+    TEST_ASSERT_TRUE(diff < 0.1 * ref);
+}
+
 void test_fmo_index_zero_is_sine() {
     const float p[] = {0.f, 0.f, 2.f, 0.f};
     std::vector<float> v = runTrig(kFmoType, 300, -1, p);
@@ -1348,6 +1365,8 @@ void test_grd_every_engine_makes_sound() {
         TEST_ASSERT_NOT_NULL(m);
         for (int i = 0; i < kGrdType.numParams; i++) m->setParam(i, kGrdType.params[i].def);
         m->setParam(0, (float)e);
+        m->setParam(11, 1.f);  // VCA = LPG, FLT = OFF: the bare Plaits voice
+        m->setParam(12, 2.f);
         const float* ins[kMaxIns] = {z, tr, z, z, z, z, z, z};
         bool c[kMaxIns] = {false, true};
         double sum = 0;
@@ -1391,6 +1410,73 @@ void test_grd_pitch_tracks() {
     TEST_ASSERT_TRUE(kGrdType.ramBytes < 64 * 1024);
     TEST_ASSERT_EQUAL(0, grdEngineIndex(16));
     delete m;
+}
+
+// ---- review r2: GRD is a whole Grind voice ----
+static double grdRms(Module* m, const float* const* ins, const bool* c, int blocks, float* trig, bool gateHigh) {
+    double sum = 0;
+    int n = 0;
+    for (int b = 0; b < blocks; b++) {
+        if (trig) constBlock(trig, gateHigh ? 5.f : 0.f);
+        m->process(ins, c);
+        if (b < blocks / 2) continue;
+        for (int k = 0; k < kBlock; k++) {
+            sum += (double)m->out(0)[k] * m->out(0)[k];
+            n++;
+        }
+    }
+    return std::sqrt(sum / n);
+}
+
+void test_grd_voice_env_and_filter() {
+    static float tr[kBlock], z[kBlock];
+    Module* m = kGrdType.create();
+    for (int i = 0; i < kGrdType.numParams; i++) m->setParam(i, kGrdType.params[i].def);
+    const float* ins[kMaxIns] = {z, tr, z, z, z, z, z, z, z};
+    bool c[kMaxIns] = {false, true};
+    m->setParam(17, 50.f);  // DCY: release 50 ms
+    const double on = grdRms(m, ins, c, 300, tr, true);
+    const double off = grdRms(m, ins, c, 600, tr, false);
+    TEST_ASSERT_TRUE(on > 0.3);
+    TEST_ASSERT_TRUE(off < 0.01 * on);
+    // No TRG patched: the VCA is open (a drone), so a fresh GRD sounds at once.
+    bool free_[kMaxIns] = {};
+    TEST_ASSERT_TRUE(grdRms(m, ins, free_, 200, nullptr, false) > 0.3);
+    // A low LP cutoff takes most of the saw away; OFF puts it back.
+    m->setParam(13, 80.f);
+    m->setParam(15, 0.f);
+    const double dark = grdRms(m, ins, free_, 200, nullptr, false);
+    m->setParam(12, 2.f);
+    const double raw = grdRms(m, ins, free_, 200, nullptr, false);
+    TEST_ASSERT_TRUE(dark < 0.5 * raw);
+    // ENV and LFO outputs
+    TEST_ASSERT_TRUE(m->out(3)[0] >= -5.01f && m->out(3)[0] <= 5.01f);
+    delete m;
+}
+
+void test_grd_timbre_cv_heard_at_default_amount() {  // review r2: TMA 0 used to zero a patched CV
+    static float tim[kBlock], z[kBlock];
+    auto run = [&](float v) {
+        Module* m = kGrdType.create();
+        for (int i = 0; i < kGrdType.numParams; i++) m->setParam(i, kGrdType.params[i].def);
+        m->setParam(0, 2.f);   // FM engine: timbre = modulation index
+        m->setParam(4, 0.f);
+        m->setParam(12, 2.f);  // FLT OFF
+        constBlock(tim, v);
+        const float* ins[kMaxIns] = {z, z, z, z, tim, z, z, z, z};
+        bool c[kMaxIns] = {false, false, false, false, true};
+        std::vector<float> o;
+        for (int b = 0; b < 200; b++) {
+            m->process(ins, c);
+            if (b > 100) o.insert(o.end(), m->out(0), m->out(0) + kBlock);
+        }
+        delete m;
+        return o;
+    };
+    const std::vector<float> a = run(0.f), b = run(4.f);
+    double d = 0;
+    for (size_t i = 0; i < a.size(); i++) d += fabs(a[i] - b[i]);
+    TEST_ASSERT_TRUE(d / a.size() > 0.1);
 }
 
 int main() {
@@ -1461,6 +1547,7 @@ int main() {
     RUN_TEST(test_kck_trig_makes_sound);
     RUN_TEST(test_str_pluck_decays);
     RUN_TEST(test_ssw_pitch);
+    RUN_TEST(test_vso_pitch);
     RUN_TEST(test_fmo_index_zero_is_sine);
     RUN_TEST(test_quantize_major);
     RUN_TEST(test_seq_steps_and_gates);
@@ -1472,6 +1559,8 @@ int main() {
     RUN_TEST(test_ad_loop);
     RUN_TEST(test_sco_tuner);
     RUN_TEST(test_grd_every_engine_makes_sound);
+    RUN_TEST(test_grd_voice_env_and_filter);
+    RUN_TEST(test_grd_timbre_cv_heard_at_default_amount);
     RUN_TEST(test_grd_pitch_tracks);
     return UNITY_END();
 }

@@ -57,6 +57,8 @@ struct ModuleTypeInfo {
     const PageDef* pages = nullptr;  // nullptr: automatic pages (see src/ui/layout.h)
     uint8_t numPages = 0;
     uint8_t poolSlots = 0;  // big buffers taken from delay_pool (DLY, REV): canAdd refuses past the pool
+    uint32_t largestAlloc = 0;  // biggest single heap block create() needs; 0 = ramBytes
+    bool costVaries = false;    // cost depends on a live param (GRD's engine): never trust a lower measurement
 };
 
 class Module {
@@ -77,6 +79,12 @@ class Module {
     void setPeak(float p) { peak_.store(p, std::memory_order_relaxed); }  // engine only
     float* out(int o) { return outBuf_ + o * kBlock; }  // kBlock floats, persists between blocks
     float monitor(int i) const;
+    // Engine only: smoothed cycles per sample this instance has taken (0 until measured).
+    void addCycles(uint32_t blockCycles) {
+        ema_ += 0.05f * ((float)blockCycles * (1.f / kBlock) - ema_);
+        cost_.store((uint32_t)ema_, std::memory_order_relaxed);
+    }
+    uint32_t measuredCycles() const { return cost_.load(std::memory_order_relaxed); }
     void setMonitor(int i, float v);  // 2 atomic slots for UI animation
 
     // Fills out(o) for kBlock samples. ins[i] is only valid when connected[i].
@@ -94,4 +102,6 @@ class Module {
     std::atomic<float> inAmounts_[kMaxIns];
     std::atomic<float> peak_{0.f};
     std::atomic<float> monitors_[2];
+    float ema_ = 0.f;  // audio thread
+    std::atomic<uint32_t> cost_{0};
 };

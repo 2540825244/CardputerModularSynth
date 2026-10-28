@@ -1,8 +1,10 @@
 #include <M5Cardputer.h>
 #include <esp_heap_caps.h>
+#include <xtensa/hal.h>
 #include "core/engine.h"
 #include "core/modules/tilt.h"
 #include "core/patch.h"
+#include "core/registry.h"
 #include "core/undo.h"
 #include "hw/audio_out.h"
 #include "hw/keyboard.h"
@@ -17,6 +19,8 @@ static Patch gPatch;
 static UndoStack gUndo;
 static SdStorage gSd;
 static Engine gEngine([]() -> uint32_t { return heap_caps_get_free_size(MALLOC_CAP_8BIT); });
+static uint32_t cycleCount() { return xthal_get_ccount(); }
+static uint32_t largestBlock() { return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT); }
 static UiController gUi(gPatch, gEngine, gUndo, gSd);
 static KeyDecoder gDecoder;
 
@@ -73,6 +77,15 @@ static void uiTask(void*) {
                           codecFailures(), (unsigned)uxTaskGetStackHighWaterMark(nullptr),
                           (unsigned)audioStackHighWater());
         }
+        if (gEngine.costsChanged()) {  // measured cycles/sample per type: the numbers to put in cpuCycles
+            int n = 0;
+            const ModuleTypeInfo* const* types = allTypes(&n);
+            Serial.print("cost");
+            for (int i = 0; i < n; i++)
+                if (const uint32_t c = gEngine.measuredCost(*types[i]))
+                    Serial.printf(" %s=%u/%u", types[i]->id, (unsigned)c, (unsigned)types[i]->cpuCycles);
+            Serial.println();
+        }
         if (!steadyPrinted && now > 5000) {
             steadyPrinted = true;
             printHeap("steady");
@@ -96,6 +109,8 @@ void setup() {
     gSd.begin();
     gUi.setDecoder(&gDecoder);
     gUi.bootLoad();
+    gEngine.setCycleCounter(cycleCount);
+    gEngine.setLargestBlock(largestBlock);
     if (!audioBegin(gEngine)) Serial.println("audioBegin FAILED");
     printHeap("init");
     xTaskCreatePinnedToCore(uiTask, "ui", 12288, nullptr, 1, nullptr, 0);

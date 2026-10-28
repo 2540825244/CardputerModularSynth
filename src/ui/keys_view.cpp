@@ -36,6 +36,12 @@ void keysAllNotesOff(UiController& ui) {
     if (KeysModule* k = static_cast<KeysModule*>(ui.engine().instance(ui.mut().openId))) k->gateOff();
 }
 
+void keysLeavePage(UiController& ui) {
+    // A latched note is a drone to tweak other modules over: it keeps sounding. Only the same
+    // key, DEL (panic), a layout change or LATCH OFF release it.
+    if (gLatchedBit < 0) keysAllNotesOff(ui);
+}
+
 int keysNoteFor(const ModuleRec& m, int row, int col) {
     return keysNoteAt((int)m.params[kLayoutParam], (int)m.params[kScaleParam], (int)m.params[kRootParam], row, col);
 }
@@ -86,7 +92,7 @@ void playKey(UiController& ui, const KeyEvent& e) {
     if (e.type != KeyEvent::Down) return;
     switch (e.side) {
         case Side::Esc:
-            keysAllNotesOff(ui);
+            keysLeavePage(ui);
             s.view = View::Patch;
             break;
         case Side::Ctrl:

@@ -24,17 +24,65 @@ Refusal Engine::canAdd(const Patch& p, const ModuleTypeInfo& t) const {
         if (used + t.poolSlots > kDelaySlots) return {false, "NO BUFFER"};
     }
     if (t.maxInstances && have >= t.maxInstances) return {false, "MAX 1"};
-    uint32_t cycles = t.cpuCycles;
-    for (int i = 0; i < p.moduleCount(); i++) cycles += p.moduleAt(i).type->cpuCycles;
+    uint32_t cycles = costOf(t);
+    for (int i = 0; i < p.moduleCount(); i++) cycles += costOf(*p.moduleAt(i).type);
     if (cycles > kCpuBudget) return {false, "NO CPU"};
     if (heapFree_() < t.ramBytes + kRamReserve) return {false, "NO RAM"};
     return {true, nullptr};
 }
 
+Refusal Engine::canAddLive(const Patch& p, const ModuleTypeInfo& t) const {
+    const Refusal r = canAdd(p, t);
+    if (!r.ok) return r;
+    // The costs miss the engine's own work (cables, mixing) and anything not measured yet.
+    const uint32_t live = (uint32_t)(cpuLoad() * (float)kCyclesPerSample);
+    if (live + costOf(t) > kCpuBudget) return {false, "NO CPU"};
+    // Free heap can be plenty while no single block fits (GRD wants 16 KB in one piece).
+    const uint32_t big = t.largestAlloc ? t.largestAlloc : t.ramBytes;
+    if (largestBlock_ && largestBlock_() < big + 1024) return {false, "NO RAM"};
+    return {true, nullptr};
+}
+
+uint32_t Engine::measuredCost(const ModuleTypeInfo& t) const {
+    for (const auto& l : learned_)
+        if (l.t == &t) return l.cycles;
+    return 0;
+}
+
+uint32_t Engine::costOf(const ModuleTypeInfo& t) const {
+    const uint32_t m = measuredCost(t);
+    if (!m) return t.cpuCycles;
+    const uint32_t padded = m + m / 8;  // headroom for cache misses the average hides
+    return t.costVaries && t.cpuCycles > padded ? t.cpuCycles : padded;
+}
+
 uint32_t Engine::estimatedCycles() const {
     uint32_t c = 0;
-    for (int i = 0; i < patch_.moduleCount(); i++) c += patch_.moduleAt(i).type->cpuCycles;
+    for (int i = 0; i < patch_.moduleCount(); i++) c += costOf(*patch_.moduleAt(i).type);
     return c;
+}
+
+void Engine::learnCosts() {
+    for (const auto& in : insts_) {
+        const uint32_t c = in.m->measuredCycles();
+        if (!c) continue;
+        Learned* l = nullptr;
+        for (auto& x : learned_)
+            if (x.t == &in.m->type()) l = &x;
+        if (!l) {
+            learned_.push_back({&in.m->type(), 0});
+            l = &learned_.back();
+        }
+        // Only a rise of > 3% counts as news (the average wobbles).
+        if (c > l->cycles + l->cycles / 32) costsChanged_ = true;
+        if (c > l->cycles) l->cycles = c;
+    }
+}
+
+bool Engine::costsChanged() {
+    const bool r = costsChanged_;
+    costsChanged_ = false;
+    return r;
 }
 
 Module* Engine::instanceOf(uint16_t id) const {
@@ -94,9 +142,9 @@ int Engine::apply(const Patch& p) {
             k++;
         }
     }
-    const int missing = instantiateAll(p);
+    missing_ = instantiateAll(p);
     publish(gen);
-    return missing;
+    return missing_;
 }
 
 void Engine::setParam(uint16_t id, uint8_t i, float v) {
@@ -123,8 +171,10 @@ void Engine::setInAmount(uint16_t id, uint8_t i, float a) {
 void Engine::collect() {
     const uint32_t seen = seen_.load(std::memory_order_acquire);
     size_t w = 0;
+    bool freed = false;
     for (size_t k = 0; k < retired_.size(); k++) {
         if (retired_[k].gen <= seen) {
+            freed = freed || retired_[k].m;
             delete retired_[k].p;
             delete retired_[k].m;
         } else {
@@ -132,17 +182,26 @@ void Engine::collect() {
         }
     }
     retired_.resize(w);
-    // retry modules that were refused for lack of a pool slot
+    if (cycles_ && (++collects_ & 63) == 0) learnCosts();
+    // Retry modules that were refused: at once when a module was just freed (its pool slot or
+    // heap is back), else every 64th call (~130 ms) - a failing create() churns big heap blocks.
+    if (missing_ == 0 || (!freed && ++retryTick_ < 64)) return;
+    retryTick_ = 0;
     bool any = false;
+    int missing = 0;
     for (int i = 0; i < patch_.moduleCount(); i++) {
         const ModuleRec& r = patch_.moduleAt(i);
         if (instanceOf(r.id)) continue;
         Module* m = r.type->create();
-        if (!m) continue;
+        if (!m) {
+            missing++;
+            continue;
+        }
         insts_.push_back({r.id, m});
         pushValues(m, r);
         any = true;
     }
+    missing_ = missing;
     if (any) publish(++gen_);
 }
 
@@ -159,6 +218,7 @@ void Engine::processBlock(float* mono) {
     for (int n = 0; n < prog->numNodes; n++) {
         const ProgramNode& node = prog->nodes[n];
         Module* m = node.m;
+        const uint32_t t0 = cycles_ ? cycles_() : 0;
         const int numIns = m->type().numIns;
         for (int in = 0; in < kMaxIns; in++) {
             conn[in] = in < numIns && node.nSrc[in] > 0;
@@ -187,6 +247,7 @@ void Engine::processBlock(float* mono) {
         }
         if (const float* mo = m->masterOut())
             for (int k = 0; k < kBlock; k++) mono[k] += mo[k];
+        if (cycles_) m->addCycles(cycles_() - t0);
     }
     for (int k = 0; k < kBlock; k++) {
         const float v = sanitize(mono[k]);

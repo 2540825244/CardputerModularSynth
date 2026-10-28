@@ -74,7 +74,7 @@ bool audioBegin(Engine& engine) {
         g_i2sErr = e;
         return false;
     }
-    xTaskCreatePinnedToCore(audioTask, "audio", 6144, nullptr, configMAX_PRIORITIES - 2, nullptr, 1);
+    xTaskCreatePinnedToCore(audioTask, "audio", 8192, nullptr, configMAX_PRIORITIES - 2, nullptr, 1);
     return true;
 }
 

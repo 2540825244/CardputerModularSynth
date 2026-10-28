@@ -131,11 +131,13 @@ class Vso : public Module {
         float* o = out(0);
         for (int i = 0; i < kBlock; i++) {
             const float hz = hzClamp(voltsToHz(base + at(pit, i) + at(fm, i)));
+            // DaisySP: the audible oscillator is the slave (SetSyncFreq); SetFreq is the master
+            // that resets it. Set before SetPW, which clamps by the slave frequency.
             if (sync) {
+                o_.SetFreq(hz);
                 o_.SetSyncFreq(hzClamp(hz * param(kRatio)));
-                o_.SetFreq(hz);
             } else {
-                o_.SetFreq(hz);
+                o_.SetSyncFreq(hz);
             }
             o_.SetWaveshape(clampf(param(kShape) + at(sh, i) * 0.2f, 0.f, 1.f));
             o_.SetPW(clampf(param(kPw) + at(pw, i) * 0.1f, 0.02f, 0.98f));

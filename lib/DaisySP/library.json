@@ -6,7 +6,8 @@
     "includeDir": "Source",
     "flags": [
       "-I$PROJECT_DIR/lib/DaisySP/Source/Utility",
-      "-w"
+      "-w",
+      "-fsingle-precision-constant"
     ]
   }
 }
