@@ -76,6 +76,7 @@ void drawFileView(const UiState& s, const bool filled[12]) {
         } else {
             emptyCell(col, 0, label, false);
         }
+        if (col == s.fileSlot) outline(col, 0, PAccent);
     }
     cv.setFont(&fonts::Font0);
     cv.setTextSize(2);
@@ -83,7 +84,7 @@ void drawFileView(const UiState& s, const bool filled[12]) {
     cv.setTextDatum(textdatum_t::middle_center);
     cv.drawString(s.fileSaveMode ? "SAVE" : "LOAD", kGridX + kGridW / 2, cellY(2));
     cv.setTextSize(1);
-    smallText(s.fileSaveMode ? "PRESS A SLOT TO SAVE" : "PRESS A SLOT TO LOAD", kGridX + kGridW / 2, cellY(3) - 6, PDim);
+    smallText(s.fileSaveMode ? "TAP A SLOT, ENTER TO SAVE" : "TAP A SLOT, ENTER TO LOAD", kGridX + kGridW / 2, cellY(3) - 6, PDim);
     smallText("TAB = SAVE / LOAD", kGridX + kGridW / 2, cellY(3) + 6, PDim);
     Side4 sd = {};
     sd.left[0] = Ic::Back;
@@ -91,6 +92,8 @@ void drawFileView(const UiState& s, const bool filled[12]) {
     sd.leftIcon[0] = sd.leftIcon[1] = true;
     sd.right[1] = Ic::Undo;
     sd.rightIcon[1] = true;
+    sd.right[2] = Ic::Enter;
+    sd.rightIcon[2] = s.fileSlot >= 0;
     drawSides(sd);
 }
 

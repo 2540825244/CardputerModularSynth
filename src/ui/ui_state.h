@@ -25,6 +25,7 @@ struct UiState {
     char toast[24];
     uint32_t toastUntilMs;
     bool fileSaveMode;
+    int8_t fileSlot;    // file menu: selected slot column 0..11, -1 none
     bool dirty;
     uint32_t lastEditMs;
     uint64_t keysHeld;  // KeysPlay: bit (3-row)*12+col per held note key

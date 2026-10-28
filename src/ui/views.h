@@ -1,12 +1,21 @@
 #pragma once
 #include "controller.h"
+#include "gesture.h"
 
-// Per-view key handlers, called by UiController::handle.
-void patchViewKey(UiController&, const KeyEvent&);
-void placeViewKey(UiController&, const KeyEvent&);
-void moduleViewKey(UiController&, const KeyEvent&);
-void keysPlayKey(UiController&, const KeyEvent&);
-void keysSettingsKey(UiController&, const KeyEvent&);
-void fileViewKey(UiController&, const KeyEvent&);
+// Per-view intent handlers, called by UiController::handle through viewDef(). A handler returns
+// true to swallow the rest of the event's gesture: the remaining actions of this event and any
+// later hold/release of the same key.
+bool patchViewAction(UiController&, const Action&);
+bool placeViewAction(UiController&, const Action&);
+bool moduleViewAction(UiController&, const Action&);
+bool keysPlayAction(UiController&, const Action&);
+bool keysSettingsAction(UiController&, const Action&);
+bool fileViewAction(UiController&, const Action&);
+
+struct ViewDef {
+    bool (*onAction)(UiController&, const Action&);
+    bool rawKeys;  // true: every key arrives as Act::Key (the Keys play view plays notes)
+};
+const ViewDef& viewDef(View);
 
 inline int cellOf(const KeyEvent& e) { return e.row * kGridCols + e.col; }

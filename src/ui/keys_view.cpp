@@ -29,7 +29,9 @@ void allNotesOff(UiController& ui) {
 
 }  // namespace
 
-void keysPlayKey(UiController& ui, const KeyEvent& e) {
+namespace {
+
+void playKey(UiController& ui, const KeyEvent& e) {
     UiState& s = ui.mut();
     const ModuleRec* m = ui.patch().find(s.openId);
     KeysModule* k = m ? static_cast<KeysModule*>(ui.engine().instance(m->id)) : nullptr;
@@ -74,10 +76,19 @@ void keysPlayKey(UiController& ui, const KeyEvent& e) {
     }
 }
 
-void keysSettingsKey(UiController& ui, const KeyEvent& e) {
-    if (!e.grid && e.type == KeyEvent::Down && e.side == Side::Enter) {
+}  // namespace
+
+// The play view is the exception to the do-it rule: every grid key plays a note (raw keys).
+bool keysPlayAction(UiController& ui, const Action& a) {
+    playKey(ui, a.key);
+    return false;
+}
+
+// Settings page: the module view, with esc flipping back to the play page.
+bool keysSettingsAction(UiController& ui, const Action& a) {
+    if (a.act == Act::Key && !a.key.grid && a.key.type == KeyEvent::Down && a.key.side == Side::Esc) {
         ui.mut().view = View::KeysPlay;
-        return;
+        return false;
     }
-    moduleViewKey(ui, e);
+    return moduleViewAction(ui, a);
 }

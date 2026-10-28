@@ -258,12 +258,12 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
     sd.leftIcon[0] = sd.leftIcon[1] = sd.leftIcon[2] = sd.leftIcon[3] = true;
     sd.right[0] = Ic::Trash; sd.right[1] = Ic::Undo; sd.right[2] = Ic::Toggle; sd.right[3] = Ic::Plus;
     sd.rightIcon[0] = sd.rightIcon[1] = sd.rightIcon[3] = true;
-    if (s.view == View::KeysSettings) {  // Enter flips back to the play view
-        sd.right[2] = Ic::Play;
-        sd.rightIcon[2] = true;
-    } else {
-        sd.rightIcon[2] = sel.spec && sel.spec->curve == Curve::Stepped;
-    }
+    // Enter = do-it on the selection: a pin carries, a stepped param toggles; hold it on a knob to tilt.
+    if (sel.c.kind == CellKind::In || sel.c.kind == CellKind::Out) sd.right[2] = Ic::Cable;
+    else if (sel.spec && sel.spec->curve == Curve::Stepped) sd.right[2] = Ic::Toggle;
+    else sd.right[2] = Ic::Tilt;
+    sd.rightIcon[2] = sel.c.kind != CellKind::Empty;
+    if (s.view == View::KeysSettings) sd.left[0] = Ic::Play;  // esc flips back to the play page
     sd.fnActive = s.carry.active;
     drawSides(sd);
 }

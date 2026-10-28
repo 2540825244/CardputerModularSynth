@@ -34,7 +34,7 @@ void doAddCable(Patch& p, void* c) {
     p.addCable(e->from, e->fromOut, e->to, e->toIn);
 }
 
-// fn + pin: start a carry, or drop it on a pin of the opposite kind.
+// Do-it on a pin: start a carry, or drop it on a pin of the opposite kind.
 void pinAction(UiController& ui, const ModuleRec& m, bool isOutput, uint8_t pin) {
     UiState& s = ui.mut();
     const Patch& p = ui.patch();
@@ -104,68 +104,44 @@ int nextEditable(const ModuleTypeInfo& t, int from) {
 
 }  // namespace
 
-void moduleViewKey(UiController& ui, const KeyEvent& e) {
-    UiState& s = ui.mut();
-    const ModuleRec* m = ui.patch().find(s.openId);
-    if (!m) {
-        s.view = View::Patch;
-        return;
-    }
-    if (e.grid && e.row >= 1) {
-        if (e.type == KeyEvent::Hold) {
-            const CellRef c = moduleCell(*m->type, e.row, e.col);
-            if (c.kind == CellKind::Param) {
-                s.modCell = (int8_t)cellOf(e);
-                ui.beginTilt(m->id, c.index, cellOf(e));
-            }
-            return;
-        }
-        if (e.type == KeyEvent::Up) {
-            if (ui.tiltActive() && ui.tiltCell() == cellOf(e)) ui.endTilt();
-            return;
-        }
-    }
-    if (e.type != KeyEvent::Down) return;
-    const CellRef sel = selected(s, *m->type);
-    const bool editable = sel.kind == CellKind::Param || sel.kind == CellKind::Out;
+namespace {
 
-    if (e.grid) {
-        if (e.row == 0) {
-            if (editable) setValue(ui, *m, sel, paramCoarse(specOf(*m, sel), e.col));
-        } else {
-            s.modCell = (int8_t)cellOf(e);
-            const CellRef c = moduleCell(*m->type, e.row, e.col);
-            if (ui.fnHeld() && (c.kind == CellKind::In || c.kind == CellKind::Out))
-                pinAction(ui, *m, c.kind == CellKind::Out, c.index);
-        }
-        return;
+// Do-it on a cell: a pin carries a cable, a stepped param steps to its next option.
+void activate(UiController& ui, const ModuleRec& m, int cell) {
+    if (cell < kGridCols) return;  // the value strip has no do-it
+    const CellRef c = moduleCell(*m.type, (uint8_t)(cell / kGridCols), (uint8_t)(cell % kGridCols));
+    if (c.kind == CellKind::In || c.kind == CellKind::Out) {
+        pinAction(ui, m, c.kind == CellKind::Out, c.index);
+    } else if (c.kind == CellKind::Param) {
+        const ParamSpec& sp = m.type->params[c.index];
+        if (sp.curve != Curve::Stepped) return;
+        float v = m.params[c.index] + 1.f;
+        if (v > sp.max) v = sp.min;
+        setValue(ui, m, c, v);
     }
+}
+
+void sideKey(UiController& ui, const ModuleRec& m, const KeyEvent& e) {
+    UiState& s = ui.mut();
+    if (e.type != KeyEvent::Down) return;
+    const CellRef sel = selected(s, *m.type);
+    const bool editable = sel.kind == CellKind::Param || sel.kind == CellKind::Out;
     switch (e.side) {
         case Side::Ctrl:
         case Side::Space:
             if (editable) {
-                const ParamSpec& sp = specOf(*m, sel);
-                setValue(ui, *m, sel, paramFine(sp, currentValue(*m, sel), e.side == Side::Space ? 1 : -1));
+                const ParamSpec& sp = specOf(m, sel);
+                setValue(ui, m, sel, paramFine(sp, currentValue(m, sel), e.side == Side::Space ? 1 : -1));
             }
             break;
         case Side::Tab:
-            s.modCell = (int8_t)nextEditable(*m->type, s.modCell < 0 ? 0 : s.modCell);
-            break;
-        case Side::Enter:
-            if (sel.kind == CellKind::Param) {
-                const ParamSpec& sp = m->type->params[sel.index];
-                if (sp.curve == Curve::Stepped) {
-                    float v = m->params[sel.index] + 1.f;
-                    if (v > sp.max) v = sp.min;
-                    setValue(ui, *m, sel, v);
-                }
-            }
+            s.modCell = (int8_t)nextEditable(*m.type, s.modCell < 0 ? 0 : s.modCell);
             break;
         case Side::Del:
             if (sel.kind == CellKind::Param) {
-                setValue(ui, *m, sel, m->type->params[sel.index].def);
+                setValue(ui, m, sel, m.type->params[sel.index].def);
             } else if (sel.kind == CellKind::In || sel.kind == CellKind::Out) {
-                PinEdit pe{m->id, sel.kind == CellKind::Out, sel.index};
+                PinEdit pe{m.id, sel.kind == CellKind::Out, sel.index};
                 ui.edit(doUnpatch, &pe);
             }
             break;
@@ -176,4 +152,38 @@ void moduleViewKey(UiController& ui, const KeyEvent& e) {
         case Side::Esc: s.view = View::Patch; break;
         default: break;
     }
+}
+
+}  // namespace
+
+bool moduleViewAction(UiController& ui, const Action& a) {
+    UiState& s = ui.mut();
+    const ModuleRec* m = ui.patch().find(s.openId);
+    if (!m) {
+        s.view = View::Patch;
+        return false;
+    }
+    switch (a.act) {
+        case Act::Select:
+            if (a.cell < kGridCols) {  // value strip: coarse value for the selected cell
+                const CellRef sel = selected(s, *m->type);
+                if (sel.kind == CellKind::Param || sel.kind == CellKind::Out)
+                    setValue(ui, *m, sel, paramCoarse(specOf(*m, sel), a.cell));
+            } else {
+                s.modCell = a.cell;
+            }
+            break;
+        case Act::Activate: activate(ui, *m, a.cell >= 0 ? a.cell : s.modCell); break;
+        case Act::Sweep: {
+            const CellRef sel = selected(s, *m->type);
+            if (sel.kind == CellKind::Param) ui.beginTilt(m->id, sel.index);
+            else activate(ui, *m, s.modCell);
+            break;
+        }
+        case Act::SweepEnd: ui.endTilt(); break;
+        case Act::Key:
+            if (!a.key.grid) sideKey(ui, *m, a.key);
+            break;
+    }
+    return false;
 }

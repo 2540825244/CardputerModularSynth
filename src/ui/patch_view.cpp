@@ -22,9 +22,10 @@ void openPlace(UiController& ui, int cell) {
     s.selCell = (int8_t)cell;
 }
 
-void gridDown(UiController& ui, const KeyEvent& e) {
+// Select: put the cursor on the cell, finish a pending move there, or start one with ctrl.
+// Returns true when it finished a move (the press is used up).
+bool select(UiController& ui, int cell) {
     UiState& s = ui.mut();
-    const int cell = cellOf(e);
     const ModuleRec* m = ui.patch().findAt(s.page, (uint8_t)cell);
     if (s.moveFromId >= 0) {
         if (m) {
@@ -35,30 +36,30 @@ void gridDown(UiController& ui, const KeyEvent& e) {
             s.moveFromId = -1;
             s.selCell = (int8_t)cell;
         }
-        return;
+        return true;
     }
     s.selCell = (int8_t)cell;
-    if (m && ui.ctrlHeld()) {
-        s.moveFromId = m->id;
-    } else if (!m && ui.fnHeld()) {
-        openPlace(ui, cell);
-    }
+    if (m && ui.ctrlHeld()) s.moveFromId = m->id;
+    return false;
 }
 
-}  // namespace
-
-void patchViewKey(UiController& ui, const KeyEvent& e) {
+// Do-it: an empty cell opens the place menu, a module opens its view.
+void activate(UiController& ui, int cell) {
     UiState& s = ui.mut();
-    if (e.grid) {
-        if (e.type == KeyEvent::Down) {
-            gridDown(ui, e);
-        } else if (e.type == KeyEvent::Hold) {
-            const int cell = cellOf(e);
-            if (s.moveFromId < 0 && !ui.ctrlHeld() && !ui.patch().findAt(s.page, (uint8_t)cell))
-                openPlace(ui, cell);
-        }
+    if (cell < 0 || s.moveFromId >= 0 || ui.ctrlHeld()) return;
+    s.selCell = (int8_t)cell;
+    const ModuleRec* m = ui.patch().findAt(s.page, (uint8_t)cell);
+    if (!m) {
+        openPlace(ui, cell);
         return;
     }
+    s.openId = m->id;
+    s.modCell = -1;
+    s.view = m->type == &kKeysType ? View::KeysPlay : View::Module;
+}
+
+void sideKey(UiController& ui, const KeyEvent& e) {
+    UiState& s = ui.mut();
     const bool down = e.type == KeyEvent::Down;
     if (e.side == Side::Space) {
         // The release is handled by UiController::handle, whatever view is active by then.
@@ -71,14 +72,6 @@ void patchViewKey(UiController& ui, const KeyEvent& e) {
     }
     if (!down) return;
     switch (e.side) {
-        case Side::Enter: {
-            const ModuleRec* m = s.selCell >= 0 ? ui.patch().findAt(s.page, (uint8_t)s.selCell) : nullptr;
-            if (!m) break;
-            s.openId = m->id;
-            s.modCell = -1;
-            s.view = m->type == &kKeysType ? View::KeysPlay : View::Module;
-            break;
-        }
         case Side::Tab:
             s.page = (uint8_t)((s.page + (ui.fnHeld() ? kPages - 1 : 1)) % kPages);
             s.selCell = -1;  // a pending move survives, so a module can change page
@@ -101,8 +94,24 @@ void patchViewKey(UiController& ui, const KeyEvent& e) {
             } else {
                 s.view = View::File;
                 s.fileSaveMode = false;
+                s.fileSlot = -1;
             }
             break;
         default: break;
     }
+}
+
+}  // namespace
+
+bool patchViewAction(UiController& ui, const Action& a) {
+    switch (a.act) {
+        case Act::Select: return select(ui, a.cell);
+        case Act::Activate:
+        case Act::Sweep: activate(ui, a.cell >= 0 ? a.cell : ui.state().selCell); break;
+        case Act::Key:
+            if (!a.key.grid) sideKey(ui, a.key);
+            break;
+        case Act::SweepEnd: break;
+    }
+    return false;
 }

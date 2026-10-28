@@ -3,7 +3,7 @@
 
 // 12x12 1-bit icons, one uint16_t per row, bit 11 = leftmost pixel. Hand-drawn from the SVGs in
 // docs/design/mockups.html.
-enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Count };
+enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Tilt, Count };
 
 constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Keys
@@ -66,4 +66,7 @@ constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Minus
      0b000000000000, 0b000000000000, 0b000000000000, 0b000000000000, 0b000000000000, 0b011111111110,
      0b011111111110, 0b000000000000, 0b000000000000, 0b000000000000, 0b000000000000, 0b000000000000},
+    {// Tilt (a tilted device over a level line)
+     0b000000000000, 0b000000001000, 0b000000110100, 0b000011000010, 0b001100000100, 0b010000001000,
+     0b001000010000, 0b000100100000, 0b000011000000, 0b000000000000, 0b111111111111, 0b000000000000},
 };

@@ -101,6 +101,12 @@ The physical keyboard is 4 rows × 14 keys. The **middle 12 columns are the grid
 - Fixed roles **[owner]**:
   - `esc` backs out of the current view.
   - `enter` opens the selected module.
+  - **One "do it" gesture [owner, 2026-10-28]:** on every cell, `fn`+tap, holding the key, and
+    tapping it then pressing `enter` all do the same thing (open, place, carry a cable, step an
+    option, load/save). A plain tap only selects. Holding `enter` is a sweep (hold-and-tilt).
+    Exceptions: the Keys play page (keys play notes) and the module view's number row (a tap sets
+    the coarse value). Gestures are mapped in one place (`src/ui/gesture.h`) so a later UI
+    redesign can remap them without touching the views. **[Claude's call: the mechanism]**
   - `del`/backspace deletes things. It is reserved for deleting.
   - `\` is **undo**.
 - Every special key has an **on-screen icon** level with it, and **icons change with the
@@ -172,12 +178,13 @@ Screenshot: `docs/design/01-patch-view-style-b.png`.
   that key is. **[owner]**
 - **Cables as colour-matched dots.** When a module is selected, it and each module at the other
   end of its cables show a small dot in that cable's colour. No lines are drawn. **[owner]**
-- **Placing a module:** hold an empty cell, or modifier + click, to open a module selection menu.
+- **Placing a module:** do-it on an empty cell (hold it, `fn`+tap it, or select it and `enter`) opens a module selection menu.
   **[owner]**
   - The mockup proposes `fn`+cell as the modifier. **[proposed]**
   - Hold-to-open timing **[open]**.
   - **Selection menu [owner, plan review]:** pressing a module type in the menu doesn't place it yet. It opens
-    that type's details (what it does, its pins, its cost), and `enter` places it.
+    that type's details (what it does, its pins, its cost), and `enter` places it. Do-it on a type
+    (`fn`+tap or hold) places it directly. **[owner, 2026-10-28]**
 - **Side keys in patch view [proposed in mockup, not objected to]:**
   - `esc` file menu (save/load)
   - `tab` next page, `fn`+`tab` previous page **[owner, plan review]**
@@ -185,7 +192,7 @@ Screenshot: `docs/design/01-patch-view-style-b.png`.
   - `ctrl` move module (ctrl+module, then target cell)
   - `del` delete module
   - `\` undo
-  - `enter` open module
+  - `enter` do-it on the selection (open module / place menu)
   - `space` audition (hold to play a note)
 
 ### 7.2 Module view (zoomed in)
@@ -212,7 +219,8 @@ A only and are to be rendered in style B.
   2. Use the number row for **coarse** values: `1`…`9` = 10–90% of the knob, `0` = 100%, `-` = min,
      `=` = default. For frequency and time the % is along the knob's log curve. **[owner, plan review]**
   3. Use **two keys for fine** −/+. The mockup uses `ctrl` = −, `space` = + **[proposed]**.
-  4. Or **hold the parameter's key and tilt the device** to sweep it.
+  4. Or **select the parameter, hold `enter` and tilt the device** to sweep it; release `enter`
+     to stop. **[owner, 2026-10-28; was "hold the parameter's key"]**
   - Bounded parameters spread their range over the 12 coarse keys. For unbounded or log-scale
     parameters (frequency, time), the owner suggested **coarse = large jumps** instead
     ("maybe like coarse should be buttons with large jump idk"). The exact scheme is **[open]**.
@@ -223,7 +231,8 @@ A only and are to be rendered in style B.
   - `ctrl` fine −
   - `del` unpatch pin / reset parameter
   - `\` undo
-  - `enter` toggle (e.g. LP/HP)
+  - `enter` do-it on the selection: carry a cable on a pin, next option on a stepped param
+    (e.g. LP/HP); hold `enter` on a knob to tilt-sweep it
   - `space` fine +
   Space is no longer "audition" here. Whether audition is needed in module view is **[open]**.
 
@@ -231,11 +240,11 @@ A only and are to be rendered in style B.
 
 Screenshot: `05-carry-cable.png`. **[owner chose this over split view; it was the owner's original idea]**
 
-1. In a module view, `fn`+pin **picks up** a cable from that pin.
+1. In a module view, do-it on a pin (`fn`+pin, hold the pin, or select it and `enter`) **picks up** a cable from that pin.
 2. Navigate freely (`esc`, select another module, `enter`). The `fn` icon stays highlighted.
 3. The top strip shows what you're holding, e.g. `● HOLDING LFO.OUT → FN+INPUT`, with a
    pulsing dot in the cable's colour. Valid target pins pulse.
-4. `fn`+pin on the target **drops** it, and the cable is made.
+4. Do-it on the target pin **drops** it, and the cable is made.
 5. Cancel: `esc` twice **[proposed]**, or `del`.
 
 - Whether you can start from an input as well as an output, and whether cables within one
@@ -299,6 +308,8 @@ just map keys to virtual midi/oct/gate/etc out".
     better flip. The owner: it "generally work[s] better".
   - If the note layout leaves spare cells, a flip cell (or settings cells) can sit in the grid.
 - The note layout (chromatic vs. other), and therefore where the flip lives, is **[open]**.
+  v1: the play page's top-row cell `=` flips to settings; `esc` on the settings page flips back
+  (2026-10-28; it was `enter`, which is now do-it). **[Claude's call]**
 - The owner also accepted "audition" on `space` in patch view.
 
 ### 8.2 Later releases (keep the system ready for these) **[owner unless noted]**
@@ -389,4 +400,8 @@ just map keys to virtual midi/oct/gate/etc out".
 | Cross-module patching | carry the cable | owner |
 | Toolchain | PlatformIO + Arduino core | owner |
 | v1 scope | starter-patch modules + Keys + patching + SD + speaker/line volume settings; rest later, keep expandable | proposed → owner agreed |
+| Gestures (2026-10-28) | `fn`+tap = hold = tap then `enter` = the cell's one do-it action, in every view; tap selects; exceptions: Keys play page, number row | owner (exceptions: Claude's guess, owner agreed) |
+| Tilt sweep (2026-10-28) | select a param, hold `enter`, tilt; was hold the param key | owner |
+| File menu (2026-10-28) | tap selects a slot, do-it loads/saves it | Claude's guess, owner agreed |
+| Keys settings → play (2026-10-28) | `esc` (enter is do-it now) | Claude's call |
 | Open items (§12) | decided in the v1 plan's table; owner changes: place menu shows details then `enter` places; `fn`+`tab` = previous page; coarse = "*k*0% of the knob", `-` min, `=` default; more Keys layouts later | owner (plan review) |

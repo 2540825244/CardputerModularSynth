@@ -24,10 +24,14 @@ class GestureMapper {
     // raw = true (Keys play view): every event becomes one Act::Key and pending Enter/activation
     // state is forgotten. Returns the number of actions written to out (<= 2).
     int map(const KeyEvent&, bool fnHeld, bool ctrlHeld, bool raw, Action* out);
-    void reset();  // forget pending Enter and per-key activation state (view changes)
+    // View changed: keys still held belong to the old view, so their hold/release do nothing;
+    // a pending Enter is forgotten.
+    void reset();
+    void consume(const KeyEvent&);  // the rest of this key's gesture (hold, Enter release) does nothing
 
    private:
     static constexpr int kCells = 48;
-    bool activated_[kCells] = {};
+    bool held_[kCells] = {};
+    bool activated_[kCells] = {};  // this press already did its do-it (or was consumed)
     bool enterDown_ = false, enterSwept_ = false;
 };

@@ -13,6 +13,22 @@ UiController::UiController(Patch& p, Engine& e, UndoStack& u, Storage& st)
     s_.modCell = -1;
     s_.moveFromId = -1;
     s_.placeType = -1;
+    s_.fileSlot = -1;
+}
+
+const ViewDef& viewDef(View v) {
+    static const ViewDef kPatch{patchViewAction, false}, kModule{moduleViewAction, false},
+        kPlace{placeViewAction, false}, kFile{fileViewAction, false}, kKeysPlay{keysPlayAction, true},
+        kKeysSettings{keysSettingsAction, false};
+    switch (v) {
+        case View::Module: return kModule;
+        case View::Place: return kPlace;
+        case View::File: return kFile;
+        case View::KeysPlay: return kKeysPlay;
+        case View::KeysSettings: return kKeysSettings;
+        case View::Patch: break;
+    }
+    return kPatch;
 }
 
 void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
@@ -40,15 +56,19 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
         }
     }
     if (auditioning && !e.grid && e.side == Side::Space && e.type == KeyEvent::Up) releaseAudition();
-    switch (s_.view) {
-        case View::Patch: patchViewKey(*this, e); break;
-        case View::Place: placeViewKey(*this, e); break;
-        case View::Module: moduleViewKey(*this, e); break;
-        case View::KeysPlay: keysPlayKey(*this, e); break;
-        case View::KeysSettings: keysSettingsKey(*this, e); break;
-        case View::File: fileViewKey(*this, e); break;
-    }
+    // Gestures become intents in one place (gesture.h); the view current at each action answers
+    // it. If an action changes the view, the rest of this event is dropped and keys still held
+    // stay with the old view.
+    const View before = s_.view;
+    Action acts[2];
+    const int n = mapper_.map(e, fnHeld(), ctrlHeld(), viewDef(before).rawKeys, acts);
+    for (int i = 0; i < n && s_.view == before; i++)
+        if (viewDef(before).onAction(*this, acts[i])) {
+            mapper_.consume(e);
+            break;
+        }
     validate();
+    if (s_.view != before) mapper_.reset();
     if (tilt_.active && s_.view != View::Module && s_.view != View::KeysSettings) tilt_.active = false;
     if (auditioning && s_.view != View::Patch) releaseAudition();
     // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
@@ -157,10 +177,10 @@ void doTilt(Patch& p, void* c) {
 }
 }  // namespace
 
-void UiController::beginTilt(uint16_t id, uint8_t idx, int cell) {
+void UiController::beginTilt(uint16_t id, uint8_t idx) {
     const ModuleRec* m = patch_.find(id);
     if (!m || idx >= m->type->numParams) return;
-    tilt_ = {true, id, idx, cell, paramToNorm(m->type->params[idx], m->params[idx]), false};
+    tilt_ = {true, id, idx, paramToNorm(m->type->params[idx], m->params[idx]), false};
     tiltGen_++;
 }
 

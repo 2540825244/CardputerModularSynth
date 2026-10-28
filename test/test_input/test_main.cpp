@@ -196,6 +196,35 @@ void test_reset_forgets_enter() {
     TEST_ASSERT_EQUAL(0, g.map(S(KeyEvent::Up, Side::Enter), false, false, false, A));
 }
 
+void test_reset_consumes_held_keys() {
+    GestureMapper g;
+    g.map(G(KeyEvent::Down, 2, 1), false, false, false, A);
+    g.reset();  // the view changed while the key was held
+    TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 2, 1), false, false, false, A));
+    g.map(G(KeyEvent::Up, 2, 1), false, false, false, A);
+    g.map(G(KeyEvent::Down, 2, 1), false, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Hold, 2, 1), false, false, false, A));
+}
+
+void test_reset_keeps_released_keys_fresh() {
+    GestureMapper g;
+    g.map(G(KeyEvent::Down, 2, 1), false, false, false, A);
+    g.map(G(KeyEvent::Up, 2, 1), false, false, false, A);
+    g.reset();
+    g.map(G(KeyEvent::Down, 2, 1), false, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Hold, 2, 1), false, false, false, A));
+}
+
+void test_consume_swallows_hold_and_enter_release() {
+    GestureMapper g;
+    g.map(G(KeyEvent::Down, 4, 2), false, false, false, A);
+    g.consume(G(KeyEvent::Down, 4, 2));
+    TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 4, 2), false, false, false, A));
+    g.map(S(KeyEvent::Down, Side::Enter), false, false, false, A);
+    g.consume(S(KeyEvent::Down, Side::Enter));
+    TEST_ASSERT_EQUAL(0, g.map(S(KeyEvent::Up, Side::Enter), false, false, false, A));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_mapping);
@@ -213,5 +242,8 @@ int main() {
     RUN_TEST(test_raw_mode_passes_everything);
     RUN_TEST(test_side_keys_pass_through);
     RUN_TEST(test_reset_forgets_enter);
+    RUN_TEST(test_reset_consumes_held_keys);
+    RUN_TEST(test_reset_keeps_released_keys_fresh);
+    RUN_TEST(test_consume_swallows_hold_and_enter_release);
     return UNITY_END();
 }

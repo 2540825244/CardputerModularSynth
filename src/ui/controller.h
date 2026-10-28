@@ -7,6 +7,7 @@
 #include "core/patch.h"
 #include "core/storage.h"
 #include "core/undo.h"
+#include "gesture.h"
 #include "key_input.h"
 #include "ui_state.h"
 
@@ -15,12 +16,12 @@ class UiController {
     UiController(Patch&, Engine&, UndoStack&, Storage&);
     void handle(const KeyEvent&, uint32_t nowMs);
     void tick(uint32_t nowMs);              // toast expiry, engine.collect (autosave: Task 17)
-    // Hold-and-tilt: while active, tilt() sets the param to start norm + degrees/60 (one undo entry).
-    void tilt(float degreesSinceHoldStart);
-    void beginTilt(uint16_t id, uint8_t paramIdx, int cell);
+    // Hold-enter-and-tilt: while active, tilt() sets the param to start norm + degrees/60 (one
+    // undo entry). Started by a Sweep on a selected param, ended by the Enter release.
+    void tilt(float degreesSinceSweepStart);
+    void beginTilt(uint16_t id, uint8_t paramIdx);
     void endTilt();
     bool tiltActive() const { return tilt_.active; }
-    int tiltCell() const { return tilt_.cell; }
     uint32_t tiltGeneration() const { return tiltGen_; }  // bumps on every beginTilt
     const UiState& state() const { return s_; }
 
@@ -63,13 +64,13 @@ class UiController {
     Storage& storage_;
     UiState s_;
     const KeyDecoder* dec_ = nullptr;
+    GestureMapper mapper_;
     bool fn_ = false, ctrl_ = false;
     bool coalescedEdit_ = false;
     struct TiltState {
         bool active;
         uint16_t id;
         uint8_t idx;
-        int cell;
         float startNorm;
         bool moved;  // left the +-1 degree deadband
     } tilt_ = {};

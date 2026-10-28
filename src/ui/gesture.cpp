@@ -6,19 +6,30 @@ Action make(Act a, int cell, const KeyEvent& e) { return Action{a, (int8_t)cell,
 }  // namespace
 
 void GestureMapper::reset() {
-    for (bool& a : activated_) a = false;
+    for (int c = 0; c < kCells; c++) activated_[c] = held_[c];
     enterDown_ = enterSwept_ = false;
 }
 
+void GestureMapper::consume(const KeyEvent& e) {
+    if (e.grid) {
+        const int cell = e.row * kGridCols + e.col;
+        if (cell >= 0 && cell < kCells) activated_[cell] = true;
+    } else if (e.side == Side::Enter) {
+        enterDown_ = enterSwept_ = false;
+    }
+}
+
 int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool ctrlHeld, bool raw, Action* out) {
+    const int cell = e.grid ? e.row * kGridCols + e.col : -1;
+    if (e.grid && (cell < 0 || cell >= kCells)) return 0;
+    if (e.grid) held_[cell] = e.type != KeyEvent::Up;
     if (raw) {
-        reset();
-        out[0] = make(Act::Key, -1, e);
+        if (e.grid) activated_[cell] = e.type != KeyEvent::Up;  // a held note never turns into do-it
+        enterDown_ = enterSwept_ = false;
+        out[0] = make(Act::Key, cell, e);
         return 1;
     }
     if (e.grid) {
-        const int cell = e.row * kGridCols + e.col;
-        if (cell < 0 || cell >= kCells) return 0;
         switch (e.type) {
             case KeyEvent::Down:
                 out[0] = make(Act::Select, cell, e);

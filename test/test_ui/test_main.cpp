@@ -71,6 +71,8 @@ struct Fx {
     void up(int c, int r) { send(KeyEvent::Up, true, c, r, Side::Esc); }
     void tap(int c, int r) { down(c, r); up(c, r); }
     void hold(int c, int r) { down(c, r); send(KeyEvent::Hold, true, c, r, Side::Esc); }
+    void holdSide(Side s) { sideDown(s); send(KeyEvent::Hold, false, 0, 0, s); }
+    void slot(int c) { tap(c, 0); side(Side::Enter); }  // file menu: select a slot, then do it
     // place type `ty` at (c,r) on the current page via fn+cell
     void place(int ty, int c, int r) {
         sideDown(Side::Fn);
@@ -87,6 +89,7 @@ void test_place_via_fn() {
     f.down(2, 1);
     TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
     TEST_ASSERT_EQUAL(14, f.ui.state().placeCell);
+    f.sideUp(Side::Fn);  // fn still held on the tile would place it at once (do-it)
     f.tap(TOsc, 1);
     TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
     TEST_ASSERT_EQUAL(TOsc, f.ui.state().placeType);
@@ -119,6 +122,7 @@ void test_place_details_back() {
     Fx f;
     f.sideDown(Side::Fn);
     f.down(0, 0);
+    f.sideUp(Side::Fn);
     f.tap(TOsc, 1);
     f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
@@ -693,9 +697,8 @@ void test_keys_flip() {
     openKeysPlay(f);
     f.tap(11, 0);
     TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
-    f.side(Side::Enter);
+    f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
-    f.tap(11, 0);
     f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
 }
@@ -712,13 +715,13 @@ void test_save_load_slot() {
     f.place(TKeys, 0, 0);
     f.place(TOsc, 1, 0);
     toFileSave(f);
-    f.tap(2, 0);
+    f.slot(2);
     TEST_ASSERT_EQUAL_STRING("SAVED", f.ui.state().toast);
     TEST_ASSERT_EQUAL(1, (int)gStore.files.count("/modsynth/patches/slot03.json"));
     gPatch.clear();
     f.eng.apply(gPatch);
     f.side(Side::Tab);
-    f.tap(2, 0);
+    f.slot(2);
     TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
     TEST_ASSERT_EQUAL(2, gPatch.moduleCount());
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);  // a load returns to the patch view
@@ -730,10 +733,10 @@ void test_load_errors() {
     Fx f;
     f.place(TKeys, 0, 0);
     f.side(Side::Esc);
-    f.tap(5, 0);
+    f.slot(5);
     TEST_ASSERT_EQUAL_STRING("NO FILE", f.ui.state().toast);
     gStore.files["/modsynth/patches/slot01.json"] = "garbage{";
-    f.tap(0, 0);
+    f.slot(0);
     TEST_ASSERT_EQUAL_STRING("BAD FILE", f.ui.state().toast);
     TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
 }
@@ -744,7 +747,7 @@ void test_load_empty_patch_file() {
     Patch empty;
     gStore.files["/modsynth/patches/slot02.json"] = patchToJson(empty);
     f.side(Side::Esc);
-    f.tap(1, 0);
+    f.slot(1);
     TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
     TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
 }
@@ -756,7 +759,7 @@ void test_load_validates_open_view() {
     f.place(TKeys, 0, 0);
     f.tap(0, 0);
     f.side(Side::Esc);
-    f.tap(1, 0);
+    f.slot(1);
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
     TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
 }
@@ -766,7 +769,7 @@ void test_sd_missing() {
     f.place(TKeys, 0, 0);
     gStore.avail = false;
     toFileSave(f);
-    f.tap(0, 0);
+    f.slot(0);
     TEST_ASSERT_EQUAL_STRING("NO SD", f.ui.state().toast);
     // autosave: toast once, then retry only after 30 s
     f.ui.tick(100000);
@@ -830,7 +833,7 @@ void test_load_resets_ui_state() {
     f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
     TEST_ASSERT_TRUE(f.ui.state().carry.active);
-    f.tap(0, 0);
+    f.slot(0);
     TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
     TEST_ASSERT_FALSE(f.ui.state().carry.active);
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
@@ -853,31 +856,31 @@ void test_tilt_edit() {
     const ModuleRec* m = gPatch.findAt(0, 0);
     const ParamSpec& sp = m->type->params[0];
     const float start = paramToNorm(sp, m->params[0]);
-    f.hold(0, 1);  // CUT
+    f.tap(0, 1);  // CUT
+    f.holdSide(Side::Enter);
     f.ui.tilt(30.f);
     TEST_ASSERT_EQUAL_FLOAT(paramFromNorm(sp, start + 0.5f), m->params[0]);
     f.ui.tilt(-200.f);
     TEST_ASSERT_EQUAL_FLOAT(20.f, m->params[0]);
-    f.up(0, 1);
+    f.sideUp(Side::Enter);
     f.ui.tilt(10.f);  // after release: ignored
     TEST_ASSERT_EQUAL_FLOAT(20.f, m->params[0]);
     f.side(Side::Backslash);
     TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
 }
 
-void test_tilt_ignores_pins_and_patch_view() {
+void test_hold_enter_on_pin_carries_not_sweeps() {
     Fx f;
     openVcf(f);
     const ModuleRec* m = gPatch.findAt(0, 0);
-    f.hold(0, 2);  // IN pin
+    f.tap(0, 2);  // IN pin
+    f.holdSide(Side::Enter);
     f.ui.tilt(30.f);
     TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
     TEST_ASSERT_FALSE(f.ui.tiltActive());
-    f.up(0, 2);
-    f.side(Side::Esc);
-    f.hold(0, 0);
-    f.ui.tilt(30.f);
-    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    f.sideUp(Side::Enter);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);  // no second toggle on release
 }
 
 void test_tilt_deadband() {
@@ -886,7 +889,8 @@ void test_tilt_deadband() {
     const ModuleRec* m = gPatch.findAt(0, 0);
     f.ui.tick(f.ui.state().lastEditMs + 2000);  // flush the placement autosave
     gUndo = UndoStack();
-    f.hold(0, 1);
+    f.tap(0, 1);
+    f.holdSide(Side::Enter);
     f.ui.tilt(0.9f);
     f.ui.tilt(-1.f);
     TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
@@ -894,7 +898,7 @@ void test_tilt_deadband() {
     f.ui.tilt(5.f);
     TEST_ASSERT_TRUE(m->params[0] != 1200.f);
     f.ui.tilt(0.5f);  // once moved, small values still apply
-    f.up(0, 1);
+    f.sideUp(Side::Enter);
     f.side(Side::Backslash);
     TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
 }
@@ -902,17 +906,172 @@ void test_tilt_deadband() {
 void test_no_autosave_mid_tilt() {
     Fx f;
     openVcf(f);
-    f.hold(0, 1);
+    f.tap(0, 1);
+    f.holdSide(Side::Enter);
     f.ui.tilt(20.f);
     const uint32_t t0 = f.ui.state().lastEditMs;
     f.ui.tick(t0 + 5000);
     TEST_ASSERT_EQUAL(0, gStore.writes);
     TEST_ASSERT_TRUE(f.ui.state().dirty);
-    f.up(0, 1);  // the debounce restarts at the release
+    f.sideUp(Side::Enter);  // the debounce restarts at the release
     f.ui.tick(f.ui.state().lastEditMs + 1999);
     TEST_ASSERT_EQUAL(0, gStore.writes);
     f.ui.tick(f.ui.state().lastEditMs + 2000);
     TEST_ASSERT_EQUAL(1, gStore.writes);
+}
+
+
+// ---- v1.1: one do-it gesture ----
+static const ModuleRec* placeAndOpen(Fx& f, int ty) {
+    f.place(ty, 0, 0);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    return gPatch.findAt(0, 0);
+}
+
+void test_hold_module_opens_it() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.hold(0, 0);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    TEST_ASSERT_EQUAL(gPatch.findAt(0, 0)->id, f.ui.state().openId);
+}
+
+void test_fn_tap_module_opens_it() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.sideDown(Side::Fn);
+    f.tap(0, 0);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().modCell);
+}
+
+void test_hold_enter_in_patch_view_opens_once() {
+    Fx f;
+    f.place(TOsc, 0, 0);
+    f.tap(0, 0);
+    f.holdSide(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+    f.sideUp(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().modCell);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+}
+
+void test_place_by_hold_tile() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.tap(2, 1);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    f.hold(TOsc, 1);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    const ModuleRec* m = gPatch.findAt(0, 14);
+    TEST_ASSERT_NOT_NULL(m);
+    TEST_ASSERT_TRUE(m->type == &kOscType);
+    f.up(TOsc, 1);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+}
+
+void test_place_by_fn_tile() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.tap(2, 1);
+    f.tap(TOsc, 1);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    TEST_ASSERT_TRUE(f.ui.undo());
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+}
+
+void test_hold_pin_picks_up_cable() {
+    Fx f;
+    placeAndOpen(f, TOsc);
+    f.hold(0, 3);  // OUT pin
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+    TEST_ASSERT_TRUE(f.ui.state().carry.fromOutput);
+}
+
+void test_enter_on_pin_picks_up_cable() {
+    Fx f;
+    placeAndOpen(f, TOsc);
+    f.tap(0, 3);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);  // a tap only selects
+    f.side(Side::Enter);
+    TEST_ASSERT_TRUE(f.ui.state().carry.active);
+}
+
+void test_hold_stepped_param_cycles() {
+    Fx f;
+    const ModuleRec* m = placeAndOpen(f, TOsc);
+    TEST_ASSERT_EQUAL_FLOAT(2.f, m->params[0]);  // wave default
+    f.hold(0, 1);
+    TEST_ASSERT_EQUAL_FLOAT(3.f, m->params[0]);
+    f.up(0, 1);
+    f.hold(0, 1);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, m->params[0]);  // wraps
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+}
+
+void test_hold_plain_param_does_nothing() {
+    Fx f;
+    const ModuleRec* m = placeAndOpen(f, TVcf);
+    f.hold(0, 1);  // CUT
+    f.ui.tilt(30.f);
+    TEST_ASSERT_EQUAL_FLOAT(1200.f, m->params[0]);
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+    TEST_ASSERT_EQUAL(1, f.ui.state().modCell / kGridCols);
+}
+
+void test_file_tap_selects_then_enter_saves() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    toFileSave(f);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().fileSlot);
+    f.tap(2, 0);
+    TEST_ASSERT_EQUAL(0, (int)gStore.files.count("/modsynth/patches/slot03.json"));
+    TEST_ASSERT_EQUAL(2, f.ui.state().fileSlot);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL_STRING("SAVED", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(1, (int)gStore.files.count("/modsynth/patches/slot03.json"));
+}
+
+void test_file_hold_slot_loads() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    toFileSave(f);
+    f.slot(0);
+    f.side(Side::Tab);  // back to LOAD
+    f.hold(0, 0);
+    TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+}
+
+void test_file_slot_cleared_on_open() {
+    Fx f;
+    f.side(Side::Esc);
+    f.tap(4, 0);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().fileSlot);
+}
+
+void test_keys_settings_esc_returns_to_play() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
+    f.tap(11, 0);
+    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
+    f.side(Side::Enter);  // enter is do-it now, not the flip
+    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
 }
 
 int main() {
@@ -968,8 +1127,21 @@ int main() {
     RUN_TEST(test_boot_load_autosave);
     RUN_TEST(test_load_resets_ui_state);
     RUN_TEST(test_tilt_edit);
-    RUN_TEST(test_tilt_ignores_pins_and_patch_view);
+    RUN_TEST(test_hold_enter_on_pin_carries_not_sweeps);
     RUN_TEST(test_tilt_deadband);
     RUN_TEST(test_no_autosave_mid_tilt);
+    RUN_TEST(test_hold_module_opens_it);
+    RUN_TEST(test_fn_tap_module_opens_it);
+    RUN_TEST(test_hold_enter_in_patch_view_opens_once);
+    RUN_TEST(test_place_by_hold_tile);
+    RUN_TEST(test_place_by_fn_tile);
+    RUN_TEST(test_hold_pin_picks_up_cable);
+    RUN_TEST(test_enter_on_pin_picks_up_cable);
+    RUN_TEST(test_hold_stepped_param_cycles);
+    RUN_TEST(test_hold_plain_param_does_nothing);
+    RUN_TEST(test_file_tap_selects_then_enter_saves);
+    RUN_TEST(test_file_hold_slot_loads);
+    RUN_TEST(test_file_slot_cleared_on_open);
+    RUN_TEST(test_keys_settings_esc_returns_to_play);
     return UNITY_END();
 }
