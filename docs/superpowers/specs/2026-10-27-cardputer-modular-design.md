@@ -405,3 +405,39 @@ just map keys to virtual midi/oct/gate/etc out".
 | File menu (2026-10-28) | tap selects a slot, do-it loads/saves it | Claude's guess, owner agreed |
 | Keys settings → play (2026-10-28) | `esc` (enter is do-it now) | Claude's call |
 | Open items (§12) | decided in the v1 plan's table; owner changes: place menu shows details then `enter` places; `fn`+`tab` = previous page; coarse = "*k*0% of the knob", `-` min, `=` default; more Keys layouts later | owner (plan review) |
+
+## 14. v1.2 changes (session of 2026-10-28, plan `docs/superpowers/plans/2026-10-28-v1.2-feature-complete.md`)
+
+The owner asked for "feature complete": more modules everywhere, unified paged menus, pages inside
+modules, a readable place menu, factory patches, a Grind-like macro module, a responsive animated UI,
+context icons, more ways to move, a visible carried cable that `fn` drops, an attenuverter on every
+input, and more keyboard layouts that switch without rewiring. **[owner]** How each is met is
+**[Claude's call]** unless marked:
+
+- **Pages everywhere:** `tab` = next page, `fn`+`tab` = previous, in the patch view (3 pages), place
+  menu (5 category pages), module view (a type's pages) and file menu (LOAD, SAVE, PRESETS, SYSTEM).
+  The tab slot shows `n/N`. In the module view `tab` used to be "next parameter". **[owner: tab flips module pages]**
+- **Module pages:** automatic when params/ins/outs overflow a row, or declared per type (`PageDef`).
+  A page is a cell page or a Play page (KEYS). Sequencer steps are `Bit` cells, toggled by a plain tap.
+- **KEYS:** pages PLAY and SET (`tab` flips; `esc` leaves from either). Six layouts using all 48 keys
+  (chromatic, scale, piano, bass fret, fourths, drum pads) as a LAYOUT param, so switching never
+  rewires. **[owner: bass fret, scale, keyboard mimic; full grid; easy switching]** Play page: `ctrl`/`space`
+  octave, `enter`/`fn`+`enter` layout, `del` panic, `\` latch.
+- **Moving:** `ctrl`+cell (v1), hold a module and press another cell **[owner]**, or select then tap
+  `ctrl` alone **[owner]**. Onto a module = swap; `fn`+target during a move = copy.
+- **Cables:** in the patch view a "HOLDING" strip shows the carry and modules that can take it pulse
+  **[owner: indication]**; a lone `fn` tap drops it **[owner]**, as does one `esc` in the patch view.
+  Hold a pin and press a pin of the other kind = patch directly.
+- **Input attenuverters:** every input has an amount −100…+100 % (default +100 %), applied after its
+  cables sum, saved as `inamounts`. **[owner]**
+- **Side strip:** one function (`src/ui/side_icons.*`) decides every icon from the state (esc = ✕
+  during a move or carry **[owner]**); held keys draw inverted and flash on a tap **[owner: respond to
+  presses]**; holding `fn` alone shows a help panel. `fn`+`\` = redo.
+- **Look:** zoom transitions, key flashes, eased value strip, value bars, activity meters, sliding
+  toasts; theme A selectable on the SYSTEM page with brightness and hold time.
+- **Files:** 36 slots, NEW patch, 12 factory presets; first boot loads BASIC. **[owner: default patches]**
+- **Modules:** about 45 new types (effects, processors, sources, drums, modulators, sequencers,
+  utilities, scope/tuner) and **GRD**, Plaits' 24 engines (original 16 first, as on the Grind).
+  **[owner: Grind macro]** DLY and REV share the two 96 KB buffers.
+- **Deferred:** USB MIDI host (needs the owner's powered OTG adapter to verify, and host mode drops
+  the USB serial console).

@@ -1388,6 +1388,7 @@ void test_grd_pitch_tracks() {
     }
     TEST_ASSERT_FLOAT_WITHIN(261.63f * 0.03f, 261.63f, crossingHz(v));
     TEST_ASSERT_EQUAL(8, grdEngineIndex(0));
+    TEST_ASSERT_TRUE(kGrdType.ramBytes < 64 * 1024);
     TEST_ASSERT_EQUAL(0, grdEngineIndex(16));
     delete m;
 }
