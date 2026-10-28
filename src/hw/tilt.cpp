@@ -1,9 +1,21 @@
 #include "tilt.h"
 #include <M5Unified.h>
-#include <math.h>
 
-float tiltRollDegrees() {
+namespace {
+TiltFilter g_filter;
+uint32_t g_lastMs = 0;
+}  // namespace
+
+void tiltPoll(uint32_t nowMs) {
+    if (!M5.Imu.isEnabled()) return;
     float ax, ay, az;
-    if (!M5.Imu.getAccel(&ax, &ay, &az)) return 0.f;
-    return atan2f(ax, az) * 57.29578f;
+    // getAccel returns false when the IMU has no new sample since the last read; the values are
+    // then stale, not zero, and must not be taken as a reading.
+    const bool fresh = M5.Imu.getAccel(&ax, &ay, &az);
+    if (!fresh) return;
+    g_filter.push(ax, ay, az, true, (float)(nowMs - g_lastMs));
+    g_lastMs = nowMs;
 }
+
+TiltAngles tiltAngles() { return g_filter.angles(); }
+bool tiltValid() { return g_filter.valid(); }

@@ -39,16 +39,14 @@ static void uiTask(void*) {
         int ne = 0;
         gDecoder.update(pressed, n, now, ev, &ne, 16);
         for (int i = 0; i < ne; i++) gUi.handle(ev[i], now);
-        if (gUi.tiltActive()) {
-            const float roll = tiltRollDegrees();
+        tiltPoll(now);
+        if (gUi.tiltActive() && tiltValid()) {
+            const float roll = tiltAngles().roll;  // within +-90, no wrap
             if (gUi.tiltGeneration() != lastTiltGen) {
                 lastTiltGen = gUi.tiltGeneration();
                 rollAtStart = roll;
             }
-            float d = roll - rollAtStart;
-            if (d > 180.f) d -= 360.f;
-            if (d < -180.f) d += 360.f;
-            gUi.tilt(d);
+            gUi.tilt(roll - rollAtStart);
         }
         gUi.tick(now);
         if (now - lastDraw >= 33) {  // <= 30 fps, core 0 only
