@@ -255,11 +255,11 @@ void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint3
     if (!g_ready) return;
     using namespace rd;
     // File-slot presence is cached: refreshed on entering the file view and when a toast appears.
-    static bool filled[12];
+    static bool filled[kSlots];
     static View lastView = View::Patch;
     static uint32_t lastToast = 0;
     if (s.view == View::File && (lastView != View::File || (s.toast[0] && s.toastUntilMs != lastToast))) {
-        for (int i = 0; i < 12; i++) filled[i] = st.exists(slotPath(i + 1).c_str());
+        for (int i = 0; i < kSlots; i++) filled[i] = st.exists(slotPath(i + 1).c_str());
     }
     lastView = s.view;
     lastToast = s.toastUntilMs;

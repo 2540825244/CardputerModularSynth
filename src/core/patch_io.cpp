@@ -41,7 +41,7 @@ std::string slotPath(int slot) {
     char buf[64];
     if (slot == 0) {
         snprintf(buf, sizeof buf, "%s/autosave.json", kPatchDir);
-    } else if (slot >= 1 && slot <= 12) {
+    } else if (slot >= 1 && slot <= kSlots) {
         snprintf(buf, sizeof buf, "%s/slot%02d.json", kPatchDir, slot);
     } else {
         return "";

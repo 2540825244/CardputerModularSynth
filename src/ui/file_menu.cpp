@@ -1,36 +1,63 @@
 #include "core/patch_io.h"
+#include "core/presets.h"
 #include "views.h"
 
 namespace {
 
-// Loads or saves the selected slot (column 0..11 -> slot 1..12).
+enum { kLoad, kSave, kPresets, kSystem, kFilePages };
+constexpr int kNewCell = 47;  // LOAD page, bottom-right: a new empty patch
+
+// Do-it on the selected cell of the LOAD / SAVE / PRESETS page.
 void run(UiController& ui) {
     UiState& s = ui.mut();
     if (s.fileSlot < 0) return;
+    char msg[24];
+    if (s.filePage == kPresets) {
+        if (ui.loadPreset(s.fileSlot, true, msg, sizeof msg)) ui.toast(msg, ui.now());
+        else ui.toast(msg, ui.now());
+        return;
+    }
+    if (s.filePage == kLoad && s.fileSlot == kNewCell) {
+        ui.newPatch();
+        return;
+    }
+    if (s.fileSlot >= kSlots) return;
     const std::string path = slotPath(s.fileSlot + 1);
-    if (s.fileSaveMode) {
+    if (s.filePage == kSave) {
         if (!ui.storage().available()) ui.toast("NO SD", ui.now());
         else if (ui.storage().write(path.c_str(), patchToJson(ui.patch()))) ui.toast("SAVED", ui.now());
         else ui.toast("SAVE FAILED", ui.now());
     } else {
-        char msg[24];
         ui.loadFile(path.c_str(), true, msg, sizeof msg);
         ui.toast(msg, ui.now());
     }
 }
 
+// SYSTEM page, row 0: col 0 theme, cols 2..6 brightness 1..5, cols 8..10 hold 300/400/600 ms.
+// A tap applies at once: settings are harmless to change.
+void system(UiController& ui, int cell) {
+    Settings& st = ui.mut().settings;
+    if (cell == 0) st.theme ^= 1;
+    else if (cell >= 2 && cell <= 6) st.brightness = (uint8_t)(cell - 1);
+    else if (cell >= 8 && cell <= 10) st.hold = (uint8_t)(cell - 8);
+    else return;
+    ui.saveSettings();
+}
+
 }  // namespace
 
-// Tap a slot (top row) to select it; do-it loads or saves it, so a stray tap never overwrites.
+// Tap a cell to select it; do-it loads, saves or loads the preset, so a stray tap never
+// overwrites. tab / fn+tab flips LOAD, SAVE, PRESETS, SYSTEM.
 bool fileViewAction(UiController& ui, const Action& a) {
     UiState& s = ui.mut();
     switch (a.act) {
         case Act::Select:
-            if (a.cell < kGridCols) s.fileSlot = a.cell;
+            if (s.filePage == kSystem) system(ui, a.cell);
+            else s.fileSlot = a.cell;
             break;
         case Act::Activate:
         case Act::Sweep:
-            if (a.cell >= kGridCols) break;
+            if (s.filePage == kSystem) break;
             if (a.cell >= 0) s.fileSlot = a.cell;
             run(ui);
             break;
@@ -38,11 +65,13 @@ bool fileViewAction(UiController& ui, const Action& a) {
             const KeyEvent& e = a.key;
             if (e.grid || e.type != KeyEvent::Down) break;
             if (e.side == Side::Tab) {
-                s.fileSaveMode = !s.fileSaveMode;
+                s.filePage = (uint8_t)((s.filePage + kFilePages + (ui.fnHeld() ? -1 : 1)) % kFilePages);
                 s.fileSlot = -1;  // a slot picked to load is never saved over by one enter
+            } else if (e.side == Side::Esc) {
+                s.view = View::Patch;
+            } else if (e.side == Side::Backslash) {
+                ui.undoOrRedo();
             }
-            else if (e.side == Side::Esc) s.view = View::Patch;
-            else if (e.side == Side::Backslash) ui.undoOrRedo();
             break;
         }
         case Act::SweepEnd:

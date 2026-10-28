@@ -22,6 +22,7 @@ class KeyDecoder {
     // chord emits the grid Down before the modifier Down: read modifiers via sideHeld().
     void update(const KeyPos* pressed, int n, uint32_t nowMs, KeyEvent* out, int* outCount, int outMax);
     bool sideHeld(Side s) const { return held_[kGridKeys + static_cast<int>(s)]; }
+    void setHoldMs(uint32_t ms) { holdMs_ = ms; }
     bool gridHeld(uint8_t col, uint8_t row) const {
         return col < kCols && row < kRows && held_[row * kCols + col];
     }
@@ -31,4 +32,5 @@ class KeyDecoder {
     bool held_[kKeys] = {};
     bool holdFired_[kKeys] = {};
     uint32_t downAt_[kKeys] = {};
+    uint32_t holdMs_ = kHoldMs;
 };

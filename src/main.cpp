@@ -30,7 +30,7 @@ static void uiTask(void*) {
     if (audioI2sError() == 0) codecBegin();
     uint32_t lastStatus = 0, lastDraw = 0;
     bool steadyPrinted = false;
-    uint32_t lastTiltGen = 0;
+    uint32_t lastTiltGen = 0, settingsGen = 0;
     bool inputPending = false;  // redraw soon after a key, not at the next 30 fps tick
     float rollAtStart = 0.f;
     KeyPos pressed[16];
@@ -53,6 +53,12 @@ static void uiTask(void*) {
             gUi.tilt(roll - rollAtStart);
         }
         gUi.tick(now);
+        if (gUi.state().settingsGen != settingsGen) {  // theme, brightness, hold time
+            settingsGen = gUi.state().settingsGen;
+            renderSetTheme(gUi.state().settings.theme);
+            renderSetBrightness(gUi.state().settings.brightness);
+            gDecoder.setHoldMs(gUi.holdMs());
+        }
         if (now - lastDraw >= 33 || (inputPending && now - lastDraw >= 12)) {  // core 0 only
             lastDraw = now;
             inputPending = false;
@@ -89,7 +95,7 @@ void setup() {
     printHeap("sprite");
     gSd.begin();
     gUi.setDecoder(&gDecoder);
-    gUi.loadAutosave();
+    gUi.bootLoad();
     if (!audioBegin(gEngine)) Serial.println("audioBegin FAILED");
     printHeap("init");
     xTaskCreatePinnedToCore(uiTask, "ui", 12288, nullptr, 1, nullptr, 0);

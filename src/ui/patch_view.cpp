@@ -144,7 +144,7 @@ void sideKey(UiController& ui, const KeyEvent& e) {
                 ui.undoStack().breakCoalescing();
             } else {
                 s.view = View::File;
-                s.fileSaveMode = false;
+                s.filePage = 0;
                 s.fileSlot = -1;
             }
             break;

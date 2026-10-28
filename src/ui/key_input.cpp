@@ -39,7 +39,7 @@ void KeyDecoder::update(const KeyPos* pressed, int n, uint32_t nowMs, KeyEvent* 
             emit(k, KeyEvent::Down);
         } else if (!now[k] && held_[k]) {
             emit(k, KeyEvent::Up);
-        } else if (now[k] && !holdFired_[k] && nowMs - downAt_[k] >= kHoldMs) {
+        } else if (now[k] && !holdFired_[k] && nowMs - downAt_[k] >= holdMs_) {
             holdFired_[k] = true;
             emit(k, KeyEvent::Hold);
         }

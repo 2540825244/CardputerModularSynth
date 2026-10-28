@@ -12,6 +12,7 @@
 #include "core/modules/vcf.h"
 #include "ui/controller.h"
 #include "ui/layout.h"
+#include "core/presets.h"
 #include "ui/anim.h"
 #include "ui/side_icons.h"
 
@@ -715,7 +716,7 @@ static void toFileSave(Fx& f) {
     f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
     f.side(Side::Tab);
-    TEST_ASSERT_TRUE(f.ui.state().fileSaveMode);
+    TEST_ASSERT_EQUAL(1, f.ui.state().filePage);
 }
 
 void test_save_load_slot() {
@@ -728,7 +729,9 @@ void test_save_load_slot() {
     TEST_ASSERT_EQUAL(1, (int)gStore.files.count("/modsynth/patches/slot03.json"));
     gPatch.clear();
     f.eng.apply(gPatch);
-    f.side(Side::Tab);
+    f.sideDown(Side::Fn);
+    f.side(Side::Tab);  // back to LOAD (tab goes on to PRESETS)
+    f.sideUp(Side::Fn);
     f.slot(2);
     TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
     TEST_ASSERT_EQUAL(2, gPatch.moduleCount());
@@ -1596,6 +1599,105 @@ void test_zoom_t_bounds() {
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.5f, flashT(100, 145, 90));
 }
 
+
+// ---- v1.2 Task 7: file pages, presets, settings ----
+void test_every_preset_loads_clean() {
+    int n = 0;
+    const Preset* ps = presets(&n);
+    TEST_ASSERT_TRUE(n >= 5);
+    for (int i = 0; i < n; i++) {
+        Patch q;
+        const LoadReport r = patchFromJson(ps[i].json, q, nullptr);
+        TEST_ASSERT_EQUAL_MESSAGE((int)LoadError::None, (int)r.error, ps[i].name);
+        TEST_ASSERT_EQUAL_MESSAGE(0, r.skippedModules, ps[i].name);
+        TEST_ASSERT_EQUAL_MESSAGE(0, r.skippedCables, ps[i].name);
+        TEST_ASSERT_TRUE_MESSAGE(q.moduleCount() >= 3, ps[i].name);
+        TEST_ASSERT_TRUE_MESSAGE(strlen(ps[i].name) <= 6, ps[i].name);
+    }
+    Patch b;
+    patchFromJson(ps[0].json, b, nullptr);
+    TEST_ASSERT_EQUAL_STRING("BASIC", ps[0].name);
+    TEST_ASSERT_EQUAL_FLOAT(2.f, b.findAt(0, 13)->params[0]);  // OSC wave SAW: integers load as params
+}
+
+void test_preset_page_loads_undoable() {
+    Fx f;
+    f.side(Side::Esc);
+    f.side(Side::Tab);
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(2, f.ui.state().filePage);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_TRUE(gPatch.moduleCount() >= 5);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+}
+
+void test_new_patch_undoable() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.side(Side::Esc);
+    f.tap(11, 3);  // NEW
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+}
+
+void test_first_boot_loads_basic() {
+    Fx f;
+    TEST_ASSERT_TRUE(f.ui.bootLoad());
+    TEST_ASSERT_TRUE(gPatch.moduleCount() >= 5);
+    TEST_ASSERT_FALSE(f.ui.state().dirty);
+    TEST_ASSERT_EQUAL(0, gUndo.size());
+}
+
+void test_file_tab_pages() {
+    Fx f;
+    f.side(Side::Esc);
+    for (int i = 1; i <= 4; i++) {
+        f.side(Side::Tab);
+        TEST_ASSERT_EQUAL(i % 4, f.ui.state().filePage);
+    }
+    f.sideDown(Side::Fn);
+    f.side(Side::Tab);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(3, f.ui.state().filePage);
+}
+
+void test_slot_36_save() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    toFileSave(f);
+    f.slot(11);  // row 0, col 11 = slot 12
+    f.tap(11, 2);  // row 2, col 11 = slot 36
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(1, (int)gStore.files.count("/modsynth/patches/slot36.json"));
+}
+
+void test_system_settings_saved() {
+    Fx f;
+    f.side(Side::Esc);
+    for (int i = 0; i < 3; i++) f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(3, f.ui.state().filePage);
+    const uint32_t gen = f.ui.state().settingsGen;
+    f.tap(0, 0);  // theme toggles on a tap
+    TEST_ASSERT_EQUAL(1, f.ui.state().settings.theme);
+    f.tap(3, 0);  // brightness 2
+    TEST_ASSERT_EQUAL(2, f.ui.state().settings.brightness);
+    f.tap(10, 0);  // hold 600 ms
+    TEST_ASSERT_EQUAL(600, f.ui.holdMs());
+    TEST_ASSERT_TRUE(f.ui.state().settingsGen != gen);
+    TEST_ASSERT_EQUAL(1, (int)gStore.files.count("/modsynth/settings.json"));
+    Fx g;  // a fresh controller reads them back
+    gStore.files["/modsynth/settings.json"] = "{\"theme\":1,\"bright\":2,\"hold\":600}";
+    g.ui.loadSettings();
+    TEST_ASSERT_EQUAL(1, g.ui.state().settings.theme);
+    TEST_ASSERT_EQUAL(600, g.ui.holdMs());
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1703,5 +1805,12 @@ int main() {
     RUN_TEST(test_side_pressed_flash);
     RUN_TEST(test_ease_converges);
     RUN_TEST(test_zoom_t_bounds);
+    RUN_TEST(test_every_preset_loads_clean);
+    RUN_TEST(test_preset_page_loads_undoable);
+    RUN_TEST(test_new_patch_undoable);
+    RUN_TEST(test_first_boot_loads_basic);
+    RUN_TEST(test_file_tab_pages);
+    RUN_TEST(test_slot_36_save);
+    RUN_TEST(test_system_settings_saved);
     return UNITY_END();
 }

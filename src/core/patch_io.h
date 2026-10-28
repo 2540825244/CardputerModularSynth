@@ -5,7 +5,9 @@
 #include "patch.h"
 
 constexpr const char* kPatchDir = "/modsynth/patches";
-std::string slotPath(int slot);  // 1..12 -> ".../slot01.json"; 0 -> ".../autosave.json"; else ""
+constexpr const char* kSettingsPath = "/modsynth/settings.json";
+constexpr int kSlots = 36;
+std::string slotPath(int slot);  // 1..36 -> ".../slot01.json"; 0 -> ".../autosave.json"; else ""
 
 std::string patchToJson(const Patch&);
 

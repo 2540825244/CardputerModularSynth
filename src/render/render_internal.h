@@ -43,7 +43,7 @@ void drawToast(const char* msg, uint32_t shownAt);
 
 void drawPatchView(const UiState&, const Patch&, Engine&);
 void drawPlaceView(const UiState&, const Patch&, Engine&);
-void drawFileView(const UiState&, const bool filled[12]);
+void drawFileView(const UiState&, const bool filled[36]);
 void drawModuleView(const UiState&, const Patch&, Engine&);  // Module and KeysSettings
 void drawKeysPlay(const UiState&, const Patch&);
 

@@ -71,7 +71,8 @@ void test_slot_path() {
     TEST_ASSERT_EQUAL_STRING("/modsynth/patches/slot01.json", slotPath(1).c_str());
     TEST_ASSERT_EQUAL_STRING("/modsynth/patches/slot12.json", slotPath(12).c_str());
     TEST_ASSERT_EQUAL_STRING("/modsynth/patches/autosave.json", slotPath(0).c_str());
-    TEST_ASSERT_EQUAL_STRING("", slotPath(13).c_str());
+    TEST_ASSERT_EQUAL_STRING("/modsynth/patches/slot36.json", slotPath(36).c_str());
+    TEST_ASSERT_EQUAL_STRING("", slotPath(37).c_str());
 }
 
 void test_roundtrip() {

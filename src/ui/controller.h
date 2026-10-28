@@ -55,6 +55,15 @@ class UiController {
     // load does neither. Returns the toast text ("LOADED", "SKIPPED n", or the error) via msg.
     bool loadFile(const char* path, bool keepUndo, char* msg, size_t msgSize);
     bool loadAutosave();  // boot: no toast, not dirty
+    // Boot: the autosave, or else the BASIC preset (not dirty, no undo). Also reads the settings.
+    bool bootLoad();
+    // Load factory preset i (presets.h). keepUndo as in loadFile.
+    bool loadPreset(int i, bool keepUndo, char* msg, size_t msgSize);
+    bool loadJson(const std::string& text, bool keepUndo, char* msg, size_t msgSize);
+    void newPatch();  // clears the patch (undoable)
+    void loadSettings();
+    void saveSettings();  // bumps settingsGen, writes /modsynth/settings.json
+    uint32_t holdMs() const;
     void validate();  // end a carry / close a view whose module is gone (after undo, load, delete)
     int lastNote = 60;
     NoteStack notes;           // KEYS play page held notes

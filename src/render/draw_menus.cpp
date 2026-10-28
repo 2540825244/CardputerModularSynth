@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include "core/patch_io.h"
+#include "core/presets.h"
 #include "core/registry.h"
 #include "render_internal.h"
 #include "ui/layout.h"
@@ -80,29 +82,105 @@ void drawPlaceView(const UiState& s, const Patch& p, Engine& e) {
     }
 }
 
-void drawFileView(const UiState& s, const bool filled[12]) {
-    for (int col = 0; col < kGridCols; col++) {
+namespace {
+
+void bandText(const char* big, const char* hint) {
+    const int y = cellY(3), h = cellH(3);
+    cv.fillRect(cellX(0), y, cellX(10) + cellW(10) - cellX(0), h, PStrip);
+    cv.setFont(&fonts::Font0);
+    cv.setTextDatum(textdatum_t::middle_left);
+    cv.setTextColor(PText);
+    cv.setTextSize(2);
+    cv.drawString(big, cellX(0) + 4, y + h / 2);
+    cv.setTextSize(1);
+    cv.setTextColor(PDim);
+    cv.drawString(hint, cellX(0) + 4 + cv.textWidth(big) * 2 + 8, y + h / 2);
+}
+
+void slotsPage(const UiState& s, const bool filled[kSlots]) {
+    for (int cell = 0; cell < kSlots; cell++) {
+        const int col = cell % kGridCols, row = cell / kGridCols;
         char label[4];
-        snprintf(label, sizeof label, "%d", col + 1);
-        const int x = cellX(col), y = cellY(0), w = cellW(col), h = cellH(0);
-        if (filled[col]) {
+        snprintf(label, sizeof label, "%d", cell + 1);
+        const int x = cellX(col), y = cellY(row), w = cellW(col), h = cellH(row);
+        if (filled[cell]) {
             cv.fillRect(x, y, w, h, PEmpty);
-            cv.drawRect(x, y, w, h, PText);
             drawIcon(Ic::File, x + (w - 12) / 2, y + 6, PText);
             smallText(label, x + w / 2, y + 22, PText);
         } else {
-            emptyCell(col, 0, label, false);
+            emptyCell(col, row, label, false);
         }
-        if (col == s.fileSlot) outline(col, 0, PAccent);
+        if (cell == s.fileSlot) outline(col, row, PAccent);
     }
-    cv.setFont(&fonts::Font0);
-    cv.setTextSize(2);
-    cv.setTextColor(PText);
-    cv.setTextDatum(textdatum_t::middle_center);
-    cv.drawString(s.fileSaveMode ? "SAVE" : "LOAD", kGridX + kGridW / 2, cellY(2));
-    cv.setTextSize(1);
-    smallText(s.fileSaveMode ? "TAP A SLOT, ENTER TO SAVE" : "TAP A SLOT, ENTER TO LOAD", kGridX + kGridW / 2, cellY(3) - 6, PDim);
-    smallText("TAB = SAVE / LOAD", kGridX + kGridW / 2, cellY(3) + 6, PDim);
+    const bool save = s.filePage == 1;
+    char hint[32];
+    if (s.fileSlot >= 0 && s.fileSlot < kSlots)
+        snprintf(hint, sizeof hint, "SLOT %d %s", s.fileSlot + 1, filled[s.fileSlot] ? (save ? "OVERWRITE?" : "") : "EMPTY");
+    else
+        snprintf(hint, sizeof hint, "%s", save ? "PICK A SLOT, ENTER" : "PICK, ENTER  TAB=MORE");
+    bandText(save ? "SAVE" : "LOAD", hint);
+    if (!save) {  // NEW: an empty patch
+        const int x = cellX(11), y = cellY(3), w = cellW(11), h = cellH(3);
+        cv.fillRect(x, y, w, h, PEmpty);
+        drawIcon(Ic::Plus, x + (w - 12) / 2, y + 6, PText);
+        smallText("NEW", x + w / 2, y + 22, PText);
+        if (s.fileSlot == 47) outline(11, 3, PAccent);
+    }
+}
+
+void presetsPage(const UiState& s) {
+    int n = 0;
+    const Preset* ps = presets(&n);
+    for (int cell = 0; cell < 36; cell++) {
+        const int col = cell % kGridCols, row = cell / kGridCols;
+        if (cell >= n) {
+            emptyCell(col, row, nullptr, false);
+            continue;
+        }
+        const int x = cellX(col), y = cellY(row), w = cellW(col), h = cellH(row);
+        cv.fillRect(x, y, w, h, PEmpty);
+        cv.fillRect(x + 2, y + 2, w - 4, 2, PAccent);
+        char a[4] = {0}, b[4] = {0};
+        strncpy(a, ps[cell].name, 3);
+        if (strlen(ps[cell].name) > 3) strncpy(b, ps[cell].name + 3, 3);
+        smallText(a, x + w / 2, y + 10, PText);
+        smallText(b, x + w / 2, y + 18, PText);
+        if (cell == s.fileSlot) outline(col, row, PAccent);
+    }
+    bandText(s.fileSlot >= 0 && s.fileSlot < n ? ps[s.fileSlot].name : "PRESETS",
+             s.fileSlot >= 0 && s.fileSlot < n ? "ENTER = LOAD" : "FACTORY PATCHES");
+}
+
+void systemPage(const UiState& s) {
+    const Settings& st = s.settings;
+    auto tile = [](int col, const char* label, bool on) {
+        const int x = cellX(col), y = cellY(0), w = cellW(col), h = cellH(0);
+        cv.fillRect(x, y, w, h, on ? PAccent : PEmpty);
+        smallText(label, x + w / 2, y + h / 2 - 2, on ? PBg : PText);
+    };
+    for (int col = 0; col < kGridCols; col++) emptyCell(col, 0, nullptr, false);
+    tile(0, st.theme ? "A" : "B", true);
+    for (int i = 1; i <= 5; i++) {
+        char l[2] = {(char)('0' + i), 0};
+        tile(1 + i, l, i <= st.brightness);
+    }
+    static const char* const kHold[] = {"300", "400", "600"};
+    for (int i = 0; i < 3; i++) tile(8 + i, kHold[i], i == st.hold);
+    smallText("THEME", cellX(0) + cellW(0) / 2, cellY(1) + 4, PDim);
+    smallText("BRIGHTNESS", (cellX(2) + cellX(6) + cellW(6)) / 2, cellY(1) + 4, PDim);
+    smallText("HOLD MS", (cellX(8) + cellX(10) + cellW(10)) / 2, cellY(1) + 4, PDim);
+    bandText("SYSTEM", "TAP TO SET");
+}
+
+}  // namespace
+
+void drawFileView(const UiState& s, const bool filled[kSlots]) {
+    switch (s.filePage) {
+        case 0:
+        case 1: slotsPage(s, filled); break;
+        case 2: presetsPage(s); break;
+        default: systemPage(s); break;
+    }
 }
 
 }  // namespace rd

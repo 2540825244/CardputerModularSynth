@@ -85,12 +85,16 @@ SideIcons sideIcons(const UiState& s, const Patch& p, bool fnHeld) {
             r.name[(int)Side::Tab] = "CATEG";
             if (s.placeType >= 0) set(r, Side::Enter, Ic::Enter, "PLACE");
             break;
-        case View::File:
+        case View::File: {
+            static const char* const kPg[] = {"LOAD", "SAVE", "PRESET", "SYS"};
             set(r, Side::Esc, Ic::Back, "BACK");
-            set(r, Side::Tab, Ic::Toggle, s.fileSaveMode ? "LOAD" : "SAVE");
+            snprintf(r.tabText, sizeof r.tabText, "%d/4", s.filePage + 1);
+            r.shown[(int)Side::Tab] = true;
+            r.name[(int)Side::Tab] = "PAGE";
             undo(r, fnHeld);
-            if (s.fileSlot >= 0) set(r, Side::Enter, Ic::Enter, s.fileSaveMode ? "SAVE" : "LOAD");
+            if (s.fileSlot >= 0 && s.filePage < 3) set(r, Side::Enter, Ic::Enter, kPg[s.filePage < 4 ? s.filePage : 0]);
             break;
+        }
     }
     if (s.carry.active && s.view != View::Patch && s.view != View::Module)
         set(r, Side::Fn, Ic::Cable, "DROP", true);

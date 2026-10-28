@@ -3,7 +3,9 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <ArduinoJson.h>
 #include "core/patch_io.h"
+#include "core/presets.h"
 #include "layout.h"
 #include "views.h"
 
@@ -153,6 +155,10 @@ bool UiController::loadFile(const char* path, bool keepUndo, char* msg, size_t m
         snprintf(msg, msgSize, "NO FILE");
         return false;
     }
+    return loadJson(text, keepUndo, msg, msgSize);
+}
+
+bool UiController::loadJson(const std::string& text, bool keepUndo, char* msg, size_t msgSize) {
     std::unique_ptr<Patch> loaded(new Patch());  // too big for the stack
     const LoadReport r = patchFromJson(text, *loaded, &engine_);
     if (r.error != LoadError::None) {
@@ -182,6 +188,67 @@ bool UiController::loadFile(const char* path, bool keepUndo, char* msg, size_t m
     if (r.skippedModules > 0) snprintf(msg, msgSize, "SKIPPED %d", r.skippedModules);
     else snprintf(msg, msgSize, "LOADED");
     return true;
+}
+
+bool UiController::loadPreset(int i, bool keepUndo, char* msg, size_t msgSize) {
+    int n = 0;
+    const Preset* ps = presets(&n);
+    if (i < 0 || i >= n) {
+        snprintf(msg, msgSize, "NO PRESET");
+        return false;
+    }
+    return loadJson(ps[i].json, keepUndo, msg, msgSize);
+}
+
+namespace {
+void doClear(Patch& p, void*) { p.clear(); }
+}  // namespace
+
+void UiController::newPatch() {
+    edit(doClear, nullptr);
+    s_.selCell = -1;
+    s_.moveFromId = -1;
+    s_.carry.active = false;
+    s_.view = View::Patch;
+    toast("NEW PATCH", now_);
+}
+
+bool UiController::bootLoad() {
+    loadSettings();
+    if (loadAutosave()) return true;
+    char msg[24];
+    return loadPreset(0, false, msg, sizeof msg);
+}
+
+uint32_t UiController::holdMs() const {
+    static const uint32_t kHold[] = {300, 400, 600};
+    return kHold[s_.settings.hold < 3 ? s_.settings.hold : 1];
+}
+
+void UiController::loadSettings() {
+    s_.settings = {0, 4, 1};
+    std::string text;
+    if (storage_.available() && storage_.read(kSettingsPath, text)) {
+        JsonDocument doc;
+        if (deserializeJson(doc, text) == DeserializationError::Ok) {
+            const int theme = doc["theme"] | 0, bright = doc["bright"] | 4, hold = doc["hold"] | 400;
+            s_.settings.theme = theme ? 1 : 0;
+            s_.settings.brightness = (uint8_t)(bright < 1 ? 1 : (bright > 5 ? 5 : bright));
+            s_.settings.hold = hold <= 300 ? 0 : (hold >= 600 ? 2 : 1);
+        }
+    }
+    s_.settingsGen++;
+}
+
+void UiController::saveSettings() {
+    s_.settingsGen++;
+    JsonDocument doc;
+    doc["theme"] = s_.settings.theme;
+    doc["bright"] = s_.settings.brightness;
+    doc["hold"] = holdMs();
+    std::string out;
+    serializeJson(doc, out);
+    if (storage_.available()) storage_.write(kSettingsPath, out);
 }
 
 bool UiController::loadAutosave() {

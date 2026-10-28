@@ -11,6 +11,12 @@ struct Carry {
     uint8_t color;
 };
 
+struct Settings {
+    uint8_t theme;       // 0 style B, 1 style A
+    uint8_t brightness;  // 1..5
+    uint8_t hold;        // 0 = 300, 1 = 400, 2 = 600 ms
+};
+
 struct UiState {
     View view;
     uint8_t page;       // 0..2
@@ -26,8 +32,10 @@ struct UiState {
     uint8_t escPresses;
     char toast[24];
     uint32_t toastUntilMs;
-    bool fileSaveMode;
-    int8_t fileSlot;    // file menu: selected slot column 0..11, -1 none
+    uint8_t filePage;   // file menu: 0 LOAD, 1 SAVE, 2 PRESETS, 3 SYSTEM
+    int8_t fileSlot;    // file menu: selected cell 0..47 on the page, -1 none
+    Settings settings;
+    uint32_t settingsGen;  // bumps on every settings change (main applies theme, brightness, hold)
     bool dirty;
     uint32_t lastEditMs;
     uint64_t keysHeld;  // KEYS play page: bit (3-row)*12+col per held note key
