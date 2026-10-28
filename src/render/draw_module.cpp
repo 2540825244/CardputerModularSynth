@@ -52,7 +52,7 @@ struct Sel {
 Sel selection(const UiState& s, const ModuleRec& m) {
     Sel r = {{CellKind::Empty, 0}, nullptr, 0.f};
     if (s.modCell < 0) return r;
-    r.c = moduleCell(*m.type, (uint8_t)(s.modCell / kGridCols), (uint8_t)(s.modCell % kGridCols));
+    r.c = moduleCell(*m.type, s.modPage, (uint8_t)(s.modCell / kGridCols), (uint8_t)(s.modCell % kGridCols));
     if (r.c.kind == CellKind::Param) {
         r.spec = &m.type->params[r.c.index];
         r.value = m.params[r.c.index];
@@ -178,6 +178,22 @@ void pinCell(const UiState& s, const Patch& p, const ModuleRec& m, int col, int 
     if (selected) outline(col, row, PAccent);
 }
 
+// A sequencer step: filled when its bit is set, numbered 1..
+void bitCell(const ModuleRec& m, int col, int row, CellRef c, bool selected) {
+    const int x = cellX(col), y = cellY(row), w = cellW(col), h = cellH(row);
+    const bool on = ((uint32_t)m.params[c.index] >> c.bit) & 1u;
+    char lab[4];
+    snprintf(lab, sizeof lab, "%d", c.bit + 1);
+    if (on) {
+        cv.fillRect(x + 1, y + 1, w - 2, h - 2, PText);
+        smallText(lab, x + w / 2, y + h / 2 - 2, PBg);
+    } else {
+        dotted(x, y, w, h, PBorder);
+        smallText(lab, x + w / 2, y + h / 2 - 2, PFaint);
+    }
+    if (selected) outline(col, row, PAccent);
+}
+
 // ---- live drawings ----
 
 void drawFilterCurve(const ModuleRec& m, Module* inst, int x, int y, int w, int h) {
@@ -240,24 +256,30 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
     const ModuleRec* m = p.find(s.openId);
     if (!m) return;
     const ModuleTypeInfo& t = *m->type;
+    if (modulePageKind(t, s.modPage) == PageKind::Play) {
+        drawKeysPlay(s, p);
+        return;
+    }
     if (s.carry.active) drawBanner(s, p);
     else drawStrip(s, *m);
-    if (t.drawing != Drawing::None) {
+    const Drawing drawing = modulePageDrawing(t, s.modPage);
+    if (drawing != Drawing::None) {
         const int x = cellX(5), y = cellY(1), w = cellX(11) + cellW(11) - x, h = cellY(3) + cellH(3) - y;
         cv.fillRect(x, y, w, h, PEmpty);
         Module* inst = e.instance(m->id);
-        if (t.drawing == Drawing::FilterCurve) drawFilterCurve(*m, inst, x, y, w, h);
+        if (drawing == Drawing::FilterCurve) drawFilterCurve(*m, inst, x, y, w, h);
         else drawEnvelope(*m, inst, x, y, w, h);
     }
     for (int row = 1; row < kGridRows; row++) {
         for (int col = 0; col < kGridCols; col++) {
-            const CellRef c = moduleCell(t, (uint8_t)row, (uint8_t)col);
+            const CellRef c = moduleCell(t, s.modPage, (uint8_t)row, (uint8_t)col);
             const bool selected = s.modCell == row * kGridCols + col;
             switch (c.kind) {
                 case CellKind::Empty: emptyCell(col, row, keyLabel(row, col), selected); break;
                 case CellKind::Param: paramCell(*m, col, row, c.index, selected); break;
                 case CellKind::In: pinCell(s, p, *m, col, row, false, c.index, selected); break;
                 case CellKind::Out: pinCell(s, p, *m, col, row, true, c.index, selected); break;
+                case CellKind::Bit: bitCell(*m, col, row, c, selected); break;
                 default: break;
             }
         }
@@ -273,7 +295,10 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
     else if (sel.spec && sel.spec->curve == Curve::Stepped) sd.right[2] = Ic::Toggle;
     else sd.right[2] = Ic::Tilt;
     sd.rightIcon[2] = sel.c.kind != CellKind::Empty;
-    if (s.view == View::KeysSettings) sd.left[0] = Ic::Play;  // esc flips back to the play page
+    char page[8];
+    const int np = modulePageCount(t);
+    snprintf(page, sizeof page, "%d/%d", s.modPage + 1, np);
+    if (np > 1) sd.tabText = page;
     sd.fnActive = s.carry.active;
     drawSides(sd);
 }
@@ -286,7 +311,6 @@ void drawKeysPlay(const UiState& s, const Patch& p) {
         if (col == 0) snprintf(lab, sizeof lab, "OCT-");
         else if (col == 1) snprintf(lab, sizeof lab, "OCT+");
         else if (col == 2 && m) snprintf(lab, sizeof lab, "%+d", (int)m->params[0]);
-        else if (col == 11) snprintf(lab, sizeof lab, "SET");
         emptyCell(col, 0, nullptr, false);
         if (lab[0]) smallText(lab, cellX(col) + cellW(col) / 2, cellY(0) + cellH(0) / 2 - 2, PText);
     }
@@ -311,6 +335,7 @@ void drawKeysPlay(const UiState& s, const Patch& p) {
     sd.leftIcon[0] = true;
     sd.right[1] = Ic::Undo;
     sd.rightIcon[1] = true;
+    sd.tabText = "1/2";
     drawSides(sd);
 }
 

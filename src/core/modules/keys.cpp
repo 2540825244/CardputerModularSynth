@@ -16,6 +16,17 @@ const char* const kOutLabels[] = {"PIT", "GAT", "VEL"};
 
 Module* create() { return new KeysModule(); }
 
+// Page 1 plays notes (the whole grid goes to the play handler); page 2 holds the settings.
+const CellRef kSetCells[36] = {
+    cP(0), cP(1), cP(2), cP(3), c_, c_, c_, c_, c_, c_, c_, c_,
+    c_,    c_,    c_,    c_,    c_, c_, c_, c_, c_, c_, c_, c_,
+    cO(0), cO(1), cO(2), c_,    c_, c_, c_, c_, c_, c_, c_, c_,
+};
+const PageDef kKeyPages[] = {
+    {"PLAY", PageKind::Play, Drawing::None, nullptr},
+    {"SET", PageKind::Cells, Drawing::None, kSetCells},
+};
+
 }  // namespace
 
 KeysModule::KeysModule() : Module(kKeysType) {}
@@ -66,4 +77,4 @@ void KeysModule::process(const float* const*, const bool*) {
 const ModuleTypeInfo kKeysType = {
     "keys", "KEY", "Keyboard: pitch, gate, velocity", Category::Source, Icon::Keys, Drawing::None,
     4, kParams, 0, nullptr, nullptr, 3, kOutKeys, kOutLabels,
-    10, sizeof(KeysModule) + 3 * kBlock * sizeof(float), 1, create};
+    10, sizeof(KeysModule) + 3 * kBlock * sizeof(float), 1, create, kKeyPages, 2};

@@ -155,9 +155,7 @@ void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint3
         case View::Patch: drawPatchView(s, p, e); break;
         case View::Place: drawPlaceView(s, p, e); break;
         case View::File: drawFileView(s, filled); break;
-        case View::Module:
-        case View::KeysSettings: drawModuleView(s, p, e); break;
-        case View::KeysPlay: drawKeysPlay(s, p); break;
+        case View::Module: drawModuleView(s, p, e); break;
     }
     const float total = (float)heap_caps_get_total_size(MALLOC_CAP_8BIT);
     drawBars(e.cpuLoad(), total > 0 ? 1.f - heap_caps_get_free_size(MALLOC_CAP_8BIT) / total : 0.f);

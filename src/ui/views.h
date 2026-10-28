@@ -8,8 +8,9 @@
 bool patchViewAction(UiController&, const Action&);
 bool placeViewAction(UiController&, const Action&);
 bool moduleViewAction(UiController&, const Action&);
-bool keysPlayAction(UiController&, const Action&);
-bool keysSettingsAction(UiController&, const Action&);
+bool keysPlayAction(UiController&, const Action&);  // a KEYS Play page (raw keys)
+void keysAllNotesOff(UiController&);
+void flipPage(UiController&, const ModuleRec&, int dir);  // module view: tab / fn+tab
 bool fileViewAction(UiController&, const Action&);
 
 struct ViewDef {

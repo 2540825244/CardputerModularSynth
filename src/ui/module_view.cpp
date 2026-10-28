@@ -84,10 +84,12 @@ bool setValue(UiController& ui, const ModuleRec& m, CellRef c, float v) {
     return true;
 }
 
-CellRef selected(const UiState& s, const ModuleTypeInfo& t) {
-    if (s.modCell < 0) return {CellKind::Empty, 0};
-    return moduleCell(t, (uint8_t)(s.modCell / kGridCols), (uint8_t)(s.modCell % kGridCols));
+CellRef cellAt(const UiState& s, const ModuleTypeInfo& t, int cell) {
+    if (cell < 0) return c_;
+    return moduleCell(t, s.modPage, (uint8_t)(cell / kGridCols), (uint8_t)(cell % kGridCols));
 }
+
+CellRef selected(const UiState& s, const ModuleTypeInfo& t) { return cellAt(s, t, s.modCell); }
 
 float currentValue(const ModuleRec& m, CellRef c) {
     if (c.kind == CellKind::Out) return m.outAmount[c.index];
@@ -99,16 +101,6 @@ const ParamSpec& specOf(const ModuleRec& m, CellRef c) {
     return isPin(c) ? kAmountSpec : m.type->params[c.index];
 }
 
-// Tab: next Param/Out cell after the cursor, in cell order, wrapping.
-int nextEditable(const ModuleTypeInfo& t, int from) {
-    for (int step = 1; step <= kCellsPerPage; step++) {
-        const int c = (from + step + kCellsPerPage) % kCellsPerPage;
-        const CellRef r = moduleCell(t, (uint8_t)(c / kGridCols), (uint8_t)(c % kGridCols));
-        if (isEditable(r)) return c;
-    }
-    return from;
-}
-
 }  // namespace
 
 namespace {
@@ -116,7 +108,7 @@ namespace {
 // Do-it on a cell: a pin carries a cable, a stepped param steps to its next option.
 void activate(UiController& ui, const ModuleRec& m, int cell) {
     if (cell < kGridCols) return;  // the value strip has no do-it
-    const CellRef c = moduleCell(*m.type, (uint8_t)(cell / kGridCols), (uint8_t)(cell % kGridCols));
+    const CellRef c = cellAt(ui.state(), *m.type, cell);
     if (c.kind == CellKind::In || c.kind == CellKind::Out) {
         pinAction(ui, m, c.kind == CellKind::Out, c.index);
     } else if (c.kind == CellKind::Param) {
@@ -127,6 +119,41 @@ void activate(UiController& ui, const ModuleRec& m, int cell) {
         setValue(ui, m, c, v);
     }
 }
+
+struct BitEdit {
+    uint16_t id;
+    uint8_t idx;
+    float value;
+};
+
+void doSetBit(Patch& p, void* c) {
+    const BitEdit* b = static_cast<BitEdit*>(c);
+    if (ModuleRec* m = p.find(b->id)) m->params[b->idx] = b->value;
+}
+
+// A step cell: a tap flips its bit (one undo entry per tap).
+void toggleBit(UiController& ui, const ModuleRec& m, CellRef c) {
+    const ParamSpec& sp = m.type->params[c.index];
+    const uint32_t v = (uint32_t)m.params[c.index] ^ (1u << c.bit);
+    BitEdit e{m.id, c.index, paramClamp(sp, (float)v)};
+    ui.undoStack().breakCoalescing();
+    ui.edit(doSetBit, &e);
+}
+
+}  // namespace
+
+// tab / fn+tab: next / previous page. Leaving a Play page releases its notes.
+void flipPage(UiController& ui, const ModuleRec& m, int dir) {
+    UiState& s = ui.mut();
+    const int n = modulePageCount(*m.type);
+    ui.endTilt();
+    if (n <= 1) return;
+    if (ui.onPlayPage()) keysAllNotesOff(ui);
+    s.modPage = (uint8_t)((s.modPage + n + dir) % n);
+    s.modCell = -1;
+}
+
+namespace {
 
 void sideKey(UiController& ui, const ModuleRec& m, const KeyEvent& e) {
     UiState& s = ui.mut();
@@ -141,10 +168,7 @@ void sideKey(UiController& ui, const ModuleRec& m, const KeyEvent& e) {
                 setValue(ui, m, sel, paramFine(sp, currentValue(m, sel), e.side == Side::Space ? 1 : -1));
             }
             break;
-        case Side::Tab:
-            ui.endTilt();
-            s.modCell = (int8_t)nextEditable(*m.type, s.modCell < 0 ? 0 : s.modCell);
-            break;
+        case Side::Tab: flipPage(ui, m, ui.fnHeld() ? -1 : 1); break;
         case Side::Del:
             if (sel.kind == CellKind::Param) {
                 setValue(ui, m, sel, m.type->params[sel.index].def);
@@ -171,6 +195,13 @@ bool moduleViewAction(UiController& ui, const Action& a) {
         s.view = View::Patch;
         return false;
     }
+    if (ui.onPlayPage()) {
+        if (a.act == Act::Key && !a.key.grid && a.key.type == KeyEvent::Down && a.key.side == Side::Tab) {
+            flipPage(ui, *m, ui.fnHeld() ? -1 : 1);
+            return false;
+        }
+        return keysPlayAction(ui, a);
+    }
     switch (a.act) {
         case Act::Select:
             ui.endTilt();  // a cursor move or a coarse value ends a sweep (a no-op when none runs)
@@ -180,6 +211,8 @@ bool moduleViewAction(UiController& ui, const Action& a) {
                     setValue(ui, *m, sel, paramCoarse(specOf(*m, sel), a.cell));
             } else {
                 s.modCell = a.cell;
+                const CellRef c = selected(s, *m->type);
+                if (c.kind == CellKind::Bit) toggleBit(ui, *m, c);
             }
             break;
         case Act::Activate: activate(ui, *m, a.cell >= 0 ? a.cell : s.modCell); break;

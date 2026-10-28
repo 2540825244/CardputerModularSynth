@@ -55,7 +55,8 @@ void activate(UiController& ui, int cell) {
     }
     s.openId = m->id;
     s.modCell = -1;
-    s.view = m->type == &kKeysType ? View::KeysPlay : View::Module;
+    s.modPage = 0;  // KEYS opens on its PLAY page
+    s.view = View::Module;
 }
 
 void sideKey(UiController& ui, const KeyEvent& e) {

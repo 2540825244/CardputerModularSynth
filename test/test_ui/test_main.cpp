@@ -174,7 +174,7 @@ void test_keys_opens_play() {
     Fx f;
     f.place(TKeys, 0, 0);
     f.side(Side::Enter);
-    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
 }
 
 void test_delete_and_undo() {
@@ -379,20 +379,9 @@ void test_del_resets_and_unpatches() {
 void test_tab_and_esc_in_module_view() {
     Fx f;
     openModule(f, TVcf, 0, 0);
-    f.tap(2, 3);  // an empty cell is selectable but Tab walks Param/Out cells
-    f.side(Side::Tab);
-    TEST_ASSERT_EQUAL(12, f.ui.state().modCell);  // first param
-    f.side(Side::Tab);
-    TEST_ASSERT_EQUAL(13, f.ui.state().modCell);
-    f.tap(3, 1);
-    f.side(Side::Tab);  // after the last param -> the inputs (they have amounts now)
-    TEST_ASSERT_EQUAL(24, f.ui.state().modCell);
-    f.side(Side::Tab);
-    f.side(Side::Tab);
-    f.side(Side::Tab);  // -> the Out
-    TEST_ASSERT_EQUAL(36, f.ui.state().modCell);
-    f.side(Side::Tab);  // wraps
-    TEST_ASSERT_EQUAL(12, f.ui.state().modCell);
+    f.tap(1, 1);
+    f.side(Side::Tab);  // VCF fits one page: tab keeps the page and the cursor
+    TEST_ASSERT_EQUAL(0, f.ui.state().modPage);
     f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
 }
@@ -642,7 +631,7 @@ static void openKeysPlay(Fx& f) {
 void test_play_notes() {
     Fx f;
     openKeysPlay(f);
-    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
     Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
     float buf[kBlock];
     f.down(0, 3);
@@ -704,11 +693,12 @@ void test_octave_cells() {
 void test_keys_flip() {
     Fx f;
     openKeysPlay(f);
-    f.tap(11, 0);
-    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
-    f.side(Side::Esc);
-    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
-    f.side(Side::Esc);
+    f.side(Side::Tab);
+    TEST_ASSERT_TRUE(f.ui.state().view == View::Module && f.ui.state().modPage == 1);
+    f.side(Side::Tab);
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
+    f.side(Side::Tab);
+    f.side(Side::Esc);  // esc leaves from any page
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
 }
 
@@ -1070,17 +1060,15 @@ void test_file_slot_cleared_on_open() {
     TEST_ASSERT_EQUAL(-1, f.ui.state().fileSlot);
 }
 
-void test_keys_settings_esc_returns_to_play() {
+void test_keys_settings_enter_is_do_it() {
     Fx f;
     f.place(TKeys, 0, 0);
     f.side(Side::Enter);
-    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
-    f.tap(11, 0);
-    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
-    f.side(Side::Enter);  // enter is do-it now, not the flip
-    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
-    f.side(Side::Esc);
-    TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
+    f.side(Side::Tab);
+    TEST_ASSERT_TRUE(f.ui.state().view == View::Module && f.ui.state().modPage == 1);
+    f.side(Side::Enter);  // enter is do-it, not a flip
+    TEST_ASSERT_TRUE(f.ui.state().view == View::Module && f.ui.state().modPage == 1);
 }
 
 // ---- v1.1: place menu by category ----
@@ -1129,13 +1117,12 @@ void test_carry_out_of_keys_settings() {
     Fx f;
     f.place(TKeys, 0, 0);
     f.side(Side::Enter);
-    f.tap(11, 0);  // settings
-    TEST_ASSERT_EQUAL(View::KeysSettings, f.ui.state().view);
+    f.side(Side::Tab);  // settings
+    TEST_ASSERT_TRUE(f.ui.state().modPage == 1);
     f.sideDown(Side::Fn);
     f.tap(0, 3);  // PIT out: start a carry
     f.sideUp(Side::Fn);
     TEST_ASSERT_TRUE(f.ui.state().carry.active);
-    f.side(Side::Esc);  // flip to play
     f.side(Side::Esc);  // to the patch view, still carrying
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
     TEST_ASSERT_TRUE(f.ui.state().carry.active);
@@ -1234,6 +1221,79 @@ void test_input_amount_edit() {
     TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.find(id)->inAmount[0]);
 }
 
+
+// ---- v1.2 Task 2: module pages ----
+static const char* const kBigIn[] = {"a", "b", "c", "d", "e", "f", "g", "h"};
+static ParamSpec kBigParams[14];
+static Module* createNone() { return nullptr; }
+static const ModuleTypeInfo& bigType(Drawing d) {
+    static ModuleTypeInfo t;
+    for (int i = 0; i < 14; i++) kBigParams[i] = {"p", "P", 0.f, 1.f, 0.f, Curve::Lin, Unit::Percent, nullptr};
+    t = ModuleTypeInfo{"big", "BIG", "test", Category::Source, Icon::Osc, d, 14, kBigParams, 8, kBigIn, kBigIn,
+                       1, kBigIn, kBigIn, 10, 100, 0, createNone};
+    return t;
+}
+
+void test_auto_pages_overflow() {
+    const ModuleTypeInfo& t = bigType(Drawing::None);
+    TEST_ASSERT_EQUAL(2, modulePageCount(t));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 1, 11), CellKind::Param, 11));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 0), CellKind::Param, 12));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 1), CellKind::Param, 13));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 2), CellKind::Empty));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 2, 7), CellKind::In, 7));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 2, 0), CellKind::Empty));
+    TEST_ASSERT_EQUAL(1, modulePageCount(kVcaType));
+}
+
+void test_drawing_page0_width5() {
+    const ModuleTypeInfo& t = bigType(Drawing::FilterCurve);
+    TEST_ASSERT_EQUAL(2, modulePageCount(t));  // page 0 holds params 0-4, page 1 holds 5-13
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 1, 5), CellKind::Drawing));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 0), CellKind::Param, 5));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 2, 2), CellKind::In, 7));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 9), CellKind::Empty));
+    TEST_ASSERT_EQUAL(Drawing::FilterCurve, modulePageDrawing(t, 0));
+    TEST_ASSERT_EQUAL(Drawing::None, modulePageDrawing(t, 1));
+}
+
+void test_keys_pages() {
+    TEST_ASSERT_EQUAL(2, modulePageCount(kKeysType));
+    TEST_ASSERT_EQUAL(PageKind::Play, modulePageKind(kKeysType, 0));
+    TEST_ASSERT_EQUAL(PageKind::Cells, modulePageKind(kKeysType, 1));
+    TEST_ASSERT_EQUAL_STRING("PLAY", modulePageName(kKeysType, 0));
+    TEST_ASSERT_TRUE(is(moduleCell(kKeysType, 1, 1, 0), CellKind::Param, 0));
+    TEST_ASSERT_TRUE(is(moduleCell(kKeysType, 1, 3, 1), CellKind::Out, 1));
+}
+
+void test_fn_tab_previous_page() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.side(Side::Enter);
+    f.sideDown(Side::Fn);
+    f.side(Side::Tab);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(1, f.ui.state().modPage);  // wraps backwards from page 0
+    f.tap(0, 1);
+    TEST_ASSERT_EQUAL(12, f.ui.state().modCell);
+    f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(0, f.ui.state().modPage);
+    TEST_ASSERT_EQUAL(-1, f.ui.state().modCell);  // a page flip clears the cursor
+}
+
+void test_tab_flip_releases_notes() {
+    Fx f;
+    openKeysPlay(f);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.down(0, 2);
+    f.side(Side::Tab);
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+    f.up(0, 2);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1302,7 +1362,7 @@ int main() {
     RUN_TEST(test_file_tap_selects_then_enter_saves);
     RUN_TEST(test_file_hold_slot_loads);
     RUN_TEST(test_file_slot_cleared_on_open);
-    RUN_TEST(test_keys_settings_esc_returns_to_play);
+    RUN_TEST(test_keys_settings_enter_is_do_it);
     RUN_TEST(test_place_type_at_by_category);
     RUN_TEST(test_place_cell_of_inverts);
     RUN_TEST(test_place_menu_row2_tile);
@@ -1315,5 +1375,10 @@ int main() {
     RUN_TEST(test_strip_fill_partial_segment);
     RUN_TEST(test_strip_fill_ends);
     RUN_TEST(test_input_amount_edit);
+    RUN_TEST(test_auto_pages_overflow);
+    RUN_TEST(test_drawing_page0_width5);
+    RUN_TEST(test_keys_pages);
+    RUN_TEST(test_fn_tab_previous_page);
+    RUN_TEST(test_tab_flip_releases_notes);
     return UNITY_END();
 }

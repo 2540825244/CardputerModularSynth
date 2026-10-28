@@ -2,15 +2,16 @@
 #include <cstdint>
 #include "core/module.h"
 
-enum class CellKind : uint8_t { Empty, Param, In, Out, Drawing };
-struct CellRef {
-    CellKind kind;
-    uint8_t index;
-};
-
-// Module-view cell layout. Rows 1..3 (row 0 is the value strip): params on row 1, ins on row 2,
-// outs on row 3, each from col 0. With a drawing, cols 5..11 are Drawing and pins fit in cols 0..4.
-CellRef moduleCell(const ModuleTypeInfo&, uint8_t row, uint8_t col);
+// Module-view pages. Row 0 is the value strip; rows 1..3 hold cells.
+// Automatic pages (type.pages == nullptr): params on row 1, ins on row 2, outs on row 3, each from
+// col 0. Page 0 is 5 cells wide when the type has a drawing (cols 5..11 draw), else 12; later pages
+// are 12 wide and continue each list where the previous page stopped.
+int modulePageCount(const ModuleTypeInfo&);
+const char* modulePageName(const ModuleTypeInfo&, int page);  // "MAIN", "P2", ... or the PageDef name
+PageKind modulePageKind(const ModuleTypeInfo&, int page);
+Drawing modulePageDrawing(const ModuleTypeInfo&, int page);
+CellRef moduleCell(const ModuleTypeInfo&, int page, uint8_t row, uint8_t col);
+inline CellRef moduleCell(const ModuleTypeInfo& t, uint8_t row, uint8_t col) { return moduleCell(t, 0, row, col); }
 
 // Place menu: row 1 = Source, row 2 = Modulator, row 3 = Processor, each in registry order from
 // col 0. Row 0 holds the details of the selected type.

@@ -24,6 +24,7 @@ class UiController {
     bool tiltActive() const { return tilt_.active; }
     uint32_t tiltGeneration() const { return tiltGen_; }  // bumps on every beginTilt
     const UiState& state() const { return s_; }
+    bool onPlayPage() const;  // the module view shows a Play page (grid keys play notes)
 
     // Shared edit helpers, used by every view file.
     // Structural edit: undo push, mutate, engine.apply, dirty. coalesceKey merges consecutive edits.
@@ -54,7 +55,7 @@ class UiController {
     bool loadAutosave();  // boot: no toast, not dirty
     void validate();  // end a carry / close a view whose module is gone (after undo, load, delete)
     int lastNote = 60;
-    NoteStack notes;           // KeysPlay held notes
+    NoteStack notes;           // KEYS play page held notes
     bool auditioning = false;  // Space held in the patch view
 
    private:

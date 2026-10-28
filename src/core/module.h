@@ -10,6 +10,29 @@ enum class Drawing : uint8_t { None, FilterCurve, Envelope };  // module-view dr
 
 class Module;
 
+// Module-view cells (rows 1..3). Bit: bit `bit` of param `index`, a step of a sequencer.
+enum class CellKind : uint8_t { Empty, Param, In, Out, Drawing, Bit };
+struct CellRef {
+    CellKind kind;
+    uint8_t index;
+    uint8_t bit;
+};
+constexpr CellRef cP(uint8_t i) { return {CellKind::Param, i, 0}; }
+constexpr CellRef cI(uint8_t i) { return {CellKind::In, i, 0}; }
+constexpr CellRef cO(uint8_t i) { return {CellKind::Out, i, 0}; }
+constexpr CellRef cB(uint8_t i, uint8_t bit) { return {CellKind::Bit, i, bit}; }
+constexpr CellRef cD = {CellKind::Drawing, 0, 0};
+constexpr CellRef c_ = {CellKind::Empty, 0, 0};
+
+// Play: the grid keys go raw to the module's play handler (KEYS); Cells: a normal cell page.
+enum class PageKind : uint8_t { Cells, Play };
+struct PageDef {
+    const char* name;  // <= 5 chars, e.g. "MAIN", "SET"
+    PageKind kind;
+    Drawing drawing;     // drawn over the Drawing cells
+    const CellRef* cells;  // 36 entries: rows 1..3, 12 each; nullptr for a Play page
+};
+
 struct ModuleTypeInfo {
     const char* id;     // stable: "keys","osc","vcf","vca","env","lfo","dly","out"
     const char* name;   // 3 letters on tiles
@@ -29,6 +52,8 @@ struct ModuleTypeInfo {
     uint32_t ramBytes;      // approx heap use of one instance
     uint8_t maxInstances;   // 0 = unlimited
     Module* (*create)();    // UI thread; nullptr result = resource unavailable
+    const PageDef* pages = nullptr;  // nullptr: automatic pages (see src/ui/layout.h)
+    uint8_t numPages = 0;
 };
 
 class Module {

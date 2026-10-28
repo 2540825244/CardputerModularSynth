@@ -21,13 +21,13 @@ void shiftOct(UiController& ui, const ModuleRec& m, int dir) {
     ui.engine().setParam(m.id, kOctParam, v);
 }
 
-void allNotesOff(UiController& ui) {
+}  // namespace
+
+void keysAllNotesOff(UiController& ui) {
     ui.notes.clear();
     ui.mut().keysHeld = 0;
     if (KeysModule* k = static_cast<KeysModule*>(ui.engine().instance(ui.mut().openId))) k->gateOff();
 }
-
-}  // namespace
 
 namespace {
 
@@ -44,10 +44,6 @@ void playKey(UiController& ui, const KeyEvent& e) {
             if (e.type != KeyEvent::Down) return;
             if (e.col == 0) shiftOct(ui, *m, -1);
             else if (e.col == 1) shiftOct(ui, *m, +1);
-            else if (e.col == 11) {
-                allNotesOff(ui);
-                s.view = View::KeysSettings;
-            }
             return;
         }
         if (e.type == KeyEvent::Hold) return;
@@ -69,7 +65,7 @@ void playKey(UiController& ui, const KeyEvent& e) {
     }
     if (e.type != KeyEvent::Down) return;
     if (e.side == Side::Esc) {
-        allNotesOff(ui);
+        keysAllNotesOff(ui);
         s.view = View::Patch;
     } else if (e.side == Side::Backslash) {
         ui.undo();
@@ -82,14 +78,4 @@ void playKey(UiController& ui, const KeyEvent& e) {
 bool keysPlayAction(UiController& ui, const Action& a) {
     playKey(ui, a.key);
     return false;
-}
-
-// Settings page: the module view, with esc flipping back to the play page.
-bool keysSettingsAction(UiController& ui, const Action& a) {
-    if (a.act == Act::Key && !a.key.grid && a.key.type == KeyEvent::Down && a.key.side == Side::Esc) {
-        ui.mut().view = View::KeysPlay;
-        ui.mut().escPresses = 0;  // a page flip, not a step back: the next esc leaves (carry kept)
-        return false;
-    }
-    return moduleViewAction(ui, a);
 }

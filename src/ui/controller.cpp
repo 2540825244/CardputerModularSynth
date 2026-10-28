@@ -4,6 +4,7 @@
 #include <cstring>
 #include <memory>
 #include "core/patch_io.h"
+#include "layout.h"
 #include "views.h"
 
 UiController::UiController(Patch& p, Engine& e, UndoStack& u, Storage& st)
@@ -18,14 +19,11 @@ UiController::UiController(Patch& p, Engine& e, UndoStack& u, Storage& st)
 
 const ViewDef& viewDef(View v) {
     static const ViewDef kPatch{patchViewAction, false, true}, kModule{moduleViewAction, false, false},
-        kPlace{placeViewAction, false, false}, kFile{fileViewAction, false, false},
-        kKeysPlay{keysPlayAction, true, false}, kKeysSettings{keysSettingsAction, false, false};
+        kPlace{placeViewAction, false, false}, kFile{fileViewAction, false, false};
     switch (v) {
         case View::Module: return kModule;
         case View::Place: return kPlace;
         case View::File: return kFile;
-        case View::KeysPlay: return kKeysPlay;
-        case View::KeysSettings: return kKeysSettings;
         case View::Patch: break;
     }
     return kPatch;
@@ -62,7 +60,7 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     const View before = s_.view;
     Action acts[2];
     const ViewDef& vd = viewDef(before);
-    const int n = mapper_.map(e, fnHeld(), ctrlHeld() && vd.ctrlBlocksHold, vd.rawKeys, acts);
+    const int n = mapper_.map(e, fnHeld(), ctrlHeld() && vd.ctrlBlocksHold, vd.rawKeys || onPlayPage(), acts);
     for (int i = 0; i < n && s_.view == before; i++)
         if (vd.onAction(*this, acts[i])) {
             mapper_.consume(e);
@@ -70,12 +68,18 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
         }
     validate();
     if (s_.view != before) mapper_.reset();
-    if (tilt_.active && s_.view != View::Module && s_.view != View::KeysSettings) tilt_.active = false;
+    if (tilt_.active && s_.view != View::Module) tilt_.active = false;
     if (auditioning && s_.view != View::Patch) releaseAudition();
     // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
     // changes nothing, so repeated taps of one fine key still merge; tilt drags (Task 19) end
     // their run explicitly on release.
     if (!coalescedEdit_ && e.type != KeyEvent::Up) undo_.breakCoalescing();
+}
+
+bool UiController::onPlayPage() const {
+    if (s_.view != View::Module) return false;
+    const ModuleRec* m = patch_.find(s_.openId);
+    return m && modulePageKind(*m->type, s_.modPage) == PageKind::Play;
 }
 
 KeysModule* UiController::keysInstance() {
@@ -92,8 +96,7 @@ void UiController::releaseAudition() {
 
 void UiController::validate() {
     if (s_.carry.active && !patch_.find(s_.carry.id)) s_.carry.active = false;
-    const bool inModule = s_.view == View::Module || s_.view == View::KeysPlay || s_.view == View::KeysSettings;
-    if (inModule && !patch_.find(s_.openId)) {
+    if (s_.view == View::Module && !patch_.find(s_.openId)) {
         s_.view = View::Patch;
         notes.clear();
         s_.keysHeld = 0;
@@ -145,6 +148,7 @@ bool UiController::loadFile(const char* path, bool keepUndo, char* msg, size_t m
     s_.moveFromId = -1;
     s_.selCell = -1;
     s_.modCell = -1;
+    s_.modPage = 0;
     notes.clear();
     s_.keysHeld = 0;
     if (keepUndo) {
