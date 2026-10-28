@@ -50,7 +50,14 @@ void modulePage(SideIcons& r, const UiState& s, const ModuleRec& m, bool fnHeld)
     set(r, Side::Esc, Ic::Back, "BACK");
     pageText(r, s.modPage, modulePageCount(t));
     undo(r, fnHeld);
-    if (modulePageKind(t, s.modPage) == PageKind::Play) return;
+    if (modulePageKind(t, s.modPage) == PageKind::Play) {  // KEYS play page
+        set(r, Side::Ctrl, Ic::Minus, "OCT-");
+        set(r, Side::Space, Ic::Plus, "OCT+");
+        set(r, Side::Enter, Ic::Layout, "LAYOUT");
+        set(r, Side::Del, Ic::Cancel, "PANIC");
+        set(r, Side::Backslash, Ic::Latch, "LATCH", m.params[7] >= 0.5f);
+        return;
+    }
     set(r, Side::Fn, Ic::Cable, s.carry.active ? "DROP" : "CABLE", s.carry.active);
     const CellRef c = s.modCell >= 0 ? moduleCell(t, s.modPage, (uint8_t)(s.modCell / kGridCols), (uint8_t)(s.modCell % kGridCols))
                                      : CellRef{CellKind::Empty, 0, 0};

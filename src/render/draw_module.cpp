@@ -3,7 +3,10 @@
 #include <stdio.h>
 #include "render_internal.h"
 #include "ui/anim.h"
+#include "core/scales.h"
+#include "ui/keys_layout.h"
 #include "ui/layout.h"
+#include "ui/views.h"
 
 namespace rd {
 
@@ -340,32 +343,33 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
 }
 
 void drawKeysPlay(const UiState& s, const Patch& p) {
-    static const char* const names[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
     const ModuleRec* m = p.find(s.openId);
-    for (int col = 0; col < kGridCols; col++) {
-        char lab[8] = "";
-        if (col == 0) snprintf(lab, sizeof lab, "OCT-");
-        else if (col == 1) snprintf(lab, sizeof lab, "OCT+");
-        else if (col == 2 && m) snprintf(lab, sizeof lab, "%+d", (int)m->params[0]);
-        emptyCell(col, 0, nullptr, false);
-        if (lab[0]) smallText(lab, cellX(col) + cellW(col) / 2, cellY(0) + cellH(0) / 2 - 2, PText);
-    }
-    for (int row = 1; row < kGridRows; row++) {
+    if (!m) return;
+    const int root = (int)m->params[6], layout = (int)m->params[4];
+    for (int row = 0; row < kGridRows; row++) {
         for (int col = 0; col < kGridCols; col++) {
-            const int note = 48 + 12 * (3 - row) + col;
-            char lab[8];
-            snprintf(lab, sizeof lab, "%s%d", names[note % 12], note / 12 - 1);
-            const bool held = (s.keysHeld >> ((3 - row) * 12 + col)) & 1;
             const int x = cellX(col), y = cellY(row), w = cellW(col), h = cellH(row);
+            const int note = keysNoteFor(*m, row, col);
+            if (note < 0) continue;  // a silent cell (piano gaps)
+            const int n = note + 12 * (int)m->params[0];
+            char lab[8];
+            if (layout == kLayPad) snprintf(lab, sizeof lab, "%d", note - 35);
+            else snprintf(lab, sizeof lab, "%s%d", kNoteNames[((n % 12) + 12) % 12], n / 12 - 1);
+            const bool held = (s.keysHeld >> (row * kGridCols + col)) & 1;
+            const bool isRoot = ((note - root) % 12 + 12) % 12 == 0;
+            const bool black = layout != kLayPad && (0b010101001010 >> (((n % 12) + 12) % 12)) & 1;
             if (held) {
                 cv.fillRect(x, y, w, h, PAccent);
                 smallText(lab, x + w / 2, y + h / 2 - 2, PBg);
-            } else {
-                dotted(x, y, w, h, PBorder);
-                smallText(lab, x + w / 2, y + h / 2 - 2, PText);
+                continue;
             }
+            if (isRoot) cv.fillRect(x, y, w, h, PEmpty);
+            if (black) cv.fillRect(x + 2, y + 2, w - 4, 3, PDim);
+            dotted(x, y, w, h, PBorder);
+            smallText(lab, x + w / 2, y + h / 2 - 2, isRoot ? PText : PDim);
         }
     }
+    smallText(keysLayoutName(layout), cellX(0) + cellW(0) / 2, cellY(0) + 2, PFaint);
 }
 
 }  // namespace rd

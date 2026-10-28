@@ -12,6 +12,8 @@
 #include "core/modules/vcf.h"
 #include "ui/controller.h"
 #include "ui/layout.h"
+#include "ui/keys_layout.h"
+#include "core/scales.h"
 #include "core/modules/mod.h"
 #include "core/presets.h"
 #include "ui/anim.h"
@@ -658,20 +660,20 @@ void test_play_notes() {
     float buf[kBlock];
     f.down(0, 3);
     f.eng.processBlock(buf);
-    TEST_ASSERT_EQUAL_FLOAT(48.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(36.f, k->monitor(0));
     TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
     f.down(4, 2);
     f.eng.processBlock(buf);
-    TEST_ASSERT_EQUAL_FLOAT(64.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(52.f, k->monitor(0));
     f.up(4, 2);
     f.eng.processBlock(buf);
-    TEST_ASSERT_EQUAL_FLOAT(48.f, k->monitor(0));
+    TEST_ASSERT_EQUAL_FLOAT(36.f, k->monitor(0));
     TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
     f.up(0, 3);
     f.eng.processBlock(buf);
     f.eng.processBlock(buf);
     TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
-    TEST_ASSERT_EQUAL(64, f.ui.lastNote);
+    TEST_ASSERT_EQUAL(52, f.ui.lastNote);
 }
 
 void test_play_esc_notes_off() {
@@ -703,13 +705,13 @@ void test_octave_cells() {
     Fx f;
     openKeysPlay(f);
     const ModuleRec* m = gPatch.findAt(0, 0);
-    f.tap(1, 0);
+    f.side(Side::Space);
     TEST_ASSERT_EQUAL_FLOAT(1.f, m->params[0]);
-    f.tap(0, 0);
-    f.tap(0, 0);
+    f.side(Side::Ctrl);
+    f.side(Side::Ctrl);
     TEST_ASSERT_EQUAL_FLOAT(-1.f, m->params[0]);
-    f.side(Side::Backslash);
-    TEST_ASSERT_EQUAL_FLOAT(0.f, m->params[0]);
+    f.tap(1, 0);  // the top row plays notes now, it no longer shifts octaves
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, m->params[0]);
 }
 
 void test_keys_flip() {
@@ -1309,7 +1311,8 @@ void test_keys_pages() {
     TEST_ASSERT_EQUAL(PageKind::Play, modulePageKind(kKeysType, 0));
     TEST_ASSERT_EQUAL(PageKind::Cells, modulePageKind(kKeysType, 1));
     TEST_ASSERT_EQUAL_STRING("PLAY", modulePageName(kKeysType, 0));
-    TEST_ASSERT_TRUE(is(moduleCell(kKeysType, 1, 1, 0), CellKind::Param, 0));
+    TEST_ASSERT_TRUE(is(moduleCell(kKeysType, 1, 1, 0), CellKind::Param, 4));  // LAYOUT first
+    TEST_ASSERT_TRUE(is(moduleCell(kKeysType, 1, 1, 3), CellKind::Param, 0));  // then OCT
     TEST_ASSERT_TRUE(is(moduleCell(kKeysType, 1, 3, 1), CellKind::Out, 1));
 }
 
@@ -1731,6 +1734,104 @@ void test_bit_cell_tap_toggles() {
     TEST_ASSERT_EQUAL_UINT32(before ^ (1u << 3), (uint32_t)gPatch.findAt(0, 12)->params[1]);
 }
 
+
+// ---- v1.2 Task 12: KEYS layouts ----
+void test_chr_layout() {
+    TEST_ASSERT_EQUAL(36, keysNoteAt(kLayChr, 0, 0, 3, 0));
+    TEST_ASSERT_EQUAL(47, keysNoteAt(kLayChr, 0, 0, 3, 11));
+    TEST_ASSERT_EQUAL(72, keysNoteAt(kLayChr, 0, 0, 0, 0));
+    TEST_ASSERT_EQUAL(-1, keysNoteAt(kLayChr, 0, 0, 4, 0));
+}
+
+void test_bass_fret_layout() {
+    TEST_ASSERT_EQUAL(28, keysNoteAt(kLayBas, 0, 0, 3, 0));  // E1
+    TEST_ASSERT_EQUAL(33, keysNoteAt(kLayBas, 0, 0, 2, 0));  // A1
+    TEST_ASSERT_EQUAL(48, keysNoteAt(kLayBas, 0, 0, 0, 5));  // G2 string, 5th fret = C3
+    TEST_ASSERT_EQUAL(keysNoteAt(kLayBas, 0, 0, 3, 5), keysNoteAt(kLayBas, 0, 0, 2, 0));  // 5th fret = next string
+}
+
+void test_scale_layout_in_key() {
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 12; c++) {
+            const int n = keysNoteAt(kLayScl, 1, 2, r, c);  // D major
+            const int pc = ((n - 2) % 12 + 12) % 12;
+            TEST_ASSERT_TRUE((scaleMask(1) >> pc) & 1u);
+        }
+    TEST_ASSERT_EQUAL(38, keysNoteAt(kLayScl, 1, 2, 3, 0));  // root D2
+    TEST_ASSERT_EQUAL(50, keysNoteAt(kLayScl, 1, 2, 2, 0));  // a row up = an octave up
+}
+
+void test_pno_black_gaps() {
+    TEST_ASSERT_EQUAL(48, keysNoteAt(kLayPno, 0, 0, 3, 0));  // C3
+    TEST_ASSERT_EQUAL(50, keysNoteAt(kLayPno, 0, 0, 3, 1));  // D3
+    TEST_ASSERT_EQUAL(49, keysNoteAt(kLayPno, 0, 0, 2, 0));  // C#3 above the C/D gap
+    TEST_ASSERT_EQUAL(-1, keysNoteAt(kLayPno, 0, 0, 2, 2));  // none after E
+    TEST_ASSERT_EQUAL(60, keysNoteAt(kLayPno, 0, 0, 3, 7));  // the next C
+    TEST_ASSERT_EQUAL(60, keysNoteAt(kLayPno, 0, 0, 1, 0));  // upper piano from C4
+    TEST_ASSERT_EQUAL(61, keysNoteAt(kLayPno, 0, 0, 0, 0));
+}
+
+void test_pad_and_4th_layouts() {
+    TEST_ASSERT_EQUAL(36, keysNoteAt(kLayPad, 0, 0, 3, 0));
+    TEST_ASSERT_EQUAL(39, keysNoteAt(kLayPad, 0, 0, 3, 3));
+    TEST_ASSERT_EQUAL(40, keysNoteAt(kLayPad, 0, 0, 2, 0));
+    TEST_ASSERT_EQUAL(52, keysNoteAt(kLayPad, 0, 0, 3, 4));
+    TEST_ASSERT_EQUAL(41, keysNoteAt(kLay4th, 0, 0, 2, 0));
+}
+
+void test_layout_switch_releases_notes() {
+    Fx f;
+    openKeysPlay(f);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.down(3, 2);
+    f.side(Side::Enter);  // next layout
+    TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.findAt(0, 0)->params[4]);
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+    f.up(3, 2);
+    f.sideDown(Side::Fn);
+    f.side(Side::Enter);  // previous
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, gPatch.findAt(0, 0)->params[4]);
+    f.sideDown(Side::Fn);
+    f.side(Side::Enter);  // wraps to the last layout
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL_FLOAT((float)(kLayCount - 1), gPatch.findAt(0, 0)->params[4]);
+}
+
+void test_ctrl_space_octave() {
+    Fx f;
+    openKeysPlay(f);
+    f.side(Side::Space);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.findAt(0, 0)->params[0]);
+    f.side(Side::Ctrl);
+    f.side(Side::Ctrl);
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, gPatch.findAt(0, 0)->params[0]);
+}
+
+void test_latch_holds() {
+    Fx f;
+    openKeysPlay(f);
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.side(Side::Backslash);  // latch on
+    TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.findAt(0, 0)->params[7]);
+    f.tap(0, 3);
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));  // still sounding after the release
+    TEST_ASSERT_EQUAL_FLOAT(36.f, k->monitor(0));
+    f.tap(2, 3);  // another key moves the held note
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(38.f, k->monitor(0));
+    f.tap(2, 3);  // the same key again releases it
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1846,5 +1947,13 @@ int main() {
     RUN_TEST(test_slot_36_save);
     RUN_TEST(test_system_settings_saved);
     RUN_TEST(test_bit_cell_tap_toggles);
+    RUN_TEST(test_chr_layout);
+    RUN_TEST(test_bass_fret_layout);
+    RUN_TEST(test_scale_layout_in_key);
+    RUN_TEST(test_pno_black_gaps);
+    RUN_TEST(test_pad_and_4th_layouts);
+    RUN_TEST(test_layout_switch_releases_notes);
+    RUN_TEST(test_ctrl_space_octave);
+    RUN_TEST(test_latch_holds);
     return UNITY_END();
 }

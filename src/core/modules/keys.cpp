@@ -1,15 +1,22 @@
 #include "keys.h"
+#include "../scales.h"
 
 namespace {
 
-enum { kOct, kGlide, kVel, kLegato };
+enum { kOct, kGlide, kVel, kLegato, kLayout, kScale, kRoot, kLatch };
 
 const char* const kOffOn[] = {"OFF", "ON"};
+const char* const kLayouts[] = {"CHR", "SCL", "PNO", "BAS", "4TH", "PAD"};  // ui/keys_layout.h order
+// The play page reads LAYOUT/SCALE/ROOT/LATCH; the audio side only uses OCT..LEGATO.
 const ParamSpec kParams[] = {
     {"oct", "OCT", -3.f, 3.f, 0.f, Curve::Stepped, Unit::Oct, nullptr},
     {"glide", "GLD", 0.f, 1000.f, 0.f, Curve::Sqr, Unit::Ms, nullptr},
     {"vel", "VEL", 0.f, 1.f, 0.8f, Curve::Lin, Unit::Percent, nullptr},
     {"legato", "LEG", 0.f, 1.f, 0.f, Curve::Stepped, Unit::Enum, kOffOn},
+    {"layout", "LAY", 0.f, 5.f, 0.f, Curve::Stepped, Unit::Enum, kLayouts},
+    {"scale", "SCL", 0.f, 12.f, 1.f, Curve::Stepped, Unit::Enum, kScaleNames},
+    {"root", "ROT", 0.f, 11.f, 0.f, Curve::Stepped, Unit::Enum, kNoteNames},
+    {"latch", "LAT", 0.f, 1.f, 0.f, Curve::Stepped, Unit::Enum, kOffOn},
 };
 const char* const kOutKeys[] = {"pitch", "gate", "vel"};
 const char* const kOutLabels[] = {"PIT", "GAT", "VEL"};
@@ -18,7 +25,7 @@ Module* create() { return new KeysModule(); }
 
 // Page 1 plays notes (the whole grid goes to the play handler); page 2 holds the settings.
 const CellRef kSetCells[36] = {
-    cP(0), cP(1), cP(2), cP(3), c_, c_, c_, c_, c_, c_, c_, c_,
+    cP(4), cP(5), cP(6), cP(0), cP(1), cP(2), cP(3), cP(7), c_, c_, c_, c_,
     c_,    c_,    c_,    c_,    c_, c_, c_, c_, c_, c_, c_, c_,
     cO(0), cO(1), cO(2), c_,    c_, c_, c_, c_, c_, c_, c_, c_,
 };
@@ -75,6 +82,6 @@ void KeysModule::process(const float* const*, const bool*) {
 }
 
 const ModuleTypeInfo kKeysType = {
-    "keys", "KEY", "Keyboard: pitch, gate, velocity", Category::Source, Icon::Keys, Drawing::None,
-    4, kParams, 0, nullptr, nullptr, 3, kOutKeys, kOutLabels,
+    "keys", "KEY", "Keyboard: 6 layouts, latch", Category::Source, Icon::Keys, Drawing::None,
+    8, kParams, 0, nullptr, nullptr, 3, kOutKeys, kOutLabels,
     10, sizeof(KeysModule) + 3 * kBlock * sizeof(float), 1, create, kKeyPages, 2};
