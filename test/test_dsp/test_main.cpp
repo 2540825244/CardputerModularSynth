@@ -75,6 +75,15 @@ void test_note_stack() {
     TEST_ASSERT_EQUAL(-1, n.current());
 }
 
+void test_slew_reaches_target_exactly() {
+    Slew s;
+    s.setTimeMs(2.f, kSampleRate);
+    s.y = 1.f;
+    for (int i = 0; i < 48000; i++) s.process(0.f);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, s.y);  // no subnormal tail
+    TEST_ASSERT_TRUE(s.y == 0.f);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_fast_exp2_accuracy);
@@ -83,5 +92,6 @@ int main() {
     RUN_TEST(test_soft_clip_bounds);
     RUN_TEST(test_sanitize);
     RUN_TEST(test_note_stack);
+    RUN_TEST(test_slew_reaches_target_exactly);
     return UNITY_END();
 }

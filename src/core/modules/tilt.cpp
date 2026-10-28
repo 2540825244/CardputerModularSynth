@@ -10,7 +10,7 @@ enum { kRange, kSmooth };
 
 const ParamSpec kParams[] = {
     {"range", "RNG", 10.f, 90.f, 45.f, Curve::Lin, Unit::Deg, nullptr},
-    {"smooth", "SMO", 0.f, 500.f, 20.f, Curve::Sqr, Unit::Ms, nullptr},
+    {"smooth", "SMO", 5.f, 500.f, 20.f, Curve::Sqr, Unit::Ms, nullptr},  // >= 5 ms: input updates at ~100 Hz
 };
 const char* const kOutKeys[] = {"roll", "pitch"};
 const char* const kOutLabels[] = {"ROL", "PIT"};
@@ -58,4 +58,4 @@ void tiltPublish(float rollDeg, float pitchDeg) {
 const ModuleTypeInfo kTiltType = {
     "tilt", "TLT", "Device tilt as CV: roll, pitch", Category::Modulator, Icon::Tilt, Drawing::None,
     2, kParams, 0, nullptr, nullptr, 2, kOutKeys, kOutLabels,
-    6, sizeof(Tilt) + 2 * kBlock * sizeof(float), 0, create};
+    25, sizeof(Tilt) + 2 * kBlock * sizeof(float), 0, create};

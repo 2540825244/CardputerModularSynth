@@ -60,4 +60,4 @@ Module* create() { return new Snh(); }
 const ModuleTypeInfo kSnhType = {
     "snh", "S&H", "Sample & hold; no IN = random", Category::Modulator, Icon::Snh, Drawing::None,
     1, kParams, 2, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
-    10, sizeof(Snh) + kBlock * sizeof(float), 0, create};
+    15, sizeof(Snh) + kBlock * sizeof(float), 0, create};

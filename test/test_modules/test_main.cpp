@@ -736,11 +736,11 @@ void test_dmx_routes() {
 
 void test_tilt_module_scales() {
     Module* m = kTiltType.create();
-    m->setParam(1, 0.f);  // SMO off
+    m->setParam(1, 5.f);  // SMO minimum
     tiltPublish(22.5f, -45.f);
     const float* ins[1] = {nullptr};
     const bool conn[1] = {false};
-    m->process(ins, conn);
+    for (int b = 0; b < 120; b++) m->process(ins, conn);
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.5f, m->out(0)[kBlock - 1]);
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, -5.f, m->out(1)[kBlock - 1]);
     delete m;
@@ -748,11 +748,11 @@ void test_tilt_module_scales() {
 
 void test_tilt_module_clamps() {
     Module* m = kTiltType.create();
-    m->setParam(1, 0.f);
+    m->setParam(1, 5.f);
     tiltPublish(90.f, 0.f);
     const float* ins[1] = {nullptr};
     const bool conn[1] = {false};
-    m->process(ins, conn);
+    for (int b = 0; b < 120; b++) m->process(ins, conn);
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 5.f, m->out(0)[kBlock - 1]);
     delete m;
 }
@@ -770,6 +770,45 @@ void test_tilt_module_smooths() {
     TEST_ASSERT_TRUE(y > 0.f && y < 5.f);
     tiltPublish(0.f, 0.f);
     delete m;
+}
+
+void test_clk_reset_while_high_retriggers() {
+    Module* m = kClkType.create();  // 120 BPM: high for samples 0..11999
+    float rst[kBlock];
+    const float* ins[2] = {nullptr, rst};
+    const bool conn[2] = {false, true};
+    constBlock(rst, 0.f);
+    for (int b = 0; b < 6000 / kBlock; b++) m->process(ins, conn);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, m->out(0)[kBlock - 1]);
+    constBlock(rst, 5.f);
+    bool sawLow = false, highAfterLow = false;
+    for (int b = 0; b < 4; b++) {
+        m->process(ins, conn);
+        for (int i = 0; i < kBlock; i++) {
+            if (m->out(0)[i] == 0.f) sawLow = true;
+            else if (sawLow) highAfterLow = true;
+        }
+    }
+    TEST_ASSERT_TRUE(sawLow);
+    TEST_ASSERT_TRUE(highAfterLow);
+    delete m;
+}
+
+void test_selector_cv_hysteresis() {
+    Selector sel;
+    float v[kBlock];
+    constBlock(v, 1.75f);  // above the 1.667 V boundary by more than the 50 mV band
+    TEST_ASSERT_EQUAL(1, sel.index(0, false, v, 0));
+    constBlock(v, 1.64f);  // just below, inside the band: stays
+    TEST_ASSERT_EQUAL(1, sel.index(0, false, v, 0));
+    constBlock(v, 1.55f);  // clearly below: switches
+    TEST_ASSERT_EQUAL(0, sel.index(0, false, v, 0));
+    constBlock(v, 1.69f);  // inside the band from below: stays
+    TEST_ASSERT_EQUAL(0, sel.index(0, false, v, 0));
+}
+
+void test_tilt_smooth_minimum() {
+    TEST_ASSERT_TRUE(kTiltType.params[1].min >= 5.f);
 }
 
 int main() {
@@ -817,5 +856,8 @@ int main() {
     RUN_TEST(test_tilt_module_scales);
     RUN_TEST(test_tilt_module_clamps);
     RUN_TEST(test_tilt_module_smooths);
+    RUN_TEST(test_clk_reset_while_high_retriggers);
+    RUN_TEST(test_selector_cv_hysteresis);
+    RUN_TEST(test_tilt_smooth_minimum);
     return UNITY_END();
 }

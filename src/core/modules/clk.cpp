@@ -48,11 +48,18 @@ class Clk : public Module {
                 rstGate_.process(rst[i]);
                 if (rstGate_.rose) {
                     count_ = 0;
-                    prevHigh_ = false;
                     if (!clk) {
-                        phase_ = inc;
-                        high = true;
+                        // Restart the beat. If OUT is high, dip for one sample so the restart
+                        // is a fresh rising edge (an envelope on OUT retriggers).
+                        if (prevHigh_) {
+                            phase_ = 0;
+                            high = false;
+                        } else {
+                            phase_ = inc;
+                            high = true;
+                        }
                     }
+                    prevHigh_ = false;
                 }
             }
             if (high && !prevHigh_) {
@@ -80,4 +87,4 @@ Module* create() { return new Clk(); }
 const ModuleTypeInfo kClkType = {
     "clk", "CLK", "Clock 20-300 BPM + divider", Category::Modulator, Icon::Clk, Drawing::None,
     2, kParams, 2, kInKeys, kInLabels, 2, kOutKeys, kOutLabels,
-    12, sizeof(Clk) + 2 * kBlock * sizeof(float), 0, create};
+    20, sizeof(Clk) + 2 * kBlock * sizeof(float), 0, create};

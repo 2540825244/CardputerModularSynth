@@ -27,7 +27,9 @@ void Slew::setTimeMs(float ms, float fs) {
 }
 
 float Slew::process(float x) {
-    y += coef * (x - y);
+    const float d = x - y;
+    // Snap the last micro-step: a one-pole otherwise ends in a subnormal tail that never reaches x.
+    y = d < 1e-6f && d > -1e-6f ? x : y + coef * d;
     return y;
 }
 

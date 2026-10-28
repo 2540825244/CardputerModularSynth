@@ -57,4 +57,4 @@ Module* create() { return new Mux(); }
 const ModuleTypeInfo kMuxType = {
     "mux", "MUX", "3:1 switch, SEL by CV or steps", Category::Processor, Icon::Mux, Drawing::None,
     2, selector::kParams, 4, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
-    20, sizeof(Mux) + kBlock * sizeof(float), 0, create};
+    40, sizeof(Mux) + kBlock * sizeof(float), 0, create};

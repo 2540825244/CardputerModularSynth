@@ -2,7 +2,7 @@
 #include "../dsp_util.h"
 
 // Which of 3 positions MUX/DMX select, per sample (audio thread).
-// CV mode: index = (pos + floor(clamp(sel, 0, 4.999) / 5 * 3)) % 3.
+// CV mode: index = (pos + floor(clamp(sel, 0, 4.999) / 5 * 3)) % 3, with +-50 mV hysteresis.
 // STEP mode: each rising SEL gate advances a count; index = (pos + count) % 3.
 // sel == nullptr (unpatched): index = pos.
 struct Selector {
@@ -16,12 +16,18 @@ struct Selector {
         }
         float v = sel[i];
         v = v < 0.f ? 0.f : (v > 4.999f ? 4.999f : v);
-        return (pos + (int)(v * (3.f / 5.f))) % 3;
+        const float x = v * (3.f / 5.f);  // 0..3, one unit per position
+        const int c = (int)x;
+        // +-50 mV hysteresis at each boundary, so a slow or noisy CV switches once.
+        constexpr float kBand = 0.05f * (3.f / 5.f);
+        if (last_ < 0 || (c > last_ && x >= c + kBand) || (c < last_ && x < last_ - kBand)) last_ = c;
+        return (pos + last_) % 3;
     }
 
    private:
     GateDetector gate_;
     int count_ = 0;
+    int last_ = -1;  // CV mode: current band, -1 before the first sample
 };
 
 // Shared parameters of MUX and DMX.

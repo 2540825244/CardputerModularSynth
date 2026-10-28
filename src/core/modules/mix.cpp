@@ -51,4 +51,4 @@ Module* create() { return new Mix(); }
 const ModuleTypeInfo kMixType = {
     "mix", "MIX", "4-in mixer, a level per input", Category::Processor, Icon::Mix, Drawing::None,
     4, kParams, 4, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
-    20, sizeof(Mix) + kBlock * sizeof(float), 0, create};
+    50, sizeof(Mix) + kBlock * sizeof(float), 0, create};
