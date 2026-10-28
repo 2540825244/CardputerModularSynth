@@ -143,6 +143,40 @@ void test_memcmp_deterministic() {
     TEST_ASSERT_EQUAL(0, memcmp(&c, &d, sizeof(Patch)));
 }
 
+
+void test_copy_module_no_cables() {
+    Patch p;
+    uint16_t a = 0, b = 0, c = 0;
+    p.addModule(kOscType, 0, 0, &a);
+    p.addModule(kOscType, 0, 1, &b);
+    p.addCable(a, 0, b, 0);
+    p.find(a)->params[2] = 3.f;
+    p.find(a)->inAmount[1] = 0.5f;
+    TEST_ASSERT_EQUAL(PatchError::None, p.copyModule(a, 1, 5, &c));
+    const ModuleRec* m = p.find(c);
+    TEST_ASSERT_NOT_NULL(m);
+    TEST_ASSERT_EQUAL(1, m->page);
+    TEST_ASSERT_EQUAL(5, m->cell);
+    TEST_ASSERT_EQUAL_FLOAT(3.f, m->params[2]);
+    TEST_ASSERT_EQUAL_FLOAT(0.5f, m->inAmount[1]);
+    TEST_ASSERT_EQUAL(1, p.cableCount());
+    TEST_ASSERT_EQUAL(PatchError::CellTaken, p.copyModule(a, 0, 1, &c));
+}
+
+void test_swap_modules() {
+    Patch p;
+    uint16_t a = 0, b = 0;
+    p.addModule(kOscType, 0, 0, &a);
+    p.addModule(kOscType, 1, 7, &b);
+    TEST_ASSERT_EQUAL(PatchError::None, p.swapModules(a, b));
+    TEST_ASSERT_EQUAL(1, p.find(a)->page);
+    TEST_ASSERT_EQUAL(7, p.find(a)->cell);
+    TEST_ASSERT_EQUAL(0, p.find(b)->page);
+    TEST_ASSERT_EQUAL(0, p.find(b)->cell);
+}
+
+void test_patch_size_budget() { TEST_ASSERT_TRUE(sizeof(Patch) <= (sizeof(void*) == 4 ? 4608u : 4864u)); }
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_add_find);
@@ -152,5 +186,8 @@ int main() {
     RUN_TEST(test_remove_module_removes_cables);
     RUN_TEST(test_move);
     RUN_TEST(test_memcmp_deterministic);
+    RUN_TEST(test_copy_module_no_cables);
+    RUN_TEST(test_swap_modules);
+    RUN_TEST(test_patch_size_budget);
     return UNITY_END();
 }

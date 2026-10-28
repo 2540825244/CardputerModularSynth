@@ -6,7 +6,7 @@ namespace {
 struct ValueEdit {
     uint16_t id;
     uint8_t idx;
-    bool amount;
+    uint8_t kind;  // 0 param, 1 output amount, 2 input amount (paramKey kinds)
     float value;
 };
 
@@ -20,7 +20,8 @@ void doSetValue(Patch& p, void* c) {
     const ValueEdit* v = static_cast<ValueEdit*>(c);
     ModuleRec* m = p.find(v->id);
     if (!m) return;
-    if (v->amount) m->outAmount[v->idx] = v->value;
+    if (v->kind == 1) m->outAmount[v->idx] = v->value;
+    else if (v->kind == 2) m->inAmount[v->idx] = v->value;
     else m->params[v->idx] = v->value;
 }
 
@@ -68,13 +69,17 @@ void doUnpatch(Patch& p, void* c) {
     p.removeCablesAtPin(e->id, e->isOutput, e->pin);
 }
 
+bool isPin(CellRef c) { return c.kind == CellKind::In || c.kind == CellKind::Out; }
+bool isEditable(CellRef c) { return c.kind == CellKind::Param || isPin(c); }
+
 bool setValue(UiController& ui, const ModuleRec& m, CellRef c, float v) {
-    const bool amount = c.kind == CellKind::Out;
-    const ParamSpec& spec = amount ? kAmountSpec : m.type->params[c.index];
+    const uint8_t kind = c.kind == CellKind::Out ? 1 : (c.kind == CellKind::In ? 2 : 0);
+    const ParamSpec& spec = kind ? kAmountSpec : m.type->params[c.index];
     v = paramClamp(spec, v);
-    ValueEdit e{m.id, c.index, amount, v};
-    ui.editValue(doSetValue, &e, paramKey(m.id, c.index, amount));
-    if (amount) ui.engine().setOutAmount(m.id, c.index, v);
+    ValueEdit e{m.id, c.index, kind, v};
+    ui.editValue(doSetValue, &e, paramKey(m.id, c.index, kind));
+    if (kind == 1) ui.engine().setOutAmount(m.id, c.index, v);
+    else if (kind == 2) ui.engine().setInAmount(m.id, c.index, v);
     else ui.engine().setParam(m.id, c.index, v);
     return true;
 }
@@ -85,11 +90,13 @@ CellRef selected(const UiState& s, const ModuleTypeInfo& t) {
 }
 
 float currentValue(const ModuleRec& m, CellRef c) {
-    return c.kind == CellKind::Out ? m.outAmount[c.index] : m.params[c.index];
+    if (c.kind == CellKind::Out) return m.outAmount[c.index];
+    if (c.kind == CellKind::In) return m.inAmount[c.index];
+    return m.params[c.index];
 }
 
 const ParamSpec& specOf(const ModuleRec& m, CellRef c) {
-    return c.kind == CellKind::Out ? kAmountSpec : m.type->params[c.index];
+    return isPin(c) ? kAmountSpec : m.type->params[c.index];
 }
 
 // Tab: next Param/Out cell after the cursor, in cell order, wrapping.
@@ -97,7 +104,7 @@ int nextEditable(const ModuleTypeInfo& t, int from) {
     for (int step = 1; step <= kCellsPerPage; step++) {
         const int c = (from + step + kCellsPerPage) % kCellsPerPage;
         const CellRef r = moduleCell(t, (uint8_t)(c / kGridCols), (uint8_t)(c % kGridCols));
-        if (r.kind == CellKind::Param || r.kind == CellKind::Out) return c;
+        if (isEditable(r)) return c;
     }
     return from;
 }
@@ -125,7 +132,7 @@ void sideKey(UiController& ui, const ModuleRec& m, const KeyEvent& e) {
     UiState& s = ui.mut();
     if (e.type != KeyEvent::Down) return;
     const CellRef sel = selected(s, *m.type);
-    const bool editable = sel.kind == CellKind::Param || sel.kind == CellKind::Out;
+    const bool editable = isEditable(sel);
     switch (e.side) {
         case Side::Ctrl:
         case Side::Space:
@@ -169,7 +176,7 @@ bool moduleViewAction(UiController& ui, const Action& a) {
             ui.endTilt();  // a cursor move or a coarse value ends a sweep (a no-op when none runs)
             if (a.cell < kGridCols) {  // value strip: coarse value for the selected cell
                 const CellRef sel = selected(s, *m->type);
-                if (sel.kind == CellKind::Param || sel.kind == CellKind::Out)
+                if (isEditable(sel))
                     setValue(ui, *m, sel, paramCoarse(specOf(*m, sel), a.cell));
             } else {
                 s.modCell = a.cell;

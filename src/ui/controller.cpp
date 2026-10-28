@@ -229,7 +229,7 @@ bool UiController::editValue(void (*fn)(Patch&, void*), void* ctx, uint32_t coal
 }
 
 bool UiController::undo() {
-    if (!undo_.pop(patch_)) return false;
+    if (!undo_.undo(patch_)) return false;
     engine_.apply(patch_);
     s_.dirty = true;
     s_.lastEditMs = now_;

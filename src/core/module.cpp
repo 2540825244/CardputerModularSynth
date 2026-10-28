@@ -6,6 +6,7 @@ Module::Module(const ModuleTypeInfo& t) : type_(t) {
     for (int i = 0; i < kMaxParams; i++)
         params_[i].store(i < t.numParams ? t.params[i].def : 0.f, std::memory_order_relaxed);
     for (auto& a : amounts_) a.store(1.f, std::memory_order_relaxed);
+    for (auto& a : inAmounts_) a.store(1.f, std::memory_order_relaxed);
     for (auto& m : monitors_) m.store(0.f, std::memory_order_relaxed);
 }
 
@@ -22,6 +23,12 @@ void Module::setOutAmount(int o, float a) {
 }
 float Module::outAmount(int o) const {
     return (o >= 0 && o < kMaxOuts) ? amounts_[o].load(std::memory_order_relaxed) : 0.f;
+}
+void Module::setInAmount(int i, float a) {
+    if (i >= 0 && i < kMaxIns) inAmounts_[i].store(a, std::memory_order_relaxed);
+}
+float Module::inAmount(int i) const {
+    return (i >= 0 && i < kMaxIns) ? inAmounts_[i].load(std::memory_order_relaxed) : 0.f;
 }
 float Module::monitor(int i) const {
     return (i >= 0 && i < 2) ? monitors_[i].load(std::memory_order_relaxed) : 0.f;

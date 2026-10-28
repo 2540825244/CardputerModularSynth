@@ -318,6 +318,26 @@ void test_v1_patch_still_loads() {
     TEST_ASSERT_EQUAL_FLOAT(0.5f, q.find(2)->outAmount[0]);
 }
 
+
+void test_old_file_input_amounts_default() {
+    const char* json = "{\"format\":1,\"modules\":[{\"id\":1,\"type\":\"osc\",\"page\":0,\"cell\":0,"
+                       "\"params\":{\"wave\":1},\"amounts\":{\"out\":0.5}}],\"cables\":[]}";
+    Patch p;
+    TEST_ASSERT_EQUAL(LoadError::None, patchFromJson(json, p, nullptr).error);
+    for (int i = 0; i < kMaxIns; i++) TEST_ASSERT_EQUAL_FLOAT(1.f, p.find(1)->inAmount[i]);
+    TEST_ASSERT_EQUAL_FLOAT(0.5f, p.find(1)->outAmount[0]);
+}
+
+void test_inamounts_round_trip() {
+    Patch p;
+    uint16_t o = add(p, kOscType, 0);
+    p.find(o)->inAmount[1] = -0.25f;
+    Patch q;
+    TEST_ASSERT_EQUAL(LoadError::None, patchFromJson(patchToJson(p), q, nullptr).error);
+    TEST_ASSERT_EQUAL_FLOAT(-0.25f, q.find(o)->inAmount[1]);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, q.find(o)->inAmount[0]);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_slot_path);
@@ -333,5 +353,7 @@ int main() {
     RUN_TEST(test_budget_skip);
     RUN_TEST(test_new_types_round_trip);
     RUN_TEST(test_v1_patch_still_loads);
+    RUN_TEST(test_old_file_input_amounts_default);
+    RUN_TEST(test_inamounts_round_trip);
     return UNITY_END();
 }

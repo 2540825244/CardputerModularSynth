@@ -1,4 +1,5 @@
 #include "engine.h"
+#include <cmath>
 #include "delay_pool.h"
 #include "dsp_util.h"
 #include "modules/dly.h"
@@ -45,6 +46,7 @@ void Engine::retire(Module* m, Program* p, uint32_t gen) { retired_.push_back({g
 void Engine::pushValues(Module* m, const ModuleRec& r) {
     for (int k = 0; k < r.type->numParams && k < kMaxParams; k++) m->setParam(k, r.params[k]);
     for (int o = 0; o < r.type->numOuts && o < kMaxOuts; o++) m->setOutAmount(o, r.outAmount[o]);
+    for (int i = 0; i < r.type->numIns && i < kMaxIns; i++) m->setInAmount(i, r.inAmount[i]);
 }
 
 int Engine::instantiateAll(const Patch& p) {
@@ -107,6 +109,13 @@ void Engine::setOutAmount(uint16_t id, uint8_t o, float a) {
     }
 }
 
+void Engine::setInAmount(uint16_t id, uint8_t i, float a) {
+    if (Module* m = instanceOf(id)) m->setInAmount(i, a);
+    if (ModuleRec* r = patch_.find(id)) {
+        if (i < kMaxIns) r->inAmount[i] = a;
+    }
+}
+
 void Engine::collect() {
     const uint32_t seen = seen_.load(std::memory_order_acquire);
     size_t w = 0;
@@ -159,12 +168,18 @@ void Engine::processBlock(float* mono) {
                 const float amt = src.m->outAmount(src.out);
                 for (int k = 0; k < kBlock; k++) acc[k] += o[k] * amt;
             }
+            const float ia = m->inAmount(in);
+            if (ia != 1.f)
+                for (int k = 0; k < kBlock; k++) acc[k] *= ia;
         }
         m->process(ins, conn);
         const int numOuts = m->type().numOuts;
         if (numOuts > 0) {
             float* o = m->out(0);
+            float pk = 0.f;
             for (int k = 0; k < numOuts * kBlock; k++) o[k] = sanitize(o[k]);
+            for (int k = 0; k < kBlock; k++) pk = fabsf(o[k]) > pk ? fabsf(o[k]) : pk;
+            m->setPeak(pk);
         }
         if (const float* mo = m->masterOut())
             for (int k = 0; k < kBlock; k++) mono[k] += mo[k];

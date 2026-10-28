@@ -59,6 +59,9 @@ Sel selection(const UiState& s, const ModuleRec& m) {
     } else if (r.c.kind == CellKind::Out) {
         r.spec = &kAmountSpec;
         r.value = m.outAmount[r.c.index];
+    } else if (r.c.kind == CellKind::In) {
+        r.spec = &kAmountSpec;
+        r.value = m.inAmount[r.c.index];
     }
     return r;
 }
@@ -124,7 +127,7 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
     }
     char name[16], val[16];
     if (sel.spec) {
-        upper(sel.c.kind == CellKind::Out ? "AMT" : sel.spec->key, name, sizeof name);
+        upper(sel.c.kind == CellKind::Param ? sel.spec->key : "AMT", name, sizeof name);
         paramFormat(*sel.spec, sel.value, val, sizeof val, true);
     } else {
         upper(m.type->name, name, sizeof name);
@@ -166,9 +169,9 @@ void pinCell(const UiState& s, const Patch& p, const ModuleRec& m, int col, int 
         cv.drawCircle(x + w / 2, cy, 2, target ? cableCol(p.nextCableColor()) : PDim);
     }
     smallText(target && !pi.partner ? "?" : (pi.partner ? pi.partner : ""), x + w / 2, y + 22, PDim);
-    if (isOut) {
+    {
         char amt[8];
-        snprintf(amt, sizeof amt, "%+d", (int)lroundf(m.outAmount[pin] * 100.f));
+        snprintf(amt, sizeof amt, "%+d", (int)lroundf((isOut ? m.outAmount[pin] : m.inAmount[pin]) * 100.f));
         smallText(amt, x + w / 2, y + 28, PDim);
     }
     if (target && pulse()) dotted(x, y, w, h, PAccent);

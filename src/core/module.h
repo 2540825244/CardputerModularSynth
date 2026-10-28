@@ -43,6 +43,10 @@ class Module {
     float param(int i) const;       // audio thread: atomic load
     void setOutAmount(int o, float a);
     float outAmount(int o) const;  // default 1.0
+    void setInAmount(int i, float a);
+    float inAmount(int i) const;   // input attenuverter, default 1.0
+    float peak() const { return peak_.load(std::memory_order_relaxed); }  // |out(0)| max, last block
+    void setPeak(float p) { peak_.store(p, std::memory_order_relaxed); }  // engine only
     float* out(int o) { return outBuf_ + o * kBlock; }  // kBlock floats, persists between blocks
     float monitor(int i) const;
     void setMonitor(int i, float v);  // 2 atomic slots for UI animation
@@ -56,5 +60,7 @@ class Module {
     float* outBuf_;
     std::atomic<float> params_[kMaxParams];
     std::atomic<float> amounts_[kMaxOuts];
+    std::atomic<float> inAmounts_[kMaxIns];
+    std::atomic<float> peak_{0.f};
     std::atomic<float> monitors_[2];
 };

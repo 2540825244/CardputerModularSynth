@@ -28,6 +28,7 @@ class Engine {
     int apply(const Patch&);
     void setParam(uint16_t id, uint8_t i, float v);
     void setOutAmount(uint16_t id, uint8_t o, float a);
+    void setInAmount(uint16_t id, uint8_t i, float a);
     Module* instance(uint16_t id);
     void collect();  // UI thread: frees retired programs/modules the audio thread has passed
 

@@ -61,6 +61,7 @@ PatchError Patch::addModuleWithId(uint16_t id, const ModuleTypeInfo& t, uint8_t 
     m.cell = cell;
     for (int i = 0; i < t.numParams && i < kMaxParams; i++) m.params[i] = t.params[i].def;
     for (int i = 0; i < kMaxOuts; i++) m.outAmount[i] = 1.f;
+    for (int i = 0; i < kMaxIns; i++) m.inAmount[i] = 1.f;
     return PatchError::None;
 }
 
@@ -87,6 +88,33 @@ PatchError Patch::moveModule(uint16_t id, uint8_t page, uint8_t cell) {
     if (at && at != m) return PatchError::CellTaken;
     m->page = page;
     m->cell = cell;
+    return PatchError::None;
+}
+
+PatchError Patch::copyModule(uint16_t id, uint8_t page, uint8_t cell, uint16_t* outId) {
+    const ModuleRec* src = find(id);
+    if (!src) return PatchError::BadPin;
+    const ModuleRec copy = *src;  // addModule may shift the array
+    uint16_t nid = 0;
+    const PatchError e = addModule(*copy.type, page, cell, &nid);
+    if (e != PatchError::None) return e;
+    ModuleRec* m = find(nid);
+    for (int i = 0; i < kMaxParams; i++) m->params[i] = copy.params[i];
+    for (int i = 0; i < kMaxOuts; i++) m->outAmount[i] = copy.outAmount[i];
+    for (int i = 0; i < kMaxIns; i++) m->inAmount[i] = copy.inAmount[i];
+    if (outId) *outId = nid;
+    return PatchError::None;
+}
+
+PatchError Patch::swapModules(uint16_t a, uint16_t b) {
+    ModuleRec* x = find(a);
+    ModuleRec* y = find(b);
+    if (!x || !y) return PatchError::BadPin;
+    const uint8_t page = x->page, cell = x->cell;
+    x->page = y->page;
+    x->cell = y->cell;
+    y->page = page;
+    y->cell = cell;
     return PatchError::None;
 }
 

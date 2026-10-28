@@ -5,11 +5,12 @@
 #include "units.h"
 
 struct ModuleRec {
+    const ModuleTypeInfo* type;  // first: no padding before the floats
     uint16_t id;
-    const ModuleTypeInfo* type;
     uint8_t page, cell;  // cell = row*12 + col
     float params[kMaxParams];
     float outAmount[kMaxOuts];
+    float inAmount[kMaxIns];  // input attenuverter, -1..+1, default 1
 };
 
 struct CableRec {
@@ -32,6 +33,9 @@ class Patch {
     void setCableColor(int i, uint8_t color) { if (i >= 0 && i < nCables_) cables_[i].color = color; }
     bool removeModule(uint16_t id);  // also removes its cables
     PatchError moveModule(uint16_t id, uint8_t page, uint8_t cell);
+    // A new module of the same type with the same params and amounts, no cables.
+    PatchError copyModule(uint16_t id, uint8_t page, uint8_t cell, uint16_t* outId);
+    PatchError swapModules(uint16_t a, uint16_t b);  // exchanges page and cell
     uint8_t nextCableColor() const;  // the colour addCable would pick
     PatchError addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint8_t toIn);  // picks colour
     int removeCablesAtPin(uint16_t id, bool isOutput, uint8_t pin);  // returns how many were removed
@@ -54,4 +58,5 @@ class Patch {
 };
 
 static_assert(std::is_trivially_copyable<Patch>::value, "undo snapshots Patch with =");
-static_assert(sizeof(Patch) <= 3072, "Patch snapshot size budget");
+// 4608 B on the device (4-byte pointers); 64-bit hosts pad each record to 128 B.
+static_assert(sizeof(Patch) <= (sizeof(void*) == 4 ? 4608 : 4864), "Patch snapshot size budget");

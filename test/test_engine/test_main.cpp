@@ -359,6 +359,37 @@ void test_apply_collect_without_block() {
     TEST_ASSERT_EQUAL(1, gDtorCount);
 }
 
+
+void test_input_amount_scales_sum() {
+    Patch p;
+    uint16_t d1 = add(p, kDcType, 0), d2 = add(p, kDcType, 2), s = add(p, kSinkType, 1);
+    wire(p, d1, 0, s, 0);
+    wire(p, d2, 0, s, 0);
+    p.find(s)->inAmount[0] = -0.5f;
+    Engine eng(bigHeap);
+    eng.apply(p);
+    run(eng, 2);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, -5.f, gSinkIn);  // (5 + 5) x -0.5
+    eng.setInAmount(s, 0, 0.25f);
+    run(eng, 1);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.5f, gSinkIn);
+}
+
+void test_input_amount_default_one() {
+    Patch p;
+    uint16_t s = add(p, kSinkType, 1);
+    for (int i = 0; i < kMaxIns; i++) TEST_ASSERT_EQUAL_FLOAT(1.f, p.find(s)->inAmount[i]);
+}
+
+void test_peak_meter() {
+    Patch p;
+    uint16_t d = add(p, kDcType, 0);
+    Engine eng(bigHeap);
+    eng.apply(p);
+    run(eng, 1);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 5.f, eng.instance(d)->peak());
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_basic_voice);
@@ -374,5 +405,8 @@ int main() {
     RUN_TEST(test_order_cycle_downstream);
     RUN_TEST(test_double_apply_before_block);
     RUN_TEST(test_apply_collect_without_block);
+    RUN_TEST(test_input_amount_scales_sum);
+    RUN_TEST(test_input_amount_default_one);
+    RUN_TEST(test_peak_meter);
     return UNITY_END();
 }

@@ -385,7 +385,11 @@ void test_tab_and_esc_in_module_view() {
     f.side(Side::Tab);
     TEST_ASSERT_EQUAL(13, f.ui.state().modCell);
     f.tap(3, 1);
-    f.side(Side::Tab);  // after last param -> the Out
+    f.side(Side::Tab);  // after the last param -> the inputs (they have amounts now)
+    TEST_ASSERT_EQUAL(24, f.ui.state().modCell);
+    f.side(Side::Tab);
+    f.side(Side::Tab);
+    f.side(Side::Tab);  // -> the Out
     TEST_ASSERT_EQUAL(36, f.ui.state().modCell);
     f.side(Side::Tab);  // wraps
     TEST_ASSERT_EQUAL(12, f.ui.state().modCell);
@@ -1215,6 +1219,21 @@ void test_strip_fill_ends() {
     TEST_ASSERT_EQUAL_FLOAT(0.f, stripFill(0.5f, 10));  // MIN/DEF cells never fill
 }
 
+
+void test_input_amount_edit() {
+    Fx f;
+    uint16_t id = openModule(f, TOsc, 0, 0);
+    f.tap(1, 2);   // IN 1 (FM)
+    f.tap(10, 0);  // - = min
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, gPatch.find(id)->inAmount[1]);
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, f.eng.instance(id)->inAmount(1));
+    f.side(Side::Space);  // fine +
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, -1.f + 2.f / 128.f, gPatch.find(id)->inAmount[1]);
+    f.side(Side::Backslash);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.find(id)->inAmount[1]);  // fine + coalesced with the coarse set
+    TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.find(id)->inAmount[0]);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1295,5 +1314,6 @@ int main() {
     RUN_TEST(test_coarse_tap_during_sweep_ends_it);
     RUN_TEST(test_strip_fill_partial_segment);
     RUN_TEST(test_strip_fill_ends);
+    RUN_TEST(test_input_amount_edit);
     return UNITY_END();
 }

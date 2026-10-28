@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include "registry.h"
 
 namespace {
@@ -64,6 +65,12 @@ std::string patchToJson(const Patch& p) {
         for (int k = 0; k < t.numParams && k < kMaxParams; k++) ps[t.params[k].key] = r.params[k];
         JsonObject am = m["amounts"].to<JsonObject>();
         for (int o = 0; o < t.numOuts && o < kMaxOuts; o++) am[t.outKeys[o]] = r.outAmount[o];
+        bool anyIn = false;  // inamounts only when one differs from 1, so v1.1 files stay byte-identical
+        for (int i = 0; i < t.numIns && i < kMaxIns; i++) anyIn |= r.inAmount[i] != 1.f;
+        if (anyIn) {
+            JsonObject ia = m["inamounts"].to<JsonObject>();
+            for (int i = 0; i < t.numIns && i < kMaxIns; i++) ia[t.inKeys[i]] = r.inAmount[i];
+        }
     }
     JsonArray cables = doc["cables"].to<JsonArray>();
     for (int i = 0; i < p.cableCount(); i++) {
@@ -94,7 +101,7 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
     JsonDocument filter;  // keep only what the loader reads
     filter["format"] = true;
     JsonObject fm = filter["modules"][0].to<JsonObject>();
-    for (const char* k : {"id", "type", "page", "cell", "params", "amounts"}) fm[k] = true;
+    for (const char* k : {"id", "type", "page", "cell", "params", "amounts", "inamounts"}) fm[k] = true;
     JsonObject fc = filter["cables"][0].to<JsonObject>();
     for (const char* k : {"from", "to", "color"}) fc[k] = true;
     JsonDocument doc;
@@ -115,7 +122,8 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
         return rep;
     }
 
-    Patch scratch;
+    std::unique_ptr<Patch> scratchPtr(new Patch());  // 4.4 KB: off the UI task stack
+    Patch& scratch = *scratchPtr;
     for (JsonObjectConst m : doc["modules"].as<JsonArrayConst>()) {
         const char* type = m["type"].is<const char*>() ? m["type"].as<const char*>() : nullptr;
         const ModuleTypeInfo* t = type ? findType(type) : nullptr;
@@ -144,6 +152,14 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
             float a = v.as<float>();
             if (!(a == a)) continue;  // NaN keeps the default
             r->outAmount[o] = a < -1.f ? -1.f : (a > 1.f ? 1.f : a);
+        }
+        JsonObjectConst ia = m["inamounts"].as<JsonObjectConst>();
+        for (int i = 0; i < t->numIns && i < kMaxIns; i++) {
+            JsonVariantConst v = ia[t->inKeys[i]];
+            if (!v.is<float>()) continue;
+            const float a = v.as<float>();
+            if (!(a == a)) continue;
+            r->inAmount[i] = a < -1.f ? -1.f : (a > 1.f ? 1.f : a);
         }
     }
     if (scratch.moduleCount() == 0 && rep.skippedModules > 0) {  // an empty file is a valid empty patch
