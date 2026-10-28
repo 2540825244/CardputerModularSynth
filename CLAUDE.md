@@ -11,14 +11,17 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 
-## Next step (as of 2026-10-27)
-The owner approved the design on 2026-10-27. The v1 implementation plan is
-`docs/superpowers/plans/2026-10-27-v1-firmware.md` (22 tasks). It also decides the spec's §12 open
-items as [Claude's call] (see the table at its top).
-1. If not done yet: the owner reviews the plan and picks an execution method (subagent-driven or native).
-2. Execute it task by task. Tasks 2, 18, 19, 20 and 21 are **owner checkpoints**: the owner flashes and
-   reports back (Claude can't hear the output or press keys). Stop and wait at each one.
-Probe done 2026-10-27, see docs/probe-results.md; chords are reliable (owner-confirmed).
+## Next step (as of 2026-10-28)
+v1 (plan `docs/superpowers/plans/2026-10-27-v1-firmware.md`) is implemented. The current plan is
+`docs/superpowers/plans/2026-10-28-v1.1-controls-and-utilities.md`: unified do-it gesture, hold-enter
+tilt, 7 new modules. Tasks 1–8 are done and reviewed (branch `feat/v1-firmware`). It is paused at the
+**Task 9 owner checkpoint**. Progress and every ruling: `.superpowers/sdd/2026-10-28-v1.1-controls-and-utilities/progress.md`
+(read its RESUME NOTE first).
+1. Owner flashes `dist/modsynth-v1.1-test.bin` and runs `dist/test-2-script.md`. So far reported: tilt
+   ran opposite on both axes, now negated in `src/hw/tilt.cpp` (d397671, not yet re-checked). Still to
+   report: tilt feel after the flip, gestures, file menu, new modules, first-boot audio.
+2. Fix what the report finds, then Task 10 (release notes, final whole-branch review, finish the branch).
+3. Execution mode the owner chose: native, plus one persistent Opus reviewer agent. No other subagents.
 
 ## Constraints to remember
 - PlatformIO + Arduino core. `pio` isn't on PATH: use `~/.platformio/penv/bin/pio`.
