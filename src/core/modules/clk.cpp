@@ -11,7 +11,7 @@ const int kDivs[] = {1, 2, 3, 4, 6, 8, 16};
 constexpr uint32_t kCountWrap = 48;  // lcm of kDivs
 
 const ParamSpec kParams[] = {
-    {"bpm", "BPM", 20.f, 300.f, 120.f, Curve::Log, Unit::None, nullptr},
+    {"bpm", "BPM", 20.f, 300.f, 120.f, Curve::Log, Unit::Bpm, nullptr},
     {"div", "DIV", 0.f, 6.f, 1.f, Curve::Stepped, Unit::Enum, kDivNames},
 };
 const char* const kInKeys[] = {"clk", "rst"};

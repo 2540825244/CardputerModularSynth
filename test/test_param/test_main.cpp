@@ -76,6 +76,20 @@ void test_format_volts() {
     TEST_ASSERT_EQUAL_STRING("+0.00V", b);
 }
 
+void test_format_bpm_and_degrees() {
+    const ParamSpec bpm = {"bpm", "BPM", 20.f, 300.f, 120.f, Curve::Log, Unit::Bpm, nullptr};
+    const ParamSpec deg = {"range", "RNG", 10.f, 90.f, 45.f, Curve::Lin, Unit::Deg, nullptr};
+    char b[16];
+    paramFormat(bpm, 120.4f, b, sizeof b, true);
+    TEST_ASSERT_EQUAL_STRING("120BPM", b);
+    paramFormat(bpm, 120.4f, b, sizeof b, false);
+    TEST_ASSERT_EQUAL_STRING("120", b);
+    paramFormat(deg, 45.f, b, sizeof b, true);
+    TEST_ASSERT_EQUAL_STRING("45DEG", b);
+    paramFormat(deg, 45.f, b, sizeof b, false);
+    TEST_ASSERT_EQUAL_STRING("45", b);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_log_roundtrip);
@@ -85,5 +99,6 @@ int main() {
     RUN_TEST(test_clamp_out_of_range);
     RUN_TEST(test_format);
     RUN_TEST(test_format_volts);
+    RUN_TEST(test_format_bpm_and_degrees);
     return UNITY_END();
 }

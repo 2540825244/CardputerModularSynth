@@ -18,6 +18,7 @@
 #include "core/modules/dmx.h"
 #include "core/modules/mux.h"
 #include "core/modules/selector.h"
+#include "core/modules/tilt.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -56,6 +57,7 @@ void test_registry() {
     TEST_ASSERT_TRUE(findType("clk") == &kClkType);
     TEST_ASSERT_TRUE(findType("mux") == &kMuxType);
     TEST_ASSERT_TRUE(findType("dmx") == &kDmxType);
+    TEST_ASSERT_TRUE(findType("tilt") == &kTiltType);
     int n = 0;
     const ModuleTypeInfo* const* t = allTypes(&n);
     TEST_ASSERT_TRUE(n >= 2);
@@ -732,6 +734,44 @@ void test_dmx_routes() {
     delete m;
 }
 
+void test_tilt_module_scales() {
+    Module* m = kTiltType.create();
+    m->setParam(1, 0.f);  // SMO off
+    tiltPublish(22.5f, -45.f);
+    const float* ins[1] = {nullptr};
+    const bool conn[1] = {false};
+    m->process(ins, conn);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.5f, m->out(0)[kBlock - 1]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, -5.f, m->out(1)[kBlock - 1]);
+    delete m;
+}
+
+void test_tilt_module_clamps() {
+    Module* m = kTiltType.create();
+    m->setParam(1, 0.f);
+    tiltPublish(90.f, 0.f);
+    const float* ins[1] = {nullptr};
+    const bool conn[1] = {false};
+    m->process(ins, conn);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 5.f, m->out(0)[kBlock - 1]);
+    delete m;
+}
+
+void test_tilt_module_smooths() {
+    Module* m = kTiltType.create();
+    m->setParam(1, 100.f);
+    tiltPublish(0.f, 0.f);
+    const float* ins[1] = {nullptr};
+    const bool conn[1] = {false};
+    for (int b = 0; b < 10; b++) m->process(ins, conn);
+    tiltPublish(45.f, 0.f);
+    m->process(ins, conn);
+    const float y = m->out(0)[kBlock - 1];
+    TEST_ASSERT_TRUE(y > 0.f && y < 5.f);
+    tiltPublish(0.f, 0.f);
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -774,5 +814,8 @@ int main() {
     RUN_TEST(test_mux_picks_input);
     RUN_TEST(test_mux_switch_is_smooth);
     RUN_TEST(test_dmx_routes);
+    RUN_TEST(test_tilt_module_scales);
+    RUN_TEST(test_tilt_module_clamps);
+    RUN_TEST(test_tilt_module_smooths);
     return UNITY_END();
 }

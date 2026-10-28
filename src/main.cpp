@@ -1,6 +1,7 @@
 #include <M5Cardputer.h>
 #include <esp_heap_caps.h>
 #include "core/engine.h"
+#include "core/modules/tilt.h"
 #include "core/patch.h"
 #include "core/undo.h"
 #include "hw/audio_out.h"
@@ -40,6 +41,7 @@ static void uiTask(void*) {
         gDecoder.update(pressed, n, now, ev, &ne, 16);
         for (int i = 0; i < ne; i++) gUi.handle(ev[i], now);
         tiltPoll(now);
+        if (tiltValid()) tiltPublish(tiltAngles().roll, tiltAngles().pitch);  // TILT modules
         if (gUi.tiltActive() && tiltValid()) {
             const float roll = tiltAngles().roll;  // within +-90, no wrap
             if (gUi.tiltGeneration() != lastTiltGen) {

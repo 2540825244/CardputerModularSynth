@@ -80,6 +80,8 @@ void paramFormat(const ParamSpec& s, float v, char* out, int len, bool longForm)
             break;
         }
         case Unit::Volts: snprintf(out, len, longForm ? "%+.2fV" : "%+.1f", (double)(v + 0.f)); break;
+        case Unit::Bpm: snprintf(out, len, longForm ? "%.0fBPM" : "%.0f", (double)v); break;
+        case Unit::Deg: snprintf(out, len, longForm ? "%.0fDEG" : "%.0f", (double)v); break;
         default: snprintf(out, len, "%.2f", (double)v); break;
     }
 }

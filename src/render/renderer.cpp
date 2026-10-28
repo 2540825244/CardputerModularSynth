@@ -32,6 +32,7 @@ void drawIcon(Icon ic, int x, int y, uint8_t color) {
         case Icon::Clk: i = Ic::Clk; break;
         case Icon::Mux: i = Ic::Mux; break;
         case Icon::Dmx: i = Ic::Dmx; break;
+        case Icon::Tilt: i = Ic::Tilt; break;
         default: break;
     }
     drawIcon(i, x, y, color);

@@ -2,7 +2,7 @@
 #include <cstdint>
 
 enum class Curve : uint8_t { Lin, Log, Sqr, Stepped };
-enum class Unit : uint8_t { None, Hz, Ms, Percent, Semi, Cents, Oct, Enum, Volts };
+enum class Unit : uint8_t { None, Hz, Ms, Percent, Semi, Cents, Oct, Enum, Volts, Bpm, Deg };
 
 struct ParamSpec {
     const char* key;    // stable lowercase id

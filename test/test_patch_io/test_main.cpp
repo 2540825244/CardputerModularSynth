@@ -9,6 +9,13 @@
 #include "core/modules/out.h"
 #include "core/modules/vca.h"
 #include "core/modules/vcf.h"
+#include "core/modules/atn.h"
+#include "core/modules/clk.h"
+#include "core/modules/dmx.h"
+#include "core/modules/mix.h"
+#include "core/modules/mux.h"
+#include "core/modules/snh.h"
+#include "core/modules/tilt.h"
 #include "core/patch_io.h"
 #include "core/registry.h"
 #include "core/storage.h"
@@ -247,6 +254,70 @@ void test_budget_skip() {
     TEST_ASSERT_EQUAL(1, r.skippedModules);
 }
 
+static void expectSame(const Patch& p, const Patch& q) {
+    TEST_ASSERT_EQUAL(p.moduleCount(), q.moduleCount());
+    for (int i = 0; i < p.moduleCount(); i++) {
+        const ModuleRec &a = p.moduleAt(i), &b = q.moduleAt(i);
+        TEST_ASSERT_EQUAL_UINT16(a.id, b.id);
+        TEST_ASSERT_EQUAL_PTR(a.type, b.type);
+        TEST_ASSERT_EQUAL_UINT8(a.cell, b.cell);
+        for (int k = 0; k < a.type->numParams; k++)
+            TEST_ASSERT_FLOAT_WITHIN(1e-6f * fmaxf(1.f, fabsf(a.params[k])), a.params[k], b.params[k]);
+        for (int o = 0; o < a.type->numOuts; o++) TEST_ASSERT_FLOAT_WITHIN(1e-6f, a.outAmount[o], b.outAmount[o]);
+    }
+    TEST_ASSERT_EQUAL(p.cableCount(), q.cableCount());
+    for (int i = 0; i < p.cableCount(); i++) {
+        TEST_ASSERT_EQUAL_UINT16(p.cableAt(i).fromId, q.cableAt(i).fromId);
+        TEST_ASSERT_EQUAL_UINT8(p.cableAt(i).fromOut, q.cableAt(i).fromOut);
+        TEST_ASSERT_EQUAL_UINT16(p.cableAt(i).toId, q.cableAt(i).toId);
+        TEST_ASSERT_EQUAL_UINT8(p.cableAt(i).toIn, q.cableAt(i).toIn);
+    }
+}
+
+void test_new_types_round_trip() {
+    Patch p;
+    const uint16_t mix = add(p, kMixType, 0), atn = add(p, kAtnType, 1), snh = add(p, kSnhType, 2),
+                   clk = add(p, kClkType, 3), mux = add(p, kMuxType, 4), dmx = add(p, kDmxType, 5),
+                   tilt = add(p, kTiltType, 6);
+    p.find(mix)->params[3] = 0.25f;
+    p.find(atn)->params[1] = -2.5f;
+    p.find(snh)->params[0] = 150.f;
+    p.find(clk)->params[0] = 97.f;
+    p.find(clk)->params[1] = 4.f;
+    p.find(mux)->params[1] = 1.f;
+    p.find(dmx)->params[0] = 2.f;
+    p.find(tilt)->params[0] = 30.f;
+    p.find(clk)->outAmount[1] = -0.5f;
+    TEST_ASSERT_EQUAL(PatchError::None, p.addCable(clk, 1, snh, 1));   // CLK.div -> S&H.trig
+    TEST_ASSERT_EQUAL(PatchError::None, p.addCable(tilt, 0, mux, 3));  // TILT.roll -> MUX.sel
+    TEST_ASSERT_EQUAL(PatchError::None, p.addCable(dmx, 2, mix, 3));   // DMX.c -> MIX.in4
+    Patch q;
+    const LoadReport r = patchFromJson(patchToJson(p), q, nullptr);
+    TEST_ASSERT_EQUAL(LoadError::None, r.error);
+    TEST_ASSERT_EQUAL(0, r.skippedModules + r.skippedCables);
+    expectSame(p, q);
+}
+
+void test_v1_patch_still_loads() {
+    // Written by the v1 firmware (8 types); must load unchanged after the registry grew.
+    const char* v1 =
+        "{\"format\":1,\"modules\":["
+        "{\"id\":1,\"type\":\"keys\",\"page\":0,\"cell\":0,\"params\":{\"oct\":1},\"amounts\":{}},"
+        "{\"id\":2,\"type\":\"osc\",\"page\":0,\"cell\":1,\"params\":{\"wave\":3},\"amounts\":{\"out\":0.5}},"
+        "{\"id\":3,\"type\":\"lfo\",\"page\":1,\"cell\":2,\"params\":{},\"amounts\":{}},"
+        "{\"id\":4,\"type\":\"out\",\"page\":0,\"cell\":11,\"params\":{},\"amounts\":{}}],"
+        "\"cables\":[{\"from\":[1,\"pitch\"],\"to\":[2,\"pitch\"],\"color\":0},"
+        "{\"from\":[2,\"out\"],\"to\":[4,\"in\"],\"color\":1}]}";
+    Patch q;
+    const LoadReport r = patchFromJson(v1, q, nullptr);
+    TEST_ASSERT_EQUAL(LoadError::None, r.error);
+    TEST_ASSERT_EQUAL(0, r.skippedModules + r.skippedCables);
+    TEST_ASSERT_EQUAL(4, q.moduleCount());
+    TEST_ASSERT_EQUAL(2, q.cableCount());
+    TEST_ASSERT_EQUAL_FLOAT(3.f, q.find(2)->params[0]);
+    TEST_ASSERT_EQUAL_FLOAT(0.5f, q.find(2)->outAmount[0]);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_slot_path);
@@ -260,5 +331,7 @@ int main() {
     RUN_TEST(test_size_bounds);
     RUN_TEST(test_id_range);
     RUN_TEST(test_budget_skip);
+    RUN_TEST(test_new_types_round_trip);
+    RUN_TEST(test_v1_patch_still_loads);
     return UNITY_END();
 }

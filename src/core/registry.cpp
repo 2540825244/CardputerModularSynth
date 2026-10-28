@@ -11,6 +11,7 @@
 #include "modules/mux.h"
 #include "modules/out.h"
 #include "modules/snh.h"
+#include "modules/tilt.h"
 #include "modules/osc.h"
 #include "modules/vca.h"
 #include "modules/vcf.h"
@@ -31,6 +32,7 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kClkType,
     &kMuxType,
     &kDmxType,
+    &kTiltType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {
