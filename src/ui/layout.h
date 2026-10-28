@@ -16,3 +16,7 @@ CellRef moduleCell(const ModuleTypeInfo&, uint8_t row, uint8_t col);
 // col 0. Row 0 holds the details of the selected type.
 int placeTypeAt(uint8_t row, uint8_t col);                  // index into allTypes(), -1 if none
 bool placeCellOf(int typeIdx, uint8_t* row, uint8_t* col);  // false if none or it doesn't fit a row
+
+// Module-view value strip: how much of top-row segment col (0..9, each 10% of the knob) is filled
+// for a value at norm 0..1, in 0..1. The last segment fills partly, so 35% shows 3.5 segments.
+float stripFill(float norm, int col);

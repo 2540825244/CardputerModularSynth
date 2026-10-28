@@ -46,3 +46,12 @@ bool placeCellOf(int typeIdx, uint8_t* row, uint8_t* col) {
     *col = (uint8_t)k;
     return true;
 }
+
+float stripFill(float norm, int col) {
+    if (col < 0 || col >= 10) return 0.f;
+    float f = norm * 10.f - (float)col;
+    // Snap float noise, so a value on a 10% step is exactly full with no sliver after it.
+    if (f < 1e-3f) return 0.f;
+    if (f > 1.f - 1e-3f) return 1.f;
+    return f;
+}

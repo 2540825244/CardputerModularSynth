@@ -1197,6 +1197,24 @@ void test_coarse_tap_during_sweep_ends_it() {
     TEST_ASSERT_EQUAL_FLOAT(coarse, m->params[0]);
 }
 
+// ---- value strip fill (owner, 2026-10-28: values between 10% steps must show truthfully) ----
+void test_strip_fill_partial_segment() {
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 1.f, stripFill(0.35f, 0));
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 1.f, stripFill(0.35f, 2));
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.5f, stripFill(0.35f, 3));
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 0.f, stripFill(0.35f, 4));
+}
+
+void test_strip_fill_ends() {
+    for (int c = 0; c < 10; c++) {
+        TEST_ASSERT_EQUAL_FLOAT(0.f, stripFill(0.f, c));
+        TEST_ASSERT_EQUAL_FLOAT(1.f, stripFill(1.f, c));
+    }
+    TEST_ASSERT_EQUAL_FLOAT(1.f, stripFill(0.4f, 3));  // exactly on a step: full, no sliver next
+    TEST_ASSERT_EQUAL_FLOAT(0.f, stripFill(0.4f, 4));
+    TEST_ASSERT_EQUAL_FLOAT(0.f, stripFill(0.5f, 10));  // MIN/DEF cells never fill
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1275,5 +1293,7 @@ int main() {
     RUN_TEST(test_ctrl_hold_pin_still_carries_in_module_view);
     RUN_TEST(test_select_during_sweep_ends_it);
     RUN_TEST(test_coarse_tap_during_sweep_ends_it);
+    RUN_TEST(test_strip_fill_partial_segment);
+    RUN_TEST(test_strip_fill_ends);
     return UNITY_END();
 }

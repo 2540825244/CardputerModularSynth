@@ -90,11 +90,12 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
     const Sel sel = selection(s, m);
     const int n = sel.spec ? (int)(sel.spec->max - sel.spec->min) + 1 : 0;
     const bool steppedCells = sel.spec && sel.spec->curve == Curve::Stepped && n <= 10;
-    const int filled = sel.spec ? (int)lroundf(paramToNorm(*sel.spec, sel.value) * 10.f) : 0;
+    const float norm = sel.spec ? paramToNorm(*sel.spec, sel.value) : 0.f;
     const int cur = sel.spec ? (int)lroundf(sel.value - sel.spec->min) : -1;
     for (int col = 0; col < kGridCols; col++) {
         const int x = cellX(col), y = cellY(0), w = cellW(col), h = cellH(0);
         bool on = false;
+        float fill = 0.f;  // knob segments: partial fill of the last one
         char lab[8] = "";
         uint8_t labCol = PFaint;
         if (col < 10) {
@@ -106,13 +107,19 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
                     labCol = PDim;
                 }
             } else {
-                on = sel.spec && col < filled;
+                fill = sel.spec ? stripFill(norm, col) : 0.f;
+                on = fill >= 0.5f;
                 snprintf(lab, sizeof lab, "%s", keyLabel(0, col));
             }
         } else {
             snprintf(lab, sizeof lab, "%s", col == 10 ? "MIN" : "DEF");
         }
-        cv.fillRect(x, y, w, h, on ? PAccent : PEmpty);
+        if (fill > 0.f && fill < 1.f) {
+            cv.fillRect(x, y, w, h, PEmpty);
+            cv.fillRect(x, y, (int)lroundf(w * fill), h, PAccent);
+        } else {
+            cv.fillRect(x, y, w, h, on ? PAccent : PEmpty);
+        }
         smallText(lab, x + w / 2, y + h - 7, on ? PBg : labCol);
     }
     char name[16], val[16];
