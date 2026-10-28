@@ -1351,6 +1351,7 @@ void test_chord_moves_without_opening() {
     f.place(TOsc, 1, 1);
     const uint16_t id = gPatch.findAt(0, 13)->id;
     f.down(1, 1);
+    f.t += 150;  // a chord, not a two-thumb rollover
     f.down(5, 3);
     f.send(KeyEvent::Hold, true, 1, 1, Side::Esc);
     f.up(5, 3);
@@ -1379,6 +1380,7 @@ void test_chord_swaps() {
     f.place(TVcf, 2, 1);
     const uint16_t o = gPatch.findAt(0, 13)->id, v = gPatch.findAt(0, 14)->id;
     f.down(1, 1);
+    f.t += 150;
     f.down(2, 1);
     f.up(2, 1);
     f.up(1, 1);
@@ -1469,6 +1471,7 @@ void test_chord_pins_patch() {
     Fx f;
     uint16_t id = openModule(f, TVcf, 0, 0);
     f.down(0, 3);  // OUT
+    f.t += 150;
     f.down(1, 2);  // CUT in
     f.up(1, 2);
     f.up(0, 3);
@@ -1832,6 +1835,64 @@ void test_latch_holds() {
     TEST_ASSERT_EQUAL_FLOAT(0.f, k->monitor(1));
 }
 
+
+// ---- v1.2 review round 1 ----
+void test_rollover_is_not_a_chord() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.down(1, 1);
+    f.down(5, 3);  // 10 ms later: two quick taps
+    f.up(1, 1);
+    f.up(5, 3);
+    TEST_ASSERT_NOT_NULL(gPatch.findAt(0, 13));
+    TEST_ASSERT_NULL(gPatch.findAt(0, 41));
+}
+
+void test_chord_pins_refused_leaves_no_carry() {
+    Fx f;
+    openModule(f, TVcf, 0, 0);
+    for (int k = 0; k < 2; k++) {  // the second time it is ALREADY PATCHED
+        f.down(0, 3);
+        f.t += 150;
+        f.down(1, 2);
+        f.up(1, 2);
+        f.up(0, 3);
+    }
+    TEST_ASSERT_EQUAL(1, gPatch.cableCount());
+    TEST_ASSERT_EQUAL_STRING("ALREADY PATCHED", f.ui.state().toast);
+    TEST_ASSERT_FALSE(f.ui.state().carry.active);
+}
+
+void test_play_page_ignores_unseen_release() {
+    Fx f;
+    f.place(TKeys, 0, 0);
+    f.hold(0, 0);  // the opening key is still down when PLAY opens
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
+    Module* k = f.eng.instance(gPatch.findAt(0, 0)->id);
+    float buf[kBlock];
+    f.down(5, 3);
+    f.eng.processBlock(buf);
+    f.up(0, 0);  // releasing the opening key must not end the note
+    f.eng.processBlock(buf);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, k->monitor(1));
+    f.up(5, 3);
+}
+
+void test_copy_at_module_limit_no_undo_step() {
+    Fx f;
+    for (int i = 0; i < kMaxModules; i++) gPatch.addModule(kVcaType, (uint8_t)(i / 12), (uint8_t)(i % 12), nullptr);
+    f.eng.apply(gPatch);
+    f.tap(0, 0);
+    f.side(Side::Ctrl);
+    const int undoBefore = gUndo.size();
+    f.sideDown(Side::Fn);
+    f.tap(5, 3);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(undoBefore, gUndo.size());
+    TEST_ASSERT_EQUAL_STRING("TOO MANY", f.ui.state().toast);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1955,5 +2016,9 @@ int main() {
     RUN_TEST(test_layout_switch_releases_notes);
     RUN_TEST(test_ctrl_space_octave);
     RUN_TEST(test_latch_holds);
+    RUN_TEST(test_rollover_is_not_a_chord);
+    RUN_TEST(test_chord_pins_refused_leaves_no_carry);
+    RUN_TEST(test_play_page_ignores_unseen_release);
+    RUN_TEST(test_copy_at_module_limit_no_undo_step);
     return UNITY_END();
 }

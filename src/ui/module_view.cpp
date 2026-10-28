@@ -136,8 +136,8 @@ void toggleBit(UiController& ui, const ModuleRec& m, CellRef c) {
     const ParamSpec& sp = m.type->params[c.index];
     const uint32_t v = (uint32_t)m.params[c.index] ^ (1u << c.bit);
     BitEdit e{m.id, c.index, paramClamp(sp, (float)v)};
-    ui.undoStack().breakCoalescing();
-    ui.edit(doSetBit, &e);
+    ui.editValue(doSetBit, &e, 0);  // key 0: every tap is its own undo step
+    ui.engine().setParam(m.id, c.index, e.value);
 }
 
 }  // namespace
@@ -234,6 +234,7 @@ bool moduleViewAction(UiController& ui, const Action& a) {
             if (s.carry.active || !fromPin || !toPin || from.kind == to.kind) break;
             pinAction(ui, *m, from.kind == CellKind::Out, from.index);
             pinAction(ui, *m, to.kind == CellKind::Out, to.index);
+            s.carry.active = false;  // a refused drop (already patched, full) must not leave a carry
             s.modCell = a.cell;
             return true;
         }

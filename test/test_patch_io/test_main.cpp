@@ -16,6 +16,7 @@
 #include "core/modules/mux.h"
 #include "core/modules/snh.h"
 #include "core/modules/tilt.h"
+#include "core/modules/mod.h"
 #include "core/patch_io.h"
 #include "core/registry.h"
 #include "core/storage.h"
@@ -216,7 +217,7 @@ void test_size_bounds() {
 
     Patch t = voice();
     Patch before = t;
-    std::string big = "{\"format\":1,\"junk\":\"" + std::string(20000, 'x') + "\",\"modules\":[]}";
+    std::string big = "{\"format\":1,\"junk\":\"" + std::string(kMaxPatchJson + 100, 'x') + "\",\"modules\":[]}";
     TEST_ASSERT_EQUAL(LoadError::BadJson, patchFromJson(big, t, nullptr).error);
     std::string deep = "{\"format\":1,\"modules\":" + std::string(500, '[') + std::string(500, ']') + "}";
     TEST_ASSERT_EQUAL(LoadError::BadJson, patchFromJson(deep, t, nullptr).error);
@@ -339,6 +340,28 @@ void test_inamounts_round_trip() {
     TEST_ASSERT_EQUAL_FLOAT(1.f, q.find(o)->inAmount[0]);
 }
 
+
+// v1.2 review: the widest patch (32 x SEQ, 16 params, every amount set, 64 cables) must save and load.
+void test_widest_patch_fits() {
+    Patch p;
+    uint16_t id[32];
+    for (int i = 0; i < 32; i++) TEST_ASSERT_EQUAL(PatchError::None, p.addModule(kSeqType, i / 12, i % 12, &id[i]));
+    for (int i = 0; i < 64; i++) TEST_ASSERT_EQUAL(PatchError::None, p.addCable(id[i % 32], (uint8_t)(i % 3), id[(i * 7 + 1) % 32], (uint8_t)(i % 2)));
+    for (int i = 0; i < 32; i++) {
+        ModuleRec* r = p.find(id[i]);
+        for (int k = 0; k < r->type->numParams; k++) r->params[k] = paramClamp(r->type->params[k], r->type->params[k].min + 0.123456789f);
+        for (int o = 0; o < kMaxOuts; o++) r->outAmount[o] = -0.123456789f;
+        for (int n = 0; n < kMaxIns; n++) r->inAmount[n] = -0.987654321f;
+    }
+    const std::string json = patchToJson(p);
+    TEST_ASSERT_TRUE(patchFits(json));
+    Patch q;
+    TEST_ASSERT_EQUAL(LoadError::None, patchFromJson(json, q, nullptr).error);
+    TEST_ASSERT_EQUAL(32, q.moduleCount());
+    TEST_ASSERT_EQUAL(64, q.cableCount());
+    TEST_ASSERT_FALSE(patchFits(std::string(kMaxPatchJson + 1, ' ')));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_slot_path);
@@ -356,5 +379,6 @@ int main() {
     RUN_TEST(test_v1_patch_still_loads);
     RUN_TEST(test_old_file_input_amounts_default);
     RUN_TEST(test_inamounts_round_trip);
+    RUN_TEST(test_widest_patch_fits);
     return UNITY_END();
 }

@@ -25,6 +25,7 @@ void run(UiController& ui) {
     const std::string path = slotPath(s.fileSlot + 1);
     if (s.filePage == kSave) {
         if (!ui.storage().available()) ui.toast("NO SD", ui.now());
+        else if (!patchFits(patchToJson(ui.patch()))) ui.toast("PATCH TOO BIG", ui.now());
         else if (ui.storage().write(path.c_str(), patchToJson(ui.patch()))) ui.toast("SAVED", ui.now());
         else ui.toast("SAVE FAILED", ui.now());
     } else {

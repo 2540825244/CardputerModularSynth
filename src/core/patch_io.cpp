@@ -8,7 +8,7 @@
 namespace {
 
 constexpr int kFormat = 1;
-constexpr size_t kMaxPatchJson = 16384;  // a full 32-module, 64-cable patch is about 12 KB
+
 constexpr int kMaxStoredId = 0xFEFF;     // keeps nextId from wrapping
 
 int findKey(const char* const* keys, int n, const char* k) {

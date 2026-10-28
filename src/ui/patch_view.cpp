@@ -54,6 +54,10 @@ void copyTo(UiController& ui, uint16_t id, int cell) {
         ui.toast("CELL TAKEN", ui.now());
         return;
     }
+    if (ui.patch().moduleCount() >= kMaxModules) {  // checked first: a failed edit would cost an undo step
+        ui.toast("TOO MANY", ui.now());
+        return;
+    }
     const Refusal r = ui.engine().canAdd(ui.patch(), *src->type);
     if (!r.ok) {
         ui.toast(r.reason, ui.now());

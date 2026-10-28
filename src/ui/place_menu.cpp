@@ -46,6 +46,10 @@ void place(UiController& ui) {
         ui.toast("CELL TAKEN", ui.now());
         return;
     }
+    if (ui.patch().moduleCount() >= kMaxModules) {
+        ui.toast("TOO MANY", ui.now());
+        return;
+    }
     Add a{&t, s.page, s.placeCell, PatchError::None};
     ui.edit(doAdd, &a);
     if (a.err != PatchError::None) {

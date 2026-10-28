@@ -6,9 +6,9 @@ Action make(Act a, int cell, const KeyEvent& e, int from = -1) { return Action{a
 int modIndex(Side s) { return s == Side::Fn ? 0 : (s == Side::Ctrl ? 1 : -1); }
 }  // namespace
 
-int GestureMapper::heldFree(int except) const {
+int GestureMapper::heldFree(int except, uint32_t nowMs) const {
     for (int c = 0; c < kCells; c++)
-        if (c != except && held_[c] && !activated_[c]) return c;
+        if (c != except && held_[c] && !activated_[c] && nowMs - downMs_[c] >= kChordMinMs) return c;
     return -1;
 }
 
@@ -26,11 +26,12 @@ void GestureMapper::consume(const KeyEvent& e) {
     }
 }
 
-int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool holdBlocked, bool raw, Action* out) {
+int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool holdBlocked, bool raw, Action* out, uint32_t nowMs) {
     const int cell = e.grid ? e.row * kGridCols + e.col : -1;
     if (e.grid && (cell < 0 || cell >= kCells)) return 0;
     const bool wasHeld = e.grid && held_[cell];
     if (e.grid) held_[cell] = e.type != KeyEvent::Up;
+    if (e.grid && e.type == KeyEvent::Down && !wasHeld) downMs_[cell] = nowMs;
     // Anything pressed while fn/ctrl is down uses that press up (it is no longer a lone tap).
     if (e.type == KeyEvent::Down && (e.grid || modIndex(e.side) < 0))
         for (int i = 0; i < 2; i++) modUsed_[i] = true;
@@ -44,7 +45,7 @@ int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool holdBlocked, bool ra
         switch (e.type) {
             case KeyEvent::Down: {
                 out[0] = make(Act::Select, cell, e);
-                const int from = wasHeld ? -1 : heldFree(cell);
+                const int from = wasHeld ? -1 : heldFree(cell, nowMs);
                 if (from >= 0) {
                     activated_[from] = activated_[cell] = true;
                     out[1] = make(Act::Chord, cell, e, from);
@@ -92,10 +93,11 @@ int GestureMapper::map(const KeyEvent& e, bool fnHeld, bool holdBlocked, bool ra
     const int mi = modIndex(e.side);
     if (mi < 0) return 1;
     if (e.type == KeyEvent::Down) {
+        modUsed_[1 - mi] = true;  // fn+ctrl: neither is a lone tap
         modDown_[mi] = true;
         bool anyGrid = false;  // a same-frame chord delivers the grid Down first
         for (int k = 0; k < kCells; k++) anyGrid |= held_[k];
-        modUsed_[mi] = anyGrid;
+        modUsed_[mi] = anyGrid || modDown_[1 - mi];
     } else if (e.type == KeyEvent::Hold) {
         modUsed_[mi] = true;
     } else {

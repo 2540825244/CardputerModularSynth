@@ -22,6 +22,8 @@ struct Action {
     int8_t from;   // Chord: the held cell, -1 otherwise
 };
 
+constexpr uint32_t kChordMinMs = 120;
+
 class GestureMapper {
    public:
     // holdBlocked: a grid hold does not do-it (the patch view's ctrl+module move).
@@ -29,7 +31,9 @@ class GestureMapper {
     // state is forgotten. Returns the number of actions written to out (<= 2).
     // A grid Down while another grid key is held and not yet activated emits Select + Chord (no
     // Activate, even with fn), and neither key's hold fires afterwards.
-    int map(const KeyEvent&, bool fnHeld, bool holdBlocked, bool raw, Action* out);
+    // nowMs: a held key only becomes a chord source after kChordMinMs, so two quick taps that
+    // overlap (thumb rollover) stay two selects.
+    int map(const KeyEvent&, bool fnHeld, bool holdBlocked, bool raw, Action* out, uint32_t nowMs = 0);
     // View changed: keys still held belong to the old view, so their hold/release do nothing;
     // a pending Enter is forgotten.
     void reset();
@@ -38,9 +42,10 @@ class GestureMapper {
    private:
     static constexpr int kCells = 48;
     bool held_[kCells] = {};
+    uint32_t downMs_[kCells] = {};
     bool activated_[kCells] = {};  // this press already did its do-it (or was consumed)
     bool enterDown_ = false, enterSwept_ = false;
     // fn / ctrl: down, and whether the press was used (a grid key, another side key, or its hold)
     bool modDown_[2] = {}, modUsed_[2] = {};
-    int heldFree(int except) const;  // a held, not activated grid cell other than `except`, or -1
+    int heldFree(int except, uint32_t nowMs) const;  // a chord source for a Down at nowMs, or -1
 };

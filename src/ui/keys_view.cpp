@@ -74,6 +74,7 @@ void playKey(UiController& ui, const KeyEvent& e) {
             ui.lastNote = note;
             k->noteOn(note);
         } else {
+            if (!(s.keysHeld & (1ull << bit))) return;  // pressed before this page opened
             s.keysHeld &= ~(1ull << bit);
             ui.notes.release(note);
             const int cur = ui.notes.current();

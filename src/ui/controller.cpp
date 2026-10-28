@@ -72,7 +72,7 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     const View before = s_.view;
     Action acts[2];
     const ViewDef& vd = viewDef(before);
-    const int n = mapper_.map(e, fnHeld(), ctrlHeld() && vd.ctrlBlocksHold, vd.rawKeys || onPlayPage(), acts);
+    const int n = mapper_.map(e, fnHeld(), ctrlHeld() && vd.ctrlBlocksHold, vd.rawKeys || onPlayPage(), acts, nowMs);
     for (int i = 0; i < n && s_.view == before; i++) {
         // A lone fn tap drops a carried cable in every view (the fn slot is lit while carrying).
         if (acts[i].act == Act::SideTap && acts[i].key.side == Side::Fn && s_.carry.active) {
@@ -134,7 +134,14 @@ void UiController::tick(uint32_t nowMs) {
     if (tilt_.active) return;  // no autosave mid-gesture
     if (!s_.dirty || (int32_t)(nowMs - s_.lastEditMs) < 2000) return;
     if (autosaveBackoff_ && (int32_t)(nowMs - autosaveRetryMs_) < 0) return;
-    if (storage_.available() && storage_.write(slotPath(0).c_str(), patchToJson(patch_))) {
+    const std::string json = patchToJson(patch_);
+    if (!patchFits(json)) {  // never write a file the loader would refuse
+        if (!autosaveWarned_) toast("PATCH TOO BIG", nowMs);
+        autosaveWarned_ = autosaveBackoff_ = true;
+        autosaveRetryMs_ = nowMs + 30000;
+        return;
+    }
+    if (storage_.available() && storage_.write(slotPath(0).c_str(), json)) {
         s_.dirty = false;
         autosaveBackoff_ = autosaveWarned_ = false;
         return;

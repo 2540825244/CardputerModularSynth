@@ -229,8 +229,10 @@ void test_consume_swallows_hold_and_enter_release() {
 // ---- v1.2: chord and side taps ----
 void test_chord_emits_from_held() {
     GestureMapper g;
-    g.map(G(KeyEvent::Down, 1, 1), false, false, false, A);
-    TEST_ASSERT_EQUAL(2, g.map(G(KeyEvent::Down, 4, 2), false, false, false, A));
+    g.map(G(KeyEvent::Down, 1, 1), false, false, false, A, 1000);
+    TEST_ASSERT_EQUAL(1, g.map(G(KeyEvent::Down, 6, 2), false, false, false, A, 1050));  // rollover, not a chord
+    g.map(G(KeyEvent::Up, 6, 2), false, false, false, A, 1060);
+    TEST_ASSERT_EQUAL(2, g.map(G(KeyEvent::Down, 4, 2), false, false, false, A, 1000 + kChordMinMs));
     TEST_ASSERT_EQUAL(Act::Select, A[0].act);
     TEST_ASSERT_EQUAL(28, A[0].cell);
     TEST_ASSERT_EQUAL(Act::Chord, A[1].act);
@@ -240,8 +242,8 @@ void test_chord_emits_from_held() {
 
 void test_chord_cancels_held_hold() {
     GestureMapper g;
-    g.map(G(KeyEvent::Down, 1, 1), false, false, false, A);
-    g.map(G(KeyEvent::Down, 4, 2), false, false, false, A);
+    g.map(G(KeyEvent::Down, 1, 1), false, false, false, A, 0);
+    g.map(G(KeyEvent::Down, 4, 2), false, false, false, A, kChordMinMs);
     TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 1, 1), false, false, false, A));
     TEST_ASSERT_EQUAL(0, g.map(G(KeyEvent::Hold, 4, 2), false, false, false, A));
 }
@@ -276,6 +278,11 @@ void test_fn_with_grid_no_side_tap() {
     g.map(G(KeyEvent::Down, 2, 2), true, false, false, A);
     g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A);
     g.map(G(KeyEvent::Up, 2, 2), true, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Fn), false, false, false, A));
+    // fn+ctrl: neither is a lone tap
+    g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A);
+    g.map(S(KeyEvent::Down, Side::Ctrl), true, false, false, A);
+    TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Ctrl), true, false, false, A));
     TEST_ASSERT_EQUAL(1, g.map(S(KeyEvent::Up, Side::Fn), false, false, false, A));
     // a long press is not a tap, nor is fn+tab
     g.map(S(KeyEvent::Down, Side::Fn), true, false, false, A);
