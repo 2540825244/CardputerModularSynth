@@ -14,6 +14,8 @@ constexpr int kStripW = 16, kGridX = 16, kGridW = 208;
 
 extern M5Canvas cv;
 extern uint32_t gNow;  // frame time, for pulsing
+extern int gTheme;     // 0 style B, 1 style A
+uint8_t categoryColor(Category);
 
 inline int cellX(int col) { return kGridX + col * kGridW / kGridCols; }
 inline int cellY(int row) { return row * kH / kGridRows; }
@@ -37,7 +39,7 @@ void drawSides(const UiState&, const Patch&, bool fnHeld);
 void drawHelp(const UiState&, const Patch&, bool fnHeld);  // fn-held overlay naming each side key
 void drawCarryStrip(const UiState&, const Patch&);          // patch view: thin "holding" banner
 void drawBars(float cpu, float ram);
-void drawToast(const char* msg);
+void drawToast(const char* msg, uint32_t shownAt);
 
 void drawPatchView(const UiState&, const Patch&, Engine&);
 void drawPlaceView(const UiState&, const Patch&, Engine&);

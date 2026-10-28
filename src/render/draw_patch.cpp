@@ -42,6 +42,12 @@ void drawPatchView(const UiState& s, const Patch& p, Engine& e) {
             Module* inst = e.instance(m->id);
             if (inst && m->type->icon == Icon::Lfo) dy = (int)lroundf(sinf(inst->monitor(0) * 6.2831853f));
             moduleTile(*m->type, col, row, false, dy);
+            if (inst && m->type->numOuts > 0 && m->type->icon != Icon::Out) {  // activity: |out| peak
+                float a = inst->peak() * (1.f / kAudioVolts);
+                a = a > 1.f ? 1.f : a;
+                const int h = (int)(a * (cellH(row) - 8) + 0.5f);
+                if (h > 0) cv.fillRect(cellX(col) + cellW(col) - 3, cellY(row) + cellH(row) - 3 - h, 2, h, PAccent);
+            }
             if (inst && m->type->icon == Icon::Out) {
                 float pk = inst->monitor(0);
                 pk = pk < 0.f ? 0.f : (pk > 1.f ? 1.f : pk);

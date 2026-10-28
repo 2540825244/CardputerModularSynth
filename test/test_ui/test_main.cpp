@@ -12,6 +12,7 @@
 #include "core/modules/vcf.h"
 #include "ui/controller.h"
 #include "ui/layout.h"
+#include "ui/anim.h"
 #include "ui/side_icons.h"
 
 void setUp() {}
@@ -1575,6 +1576,26 @@ void test_side_pressed_flash() {
     TEST_ASSERT_FALSE(sidePressed(f.ui.state(), kDel, down + 200));
 }
 
+
+// ---- v1.2 Task 6: animation helpers ----
+void test_ease_converges() {
+    float v = 0.f;
+    for (int i = 0; i < 40; i++) v = ease(v, 1.f, 33.f, 60.f);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, v);
+    TEST_ASSERT_TRUE(ease(0.f, 1.f, 33.f, 60.f) > 0.3f);
+    TEST_ASSERT_TRUE(ease(0.f, 1.f, 33.f, 60.f) < 0.6f);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, ease(0.f, 1.f, 0.f, 60.f));
+}
+
+void test_zoom_t_bounds() {
+    TEST_ASSERT_EQUAL_FLOAT(0.f, zoomT(1000, 1000));
+    TEST_ASSERT_EQUAL_FLOAT(1.f, zoomT(1000, 1000 + kZoomMs));
+    TEST_ASSERT_EQUAL_FLOAT(0.5f, zoomT(1000, 1000 + kZoomMs / 2));
+    TEST_ASSERT_EQUAL_FLOAT(1.f, zoomT(1000, 5000));
+    TEST_ASSERT_EQUAL_FLOAT(0.f, flashT(100, 300, 90));
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.5f, flashT(100, 145, 90));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1680,5 +1701,7 @@ int main() {
     RUN_TEST(test_icons_fn_held_redo);
     RUN_TEST(test_help_visible_after_fn_hold);
     RUN_TEST(test_side_pressed_flash);
+    RUN_TEST(test_ease_converges);
+    RUN_TEST(test_zoom_t_bounds);
     return UNITY_END();
 }

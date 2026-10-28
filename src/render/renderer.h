@@ -9,5 +9,7 @@
 bool renderBegin();
 // Full redraw into the sprite, then pushSprite. Call at <= 30 fps.
 void renderFrame(const UiState&, const Patch&, Engine&, Storage&, uint32_t nowMs, bool fnHeld);
+void renderSetTheme(int theme);  // 0 = style B (grey LCD), 1 = style A (dark)
+void renderSetBrightness(int level);  // 1..5
 // Sprite buffer bytes, for the RAM report.
 uint32_t renderSpriteBytes();

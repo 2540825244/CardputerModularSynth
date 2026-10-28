@@ -31,6 +31,7 @@ static void uiTask(void*) {
     uint32_t lastStatus = 0, lastDraw = 0;
     bool steadyPrinted = false;
     uint32_t lastTiltGen = 0;
+    bool inputPending = false;  // redraw soon after a key, not at the next 30 fps tick
     float rollAtStart = 0.f;
     KeyPos pressed[16];
     KeyEvent ev[16];
@@ -40,6 +41,7 @@ static void uiTask(void*) {
         int ne = 0;
         gDecoder.update(pressed, n, now, ev, &ne, 16);
         for (int i = 0; i < ne; i++) gUi.handle(ev[i], now);
+        if (ne > 0) inputPending = true;
         tiltPoll(now);
         if (tiltValid()) tiltPublish(tiltAngles().roll, tiltAngles().pitch);  // TILT modules
         if (gUi.tiltActive() && tiltValid()) {
@@ -51,8 +53,9 @@ static void uiTask(void*) {
             gUi.tilt(roll - rollAtStart);
         }
         gUi.tick(now);
-        if (now - lastDraw >= 33) {  // <= 30 fps, core 0 only
+        if (now - lastDraw >= 33 || (inputPending && now - lastDraw >= 12)) {  // core 0 only
             lastDraw = now;
+            inputPending = false;
             renderFrame(gUi.state(), gPatch, gEngine, gSd, now, gUi.fnHeld());
         }
         if (now - lastStatus >= 500) {

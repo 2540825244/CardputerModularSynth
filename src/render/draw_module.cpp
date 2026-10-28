@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "render_internal.h"
+#include "ui/anim.h"
 #include "ui/layout.h"
 
 namespace rd {
@@ -93,7 +94,16 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
     const Sel sel = selection(s, m);
     const int n = sel.spec ? (int)(sel.spec->max - sel.spec->min) + 1 : 0;
     const bool steppedCells = sel.spec && sel.spec->curve == Curve::Stepped && n <= 10;
-    const float norm = sel.spec ? paramToNorm(*sel.spec, sel.value) : 0.f;
+    // The fill eases to a new value (tau 60 ms); a new selection jumps.
+    static float shown = 0.f;
+    static int8_t shownCell = -1;
+    static uint32_t lastMs = 0;
+    const float target = sel.spec ? paramToNorm(*sel.spec, sel.value) : 0.f;
+    if (shownCell != s.modCell) shown = target;
+    else shown = ease(shown, target, (float)(gNow - lastMs), 60.f);
+    shownCell = s.modCell;
+    lastMs = gNow;
+    const float norm = shown;
     const int cur = sel.spec ? (int)lroundf(sel.value - sel.spec->min) : -1;
     for (int col = 0; col < kGridCols; col++) {
         const int x = cellX(col), y = cellY(0), w = cellW(col), h = cellH(0);
@@ -149,6 +159,11 @@ void paramCell(const ModuleRec& m, int col, int row, uint8_t idx, bool selected)
     paramFormat(sp, m.params[idx], val, sizeof val, false);
     smallText(sp.label, x + w / 2, y + h / 2 - 6, PText);
     smallText(val, x + w / 2, y + h / 2 + 2, PDim);
+    if (sp.curve != Curve::Stepped) {  // value bar along the bottom
+        const int bw = (int)lroundf((w - 4) * paramToNorm(sp, m.params[idx]));
+        cv.drawFastHLine(x + 2, y + h - 4, w - 4, PBorder);
+        if (bw > 0) cv.fillRect(x + 2, y + h - 5, bw, 2, PAccent);
+    }
     if (selected) outline(col, row, PAccent);
 }
 

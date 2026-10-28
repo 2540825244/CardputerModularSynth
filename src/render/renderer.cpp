@@ -2,12 +2,24 @@
 #include <stdio.h>
 #include <string.h>
 #include "core/patch_io.h"
+#include "ui/anim.h"
+#include "ui/layout.h"
 #include "render_internal.h"
 
 namespace rd {
 
 M5Canvas cv(&M5Cardputer.Display);
 uint32_t gNow = 0;
+int gTheme = 0;
+
+uint8_t categoryColor(Category c) {
+    if (!gTheme) return PText;
+    switch (c) {
+        case Category::Source: return PAccent;
+        case Category::Modulator: return PSpare0;
+        default: return PSpare1;
+    }
+}
 
 void drawIcon(Ic ic, int x, int y, uint8_t color) {
     const uint16_t* rows = kIcons[(int)ic];
@@ -80,7 +92,8 @@ void outline(int col, int row, uint8_t color) {
 void moduleTile(const ModuleTypeInfo& t, int col, int row, bool dim, int iconDy) {
     const int x = cellX(col), y = cellY(row), w = cellW(col);
     const uint8_t fg = dim ? PFaint : PText;
-    cv.fillRect(x + 2, y + 2, w - 4, 2, dim ? PFaint : PText);  // category bar
+    if (gTheme) cv.fillRect(x, y, w, cellH(row), PEmpty);
+    cv.fillRect(x + 2, y + 2, w - 4, 2, dim ? PFaint : categoryColor(t.category));  // category bar
     drawIcon(t.icon, x + (w - 12) / 2, y + 8 + iconDy, fg);
     smallText(t.name, x + w / 2, y + 22, fg);
 }
@@ -162,13 +175,49 @@ void drawBars(float cpu, float ram) {
     bar(kW - 2, ram);
 }
 
-void drawToast(const char* msg) {
+// Slides down from above the screen over the first 100 ms.
+void drawToast(const char* msg, uint32_t shownAt) {
     if (!msg[0]) return;
-    cv.fillRect(kGridX + 2, 2, kGridW - 4, 14, PAccent);
+    const float t = 1.f - flashT(shownAt, gNow, 100);
+    const int y = -14 + (int)(16.f * t);
+    cv.fillRoundRect(kGridX + 2, y, kGridW - 4, 14, 3, PAccent);
     cv.setFont(&fonts::Font0);
     cv.setTextColor(PBg);
     cv.setTextDatum(textdatum_t::middle_center);
-    cv.drawString(msg, kGridX + kGridW / 2, 9);
+    cv.drawString(msg, kGridX + kGridW / 2, y + 7);
+}
+
+// Zoom outline between a tile and the whole grid when a module view opens or closes.
+void drawZoom(const UiState& s, const Patch& p) {
+    const float z = zoomT(s.viewMs, gNow);
+    if (z >= 1.f || s.viewMs == 0) return;
+    const bool opening = s.view == View::Module && s.prevView == View::Patch;
+    const bool closing = s.view == View::Patch && s.prevView == View::Module;
+    const bool placing = s.view == View::Place && s.prevView == View::Patch;
+    if (!opening && !closing && !placing) return;
+    int cell = s.selCell;
+    if (opening || closing)
+        if (const ModuleRec* m = p.find(s.openId))
+            if (m->page == s.page) cell = m->cell;
+    if (placing) cell = s.placeCell;
+    if (cell < 0) return;
+    const int col = cell % kGridCols, row = cell / kGridCols;
+    const float a = closing ? 1.f - z : z;  // 0 = tile, 1 = grid
+    const int x0 = cellX(col), y0 = cellY(row), w0 = cellW(col), h0 = cellH(row);
+    const int x = x0 + (int)((kGridX - x0) * a), y = y0 + (int)((0 - y0) * a);
+    const int w = w0 + (int)((kGridW - w0) * a), h = h0 + (int)((kH - h0) * a);
+    cv.drawRect(x, y, w, h, PAccent);
+    cv.drawRect(x + 1, y + 1, w - 2, h - 2, PAccent);
+}
+
+// A grid key flashes its cell for 90 ms after its Down.
+void drawPressFlash(const UiState& s, bool playPage) {
+    if (s.pressCell < 0 || playPage) return;
+    const float f = flashT(s.pressMs, gNow, 90);
+    if (f <= 0.f) return;
+    const int col = s.pressCell % kGridCols, row = s.pressCell / kGridCols;
+    const int inset = (int)((1.f - f) * 4.f);
+    cv.drawRect(cellX(col) + inset, cellY(row) + inset, cellW(col) - 2 * inset, cellH(row) - 2 * inset, PAccent);
 }
 
 }  // namespace rd
@@ -176,13 +225,25 @@ void drawToast(const char* msg) {
 static bool g_ready = false;
 static uint32_t g_spriteBytes = 0;
 
+void renderSetTheme(int theme) {
+    rd::gTheme = theme ? 1 : 0;
+    const uint32_t* pal = rd::gTheme ? kStyleA : kStyleB;
+    for (int i = 0; i < 16; i++) {
+        const uint32_t c = pal[i];
+        rd::cv.setPaletteColor(i, (uint8_t)(c >> 16), (uint8_t)(c >> 8), (uint8_t)c);
+    }
+}
+
+void renderSetBrightness(int level) {
+    level = level < 1 ? 1 : (level > 5 ? 5 : level);
+    static const uint8_t kLevels[] = {30, 70, 120, 180, 255};
+    M5Cardputer.Display.setBrightness(kLevels[level - 1]);
+}
+
 bool renderBegin() {
     rd::cv.setColorDepth(4);
     if (!rd::cv.createSprite(rd::kW, rd::kH)) return false;
-    for (int i = 0; i < 16; i++) {
-        const uint32_t c = kStyleB[i];
-        rd::cv.setPaletteColor(i, (uint8_t)(c >> 16), (uint8_t)(c >> 8), (uint8_t)c);
-    }
+    renderSetTheme(0);
     g_spriteBytes = (rd::kW * rd::kH + 1) / 2;
     g_ready = true;
     return true;
@@ -211,11 +272,14 @@ void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint3
         case View::File: drawFileView(s, filled); break;
         case View::Module: drawModuleView(s, p, e); break;
     }
+    drawPressFlash(s, s.view == View::Module && p.find(s.openId) &&
+                          modulePageKind(*p.find(s.openId)->type, s.modPage) == PageKind::Play);
+    drawZoom(s, p);
     drawSides(s, p, fnHeld);
     if (s.view == View::Patch && s.carry.active) drawCarryStrip(s, p);
     if (helpVisible(s, nowMs)) drawHelp(s, p, fnHeld);
     const float total = (float)heap_caps_get_total_size(MALLOC_CAP_8BIT);
     drawBars(e.cpuLoad(), total > 0 ? 1.f - heap_caps_get_free_size(MALLOC_CAP_8BIT) / total : 0.f);
-    if (s.toast[0] && (int32_t)(nowMs - s.toastUntilMs) < 0) drawToast(s.toast);
+    if (s.toast[0] && (int32_t)(nowMs - s.toastUntilMs) < 0) drawToast(s.toast, s.toastUntilMs - 1500);
     cv.pushSprite(0, 0);
 }
