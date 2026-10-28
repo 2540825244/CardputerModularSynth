@@ -23,6 +23,7 @@
 #include "core/modules/selector.h"
 #include "core/modules/tilt.h"
 #include "core/modules/fx.h"
+#include "core/modules/proc.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
 
@@ -960,6 +961,148 @@ void test_psh_octave_up() {
     delete m;
 }
 
+
+// ---- v1.2 Task 9: processors ----
+// Runs `t` with a sine of `hz` / `volts` on input 0 (and `in1` held on input 1), returns out `o`.
+static std::vector<float> runSine(const ModuleTypeInfo& t, float hz, float volts, int blocks, int o = 0,
+                                  float in1 = 0.f, bool in1On = false, const float* params = nullptr) {
+    Module* m = t.create();
+    if (params)
+        for (int i = 0; i < t.numParams; i++) m->setParam(i, params[i]);
+    static float b0[kBlock], b1[kBlock];
+    const float* ins[kMaxIns] = {b0, b1, b1, b1, b1, b1, b1, b1};
+    bool c[kMaxIns] = {true, in1On};
+    std::vector<float> r;
+    float ph = 0.f;
+    for (int blk = 0; blk < blocks; blk++) {
+        for (int k = 0; k < kBlock; k++) {
+            b0[k] = volts * sinf(ph);
+            ph += 6.2831853f * hz / kSampleRate;
+            b1[k] = in1;
+        }
+        m->process(ins, c);
+        r.insert(r.end(), m->out(o), m->out(o) + kBlock);
+    }
+    delete m;
+    return r;
+}
+
+void test_lad_lowpasses() {
+    const float lo = rms(runSine(kLadType, 100.f, 2.f, 300), 4800);
+    const float hi = rms(runSine(kLadType, 8000.f, 2.f, 300), 4800);
+    TEST_ASSERT_TRUE(lo > 0.5f);
+    TEST_ASSERT_TRUE(hi < lo * 0.1f);
+}
+
+void test_vcf_bp_mode() {
+    const float p[] = {1000.f, 0.2f, 2.f, 0.f};
+    const float mid = rms(runSine(kVcfType, 1000.f, 2.f, 300, 0, 0.f, false, p), 4800);
+    const float low = rms(runSine(kVcfType, 50.f, 2.f, 300, 0, 0.f, false, p), 4800);
+    TEST_ASSERT_TRUE(mid > low * 4.f);
+}
+
+void test_fld_folds_above_threshold() {
+    const float p[] = {6.f, 0.f};
+    std::vector<float> y = runSine(kFldType, 100.f, 5.f, 100, 0, 0.f, false, p);
+    float mx = 0.f;
+    for (float v : y) mx = fabsf(v) > mx ? fabsf(v) : mx;
+    TEST_ASSERT_TRUE(mx <= 5.01f);
+    // folding adds zero crossings: many more than the input's 2 per cycle
+    TEST_ASSERT_TRUE(crossingHz(y) > 300.f);
+}
+
+void test_cru_quantizes() {
+    const float p[] = {2.f, 48000.f, 1.f};
+    std::vector<float> y = runSine(kCruType, 100.f, 5.f, 50, 0, 0.f, false, p);
+    for (float v : y) {
+        const float q = v / 2.5f;  // 2 bits: steps of 2.5 V
+        TEST_ASSERT_FLOAT_WITHIN(1e-3f, roundf(q), q);
+    }
+}
+
+void test_lpg_closes_after_decay() {
+    Module* m = kLpgType.create();
+    m->setParam(0, 50.f);
+    static float b0[kBlock], tr[kBlock];
+    const float* ins[3] = {b0, b0, tr};
+    bool c[3] = {true, false, true};
+    for (int k = 0; k < kBlock; k++) b0[k] = (k % 16 < 8) ? 4.f : -4.f;
+    constBlock(tr, 5.f);
+    m->process(ins, c);
+    constBlock(tr, 0.f);
+    for (int i = 0; i < 4; i++) m->process(ins, c);
+    float early = 0.f;
+    for (int k = 0; k < kBlock; k++) early += fabsf(m->out(0)[k]);
+    for (int i = 0; i < 600; i++) m->process(ins, c);
+    float late = 0.f;
+    for (int k = 0; k < kBlock; k++) late += fabsf(m->out(0)[k]);
+    TEST_ASSERT_TRUE(early > 10.f);
+    TEST_ASSERT_TRUE(late < early * 0.01f);
+    delete m;
+}
+
+void test_ring_multiplies() {
+    Module* m = kRingType.create();
+    static float a[kBlock], b[kBlock];
+    constBlock(a, 2.f);
+    constBlock(b, -2.5f);
+    const float* ins[2] = {a, b};
+    bool c[2] = {true, true};
+    m->process(ins, c);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, -1.f, m->out(0)[0]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, -0.5f, m->out(1)[0]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 2.f, m->out(2)[0]);
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, -2.5f, m->out(3)[0]);
+    delete m;
+}
+
+void test_xfd_ends() {
+    const float p0[] = {0.f}, p1[] = {1.f};
+    Module* m = kXfdType.create();
+    static float a[kBlock], b[kBlock];
+    constBlock(a, 1.f);
+    constBlock(b, 3.f);
+    const float* ins[3] = {a, b, b};
+    bool c[3] = {true, true, false};
+    m->setParam(0, p0[0]);
+    for (int i = 0; i < 50; i++) m->process(ins, c);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 1.f, m->out(0)[kBlock - 1]);
+    m->setParam(0, p1[0]);
+    for (int i = 0; i < 50; i++) m->process(ins, c);
+    TEST_ASSERT_FLOAT_WITHIN(1e-3f, 3.f, m->out(0)[kBlock - 1]);
+    delete m;
+}
+
+void test_dyn_reduces_loud() {
+    const float p[] = {-20.f, 10.f, 1.f, 100.f, 0.f};
+    const float loud = rms(runSine(kDynType, 200.f, 5.f, 300, 0, 0.f, false, p), 4800);
+    const float quiet = rms(runSine(kDynType, 200.f, 0.2f, 300, 0, 0.f, false, p), 4800);
+    TEST_ASSERT_TRUE(loud / quiet < 25.f * 0.5f);  // input ratio is 25
+    TEST_ASSERT_TRUE(rms(runSine(kDynType, 200.f, 5.f, 300, 1, 0.f, false, p), 4800) > 0.5f);  // GR out
+}
+
+void test_enf_tracks_level() {
+    std::vector<float> e = runSine(kEnfType, 200.f, 4.f, 200);
+    TEST_ASSERT_TRUE(e.back() > 2.f && e.back() < 4.5f);
+    std::vector<float> g = runSine(kEnfType, 200.f, 4.f, 200, 1);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, g.back());
+}
+
+void test_slw_rise_time() {
+    Module* m = kSlwType.create();
+    m->setParam(0, 100.f);  // 10 V per 100 ms
+    static float a[kBlock];
+    constBlock(a, 5.f);
+    const float* ins[1] = {a};
+    bool c[1] = {true};
+    const int half = (int)(0.05f * kSampleRate / kBlock);  // 50 ms -> 5 V
+    for (int i = 0; i < half / 2; i++) m->process(ins, c);
+    TEST_ASSERT_FLOAT_WITHIN(0.2f, 2.5f, m->out(0)[kBlock - 1]);
+    for (int i = 0; i < half; i++) m->process(ins, c);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 5.f, m->out(0)[kBlock - 1]);
+    delete m;
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -1014,5 +1157,15 @@ int main() {
     RUN_TEST(test_rev_tail_decays);
     RUN_TEST(test_pool_shared_dly_rev);
     RUN_TEST(test_psh_octave_up);
+    RUN_TEST(test_lad_lowpasses);
+    RUN_TEST(test_vcf_bp_mode);
+    RUN_TEST(test_fld_folds_above_threshold);
+    RUN_TEST(test_cru_quantizes);
+    RUN_TEST(test_lpg_closes_after_decay);
+    RUN_TEST(test_ring_multiplies);
+    RUN_TEST(test_xfd_ends);
+    RUN_TEST(test_dyn_reduces_loud);
+    RUN_TEST(test_enf_tracks_level);
+    RUN_TEST(test_slw_rise_time);
     return UNITY_END();
 }

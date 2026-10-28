@@ -2,6 +2,7 @@
 #include <cstring>
 #include "modules/dly.h"
 #include "modules/fx.h"
+#include "modules/proc.h"
 #include "modules/dmx.h"
 #include "modules/env.h"
 #include "modules/keys.h"
@@ -41,6 +42,18 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kPhaType,
     &kTrmType,
     &kPshType,
+    // v1.2 processors and utilities
+    &kLadType,
+    &kFldType,
+    &kOvdType,
+    &kCruType,
+    &kLpgType,
+    &kRingType,
+    &kXfdType,
+    &kDynType,
+    &kAwhType,
+    &kEnfType,
+    &kSlwType,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {

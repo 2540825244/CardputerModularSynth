@@ -350,6 +350,9 @@ void test_enter_cycles_enum() {
     f.side(Side::Enter);
     TEST_ASSERT_EQUAL_FLOAT(1.f, gPatch.find(id)->params[2]);
     f.side(Side::Enter);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL_FLOAT(3.f, gPatch.find(id)->params[2]);  // LP HP BP NOT
+    f.side(Side::Enter);
     TEST_ASSERT_EQUAL_FLOAT(0.f, gPatch.find(id)->params[2]);
 }
 

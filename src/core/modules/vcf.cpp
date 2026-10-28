@@ -9,11 +9,11 @@ enum { kCutoff, kRes, kMode, kDrive };
 enum { kInIn, kInCut, kInRes };
 constexpr int kStep = 8;  // SetFreq/SetRes cadence in samples
 
-const char* const kModeNames[] = {"LP", "HP"};
+const char* const kModeNames[] = {"LP", "HP", "BP", "NOT"};
 const ParamSpec kParams[] = {
     {"cutoff", "CUT", 20.f, 20000.f, 1200.f, Curve::Log, Unit::Hz, nullptr},
     {"res", "RES", 0.f, 1.f, 0.2f, Curve::Lin, Unit::Percent, nullptr},
-    {"mode", "MOD", 0.f, 1.f, 0.f, Curve::Stepped, Unit::Enum, kModeNames},
+    {"mode", "MOD", 0.f, 3.f, 0.f, Curve::Stepped, Unit::Enum, kModeNames},
     {"drive", "DRV", 0.f, 1.f, 0.f, Curve::Lin, Unit::Percent, nullptr},
 };
 const char* const kInKeys[] = {"in", "cut", "res"};
@@ -39,7 +39,7 @@ class Vcf : public Module {
             slew_.y = cutVolts_;
         }
         const float res0 = param(kRes);
-        const bool hp = param(kMode) >= 0.5f;
+        const int mode = (int)(param(kMode) + 0.5f);
         svf_.SetDrive(param(kDrive));
         const float* in = connected[kInIn] ? ins[kInIn] : nullptr;
         const float* cut = connected[kInCut] ? ins[kInCut] : nullptr;
@@ -59,7 +59,8 @@ class Vcf : public Module {
             svf_.SetFreq(hz);
             for (int j = i; j < i + kStep; j++) {
                 svf_.Process(in ? in[j] * 0.2f : 0.f);
-                o[j] = (hp ? svf_.High() : svf_.Low()) * kAudioVolts;
+                const float y = mode == 1 ? svf_.High() : (mode == 2 ? svf_.Band() : (mode == 3 ? svf_.Notch() : svf_.Low()));
+                o[j] = y * kAudioVolts;
             }
         }
         setMonitor(0, hz);
@@ -78,6 +79,6 @@ Module* create() { return new Vcf(); }
 }  // namespace
 
 const ModuleTypeInfo kVcfType = {
-    "vcf", "VCF", "12 dB LP/HP filter, cutoff CV", Category::Processor, Icon::Vcf,
+    "vcf", "VCF", "12 dB LP/HP/BP/notch filter", Category::Processor, Icon::Vcf,
     Drawing::FilterCurve, 4, kParams, 3, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     45, sizeof(Vcf) + kBlock * sizeof(float), 0, create};

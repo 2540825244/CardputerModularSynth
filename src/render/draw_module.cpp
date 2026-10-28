@@ -218,7 +218,7 @@ void drawFilterCurve(const ModuleRec& m, Module* inst, int x, int y, int w, int 
     const float res = inst ? inst->monitor(1) : m.params[1];
     float q = 1.f / (2.f * (1.f - powf(res < 0.f ? 0.f : res, 0.25f)));
     q = q > 20.f ? 20.f : q;
-    const bool hp = m.params[2] >= 0.5f;
+    const int mode = (int)(m.params[2] + 0.5f);
     auto fx = [&](float f) { return x + (int)(log10f(f / 20.f) / 3.f * (w - 1)); };
     for (float f : {100.f, 1000.f, 10000.f}) cv.drawFastVLine(fx(f), y, h, PBorder);
     int prev = 0;
@@ -227,7 +227,9 @@ void drawFilterCurve(const ModuleRec& m, Module* inst, int x, int y, int w, int 
         const float r = f / fc, r2 = r * r;
         const float d = 1.f - r2;
         float mag = 1.f / sqrtf(d * d + (r / q) * (r / q));
-        if (hp) mag *= r2;
+        if (mode == 1) mag *= r2;
+        else if (mode == 2) mag *= r / q;
+        else if (mode == 3) mag *= fabsf(d);
         const float db = 20.f * log10f(mag + 1e-6f);
         int yy = y + (int)((12.f - db) / 60.f * h);
         yy = yy < y ? y : (yy > y + h - 1 ? y + h - 1 : yy);
@@ -236,7 +238,8 @@ void drawFilterCurve(const ModuleRec& m, Module* inst, int x, int y, int w, int 
     }
     const int xc = fx(fc < 20.f ? 20.f : (fc > 20000.f ? 20000.f : fc));
     for (int j = 0; j < h; j += 4) cv.drawFastVLine(xc, y + j, 2, PAccent);
-    smallText(hp ? "HP 12DB" : "LP 12DB", x + 18, y + h - 8, PDim);
+    static const char* const kModes[] = {"LP 12DB", "HP 12DB", "BP 12DB", "NOTCH"};
+    smallText(kModes[mode < 0 ? 0 : (mode > 3 ? 3 : mode)], x + 18, y + h - 8, PDim);
 }
 
 void drawEnvelope(const ModuleRec& m, Module* inst, int x, int y, int w, int h) {
