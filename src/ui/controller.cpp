@@ -162,7 +162,11 @@ void UiController::tick(uint32_t nowMs) {
     if (autosaveBackoff_ && (int32_t)(nowMs - autosaveRetryMs_) < 0) return;
     const std::string json = patchToJson(patch_);
     if (json.empty()) {  // out of heap: keep dirty, try again later
-        if (!autosaveWarned_) toast("NO RAM", nowMs);
+        // Said again every 30 s: edits since the last good save are lost at power-off.
+        if (!autosaveWarned_ || (int32_t)(nowMs - autosaveWarnMs_) >= 30000) {
+            toast("NOT SAVED: NO RAM", nowMs);
+            autosaveWarnMs_ = nowMs;
+        }
         autosaveWarned_ = autosaveBackoff_ = true;
         autosaveRetryMs_ = nowMs + 5000;
         return;

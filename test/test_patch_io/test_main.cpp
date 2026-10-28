@@ -256,6 +256,18 @@ void test_budget_skip() {
     TEST_ASSERT_EQUAL(1, r.skippedModules);
 }
 
+void test_load_keeps_cpu_heavy_patch() {
+    std::string json = "{\"format\":1,\"modules\":[{\"id\":1,\"type\":\"grd\",\"page\":0,\"cell\":0}";
+    for (int i = 0; i < 8; i++)
+        json += ",{\"id\":" + std::to_string(i + 2) + ",\"type\":\"str\",\"page\":0,\"cell\":" + std::to_string(i + 1) + "}";
+    json += "],\"cables\":[]}";
+    Engine eng(bigHeap);
+    Patch p;
+    const LoadReport r = patchFromJson(json, p, &eng);  // GRD 2400 + 8 x STR 260 > the 4000 budget
+    TEST_ASSERT_EQUAL(0, r.skippedModules);
+    TEST_ASSERT_EQUAL(9, p.moduleCount());
+}
+
 static void expectSame(const Patch& p, const Patch& q) {
     TEST_ASSERT_EQUAL(p.moduleCount(), q.moduleCount());
     for (int i = 0; i < p.moduleCount(); i++) {
@@ -375,6 +387,7 @@ int main() {
     RUN_TEST(test_size_bounds);
     RUN_TEST(test_id_range);
     RUN_TEST(test_budget_skip);
+    RUN_TEST(test_load_keeps_cpu_heavy_patch);
     RUN_TEST(test_new_types_round_trip);
     RUN_TEST(test_v1_patch_still_loads);
     RUN_TEST(test_old_file_input_amounts_default);

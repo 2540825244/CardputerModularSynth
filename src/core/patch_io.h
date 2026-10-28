@@ -22,9 +22,9 @@ struct LoadReport {
     LoadError error;
     int skippedModules;
     int skippedCables;
-    const char* skippedType;  // the first type the budget refused (NO CPU / RAM), or nullptr
+    const char* skippedType;  // the first type the budget refused (NO BUFFER / MAX 1), or nullptr
 };
 
-// `out` is untouched unless error == None. `budget` (optional) vetoes modules via canAdd() against
-// the partially built patch.
+// `out` is untouched unless error == None. `budget` (optional) vetoes modules via canLoad() against
+// the partially built patch (pool slots, instance counts; never CPU or RAM).
 LoadReport patchFromJson(const std::string&, Patch& out, const Engine* budget);

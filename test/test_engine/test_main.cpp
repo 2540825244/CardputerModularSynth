@@ -76,6 +76,8 @@ Counted::Counted() : Module(kCountedType) {}
 
 static uint32_t bigHeap() { return 1000000; }
 static uint32_t smallHeap() { return 10 * 1024; }
+static uint32_t gHeap = 0;
+static uint32_t setHeap() { return gHeap; }
 
 static uint16_t add(Patch& p, const ModuleTypeInfo& t, int cell) {
     uint16_t id = 0;
@@ -316,6 +318,86 @@ void test_budget() {
     TEST_ASSERT_EQUAL_STRING("NO CPU", r.reason);
 }
 
+void test_load_never_skips_for_ram() {
+    // A file's module is never dropped for RAM: it waits in the patch until the heap has room.
+    gHeap = 0;
+    Engine eng(setHeap);
+    Patch p;
+    TEST_ASSERT_TRUE(eng.canLoad(p, kOscType).ok);
+    const uint16_t o = add(p, kOscType, 0);
+    TEST_ASSERT_EQUAL(1, eng.apply(p));  // below the reserve: not created
+    TEST_ASSERT_NULL(eng.instance(o));
+    gHeap = 1000000;
+    for (int i = 0; i < 64; i++) eng.collect();
+    TEST_ASSERT_NOT_NULL(eng.instance(o));
+    TEST_ASSERT_EQUAL(0, eng.missing());
+}
+
+void test_load_skips_no_cpu() {
+    // A patch built against the live load must reload whole: only pool slots and MAX 1 skip.
+    Engine eng(bigHeap);
+    Patch q;
+    ModuleTypeInfo heavy = kDcType;
+    heavy.cpuCycles = 3000;
+    q.addModule(heavy, 0, 0, nullptr);
+    TEST_ASSERT_EQUAL_STRING("NO CPU", eng.canAdd(q, heavy).reason);
+    TEST_ASSERT_TRUE(eng.canLoad(q, heavy).ok);
+    add(q, kDlyType, 1);
+    add(q, kDlyType, 2);
+    TEST_ASSERT_EQUAL_STRING("NO BUFFER", eng.canLoad(q, kDlyType).reason);  // only two exist
+}
+
+void test_live_cpu_is_measured_load() {
+    // The per-type sum (each type's worst moment) refuses; the measured load has room.
+    Engine eng(bigHeap);
+    Patch q;
+    ModuleTypeInfo heavy = kDcType;
+    heavy.cpuCycles = 2500;
+    q.addModule(heavy, 0, 0, nullptr);
+    TEST_ASSERT_EQUAL_STRING("NO CPU", eng.canAdd(q, heavy).reason);
+    eng.setCpuLoad(0.2f);  // 1000 cycles measured
+    TEST_ASSERT_TRUE(eng.canAddLive(q, heavy).ok);
+    eng.setCpuLoad(0.4f);
+    TEST_ASSERT_EQUAL_STRING("NO CPU", eng.canAddLive(q, heavy).reason);
+}
+
+void test_replaced_dly_waits_for_static_slot() {
+    // A new DLY must not take the 96 KB heap slot while its retired predecessor still holds the
+    // static one: it is missing for one collect(), then lands in the static slot.
+    Engine eng(bigHeap);
+    Patch a;
+    add(a, kDlyType, 0);
+    TEST_ASSERT_EQUAL(0, eng.apply(a));
+    run(eng, 2);
+    Patch b;
+    b.nextId = 50;
+    const uint16_t d = add(b, kDlyType, 0);
+    TEST_ASSERT_EQUAL(1, eng.apply(b));
+    TEST_ASSERT_NULL(eng.instance(d));
+    run(eng, 3);
+    TEST_ASSERT_NOT_NULL(eng.instance(d));
+    TEST_ASSERT_EQUAL_INT(0, delayPoolStaticFree());
+    TEST_ASSERT_EQUAL_INT(1, delayPoolFree());  // the heap slot was never taken
+    eng.apply(Patch());
+    run(eng, 3);
+}
+
+void test_second_delay_slot_is_heap() {
+    // The first DLY/REV takes the static slot; the second needs a 96 KB heap block.
+    gHeap = kRamReserve + 50 * 1024;
+    Engine eng(setHeap);
+    Patch p;
+    TEST_ASSERT_TRUE(eng.canAdd(p, kDlyType).ok);
+    add(p, kDlyType, 0);
+    TEST_ASSERT_EQUAL_STRING("NO RAM", eng.canAdd(p, kDlyType).reason);
+    gHeap = kRamReserve + kDelaySlotBytes + 1024;
+    TEST_ASSERT_TRUE(eng.canAdd(p, kDlyType).ok);
+    eng.setLargestBlock(tinyBlock);
+    TEST_ASSERT_EQUAL_STRING("NO RAM", eng.canAddLive(p, kDlyType).reason);
+    TEST_ASSERT_EQUAL_UINT32(0, delayPoolHeapBytes(0, 1));
+    TEST_ASSERT_EQUAL_UINT32(kDelaySlotBytes, delayPoolHeapBytes(1, 1));
+}
+
 void test_apply_param_change_keeps_state() {
     Patch p;
     uint16_t o = add(p, kOscType, 0), out = add(p, kOutType, 1);
@@ -479,5 +561,10 @@ int main() {
     RUN_TEST(test_input_amount_scales_sum);
     RUN_TEST(test_input_amount_default_one);
     RUN_TEST(test_peak_meter);
+    RUN_TEST(test_load_never_skips_for_ram);
+    RUN_TEST(test_load_skips_no_cpu);
+    RUN_TEST(test_live_cpu_is_measured_load);
+    RUN_TEST(test_replaced_dly_waits_for_static_slot);
+    RUN_TEST(test_second_delay_slot_is_heap);
     return UNITY_END();
 }

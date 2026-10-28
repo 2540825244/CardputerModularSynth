@@ -144,7 +144,7 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
             continue;
         }
         const int id = m["id"].as<int>(), page = m["page"].as<int>(), cell = m["cell"].as<int>();
-        if (budget && !budget->canAdd(scratch, *t).ok) {
+        if (budget && !budget->canLoad(scratch, *t).ok) {
             if (!rep.skippedType) rep.skippedType = t->name;
             rep.skippedModules++;
             continue;

@@ -350,7 +350,8 @@ just map keys to virtual midi/oct/gate/etc out".
   - each module type declares an approximate CPU cost and RAM need
   - CPU and RAM show in the status bars
   - **adding a module that won't fit is refused** with a clear message
-- **No allocation on the audio thread.** Delay buffers come from a fixed pool.
+- **No allocation on the audio thread.** Delay buffers come from a pool (one static slot, one heap
+  slot taken on the UI thread when a second DLY/REV is placed).
 
 ## 11. Patch storage **[owner: SD; format details proposed]**
 
@@ -462,5 +463,30 @@ input, and more keyboard layouts that switch without rewiring. **[owner]** How e
   the heap (nothing is written: a truncated JSON would replace a good file); "SKIPPED n TYP" names the
   type a load left out for budget. GRD takes two heap blocks (16 KB Plaits buffer + ~11 KB object):
   two fit a fragmented heap more often than one of ~28 KB.
+- **RAM (owner report, v1.2-test2: GRD "NO RAM" on an empty patch, no room after the test-1 patch,
+  a load dropped DLY)**: static RAM was 275.5 KB, leaving ~10-20 KB of heap under the 24 KB reserve.
+  Owner: "smaller undo / remove undo / quick save onto SD"; "if memory is limited, the main goal
+  should be making fun generation possible". Now 153.8 KB static:
+  - Undo keeps compact snapshots (only the modules in use, each with its own type's params and
+    pins) in one 16 KB arena, up to 16 steps (~3 on a full 32-module patch); the oldest go first.
+    Was 8 full 5.3 KB copies (42 KB). **[owner: smaller undo; size Claude's call]**
+  - One delay slot (1 s, 96 KB) is static; the second DLY/REV takes its 96 KB from the heap while
+    placed (canAdd counts it, canAddLive needs the 96 KB block). REV's plate needs 45,945 samples,
+    so slots stay 1 s. **[Claude's call, from the owner's "fun generation" priority]**
+  - A load never leaves a module out for RAM or CPU (a patch built against the live load must
+    reload whole; a reduced patch would be autosaved over the good one): one without heap stays in
+    the patch, greyed out and silent ("NO RAM"), and is created once there is room; an overloaded
+    patch says "CPU FULL". Only pool slots and MAX 1 skip.
+    Every create keeps kRamReserve free; a DLY/REV replacing a retired one waits a collect() for
+    the static slot instead of taking the heap slot.
+  - Adding to the running patch judges CPU by the measured load + the new type's cost only (the
+    per-type sum over-counts: each type's worst moment). **[owner: "quite bounded by CPU"]**
+- **Force: fn+enter** **[owner: "modifier enter to bypass", "even when loading"]**: in the place menu
+  it places past NO CPU / NO RAM (toast "FORCED"); the enter icon reads FORCE (lit) while fn is held.
+  MAX 1 and NO BUFFER still hold. Creates always keep kRamReserve (32 KB: a full patch's save), so a
+  forced RAM-short module waits greyed out. Loads need no force (they never skip for budget).
+- Autosave out of heap toasts "NOT SAVED: NO RAM" again every 30 s.
+- fn shows an icon in every view: PLACE in the place menu, LOAD/SAVE/PRESET in the file menu,
+  a shift arrow (PREV) where fn only reverses tab/enter (KEYS play page, SYSTEM page). **[owner report]**
 - KEYS: a latched note keeps sounding when you leave the Play page (space audition is off while latched). CHROMATIC starts at C3 again
   (v1.1's bottom row), so old patches keep their octave.

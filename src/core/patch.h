@@ -52,6 +52,7 @@ class Patch {
     uint16_t nextId;  // ids never reused within a session
 
    private:
+    friend class UndoStack;  // packs only the records in use
     ModuleRec modules_[kMaxModules];
     CableRec cables_[kMaxCables];
     int nModules_, nCables_;

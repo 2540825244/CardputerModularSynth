@@ -33,13 +33,16 @@ int typeAtCell(const UiState& s, int cell) {
     return placeTypeAt(s.placePage, (uint8_t)(cell / kGridCols), (uint8_t)(cell % kGridCols));
 }
 
-void place(UiController& ui) {
+// force (fn+enter): past NO CPU / NO RAM. A forced module that has no heap yet waits in the
+// patch, silent ("NO RAM"), and starts once there is room; pool slots and MAX 1 still hold.
+void place(UiController& ui, bool force) {
     UiState& s = ui.mut();
     if (s.placeType < 0) return;
     const ModuleTypeInfo& t = *allTypes(nullptr)[s.placeType];
     const Refusal r = ui.engine().canAddLive(ui.patch(), t);
-    if (!r.ok) {
-        ui.toast(r.reason, ui.now());
+    const Refusal hard = ui.engine().canLoad(ui.patch(), t);
+    if (!r.ok && (!force || !hard.ok)) {
+        ui.toast(force ? hard.reason : r.reason, ui.now());
         return;
     }
     if (ui.patch().findAt(s.page, s.placeCell)) {
@@ -56,6 +59,7 @@ void place(UiController& ui) {
         ui.toast(errText(a.err), ui.now());
         return;
     }
+    if (!r.ok) ui.toast("FORCED", ui.now());
     s.selCell = (int8_t)s.placeCell;
     s.placeType = -1;
     s.view = View::Patch;
@@ -79,7 +83,7 @@ bool placeViewAction(UiController& ui, const Action& a) {
                 if (t < 0) break;
                 s.placeType = (int8_t)t;
             }
-            place(ui);
+            place(ui, a.cell < 0 && ui.fnHeld());  // fn+enter forces; fn+tile is the plain do-it
             break;
         case Act::Key:
             if (a.key.grid || a.key.type != KeyEvent::Down) break;

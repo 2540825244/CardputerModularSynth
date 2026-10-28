@@ -15,7 +15,7 @@ struct Refusal {
 
 constexpr uint32_t kCpuBudget = 4000;          // cycles per sample the modules may take
 constexpr uint32_t kCyclesPerSample = 5000;    // 240 MHz / 48 kHz: what the measured load is relative to
-constexpr uint32_t kRamReserve = 24 * 1024;
+constexpr uint32_t kRamReserve = 32 * 1024;  // a full 32-module patch save: JSON doc + text
 
 class Engine {
    public:
@@ -35,6 +35,13 @@ class Engine {
     };
     Live live() const;  // read once per frame when checking many types (the heap walk takes a lock)
     Refusal canAddLive(const Patch&, const ModuleTypeInfo&, const Live&) const;
+    // Loading: pool slots and instance counts only. Neither CPU nor RAM leaves a module out of a
+    // file (a patch built against the live load must reload as it was; a reduced patch would be
+    // autosaved over the good one). One without heap stays in the patch, missing, until there is
+    // room; an overloaded patch says "CPU FULL".
+    Refusal canLoad(const Patch& sofar, const ModuleTypeInfo&) const;
+    // Heap one more t needs in p: its ramBytes plus a heap delay slot past the static one.
+    static uint32_t ramFor(const Patch& p, const ModuleTypeInfo& t);
     uint32_t costOf(const ModuleTypeInfo&) const;
     uint32_t measuredCost(const ModuleTypeInfo&) const;  // 0 = not run yet
     void setCycleCounter(CycleFn f) { cycles_ = f; }
@@ -67,6 +74,11 @@ class Engine {
         Program* p;
     };
     Module* instanceOf(uint16_t id) const;
+    Refusal fits(const Patch&, const ModuleTypeInfo&, bool cpu = true) const;  // pool, instance count, CPU
+    // Create only with the reserve left over (a forced add or a load may not fit yet), and never
+    // take the heap delay slot while a retired module still holds the static one.
+    bool canCreate(const ModuleTypeInfo&) const;
+    Module* tryCreate(const ModuleTypeInfo& t) const { return canCreate(t) ? t.create() : nullptr; }
     void retire(Module* m, Program* p, uint32_t gen);
     static void pushValues(Module*, const ModuleRec&);
     int instantiateAll(const Patch&);  // creates missing, pushes params; returns # missing

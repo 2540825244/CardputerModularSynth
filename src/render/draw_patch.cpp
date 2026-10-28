@@ -41,7 +41,7 @@ void drawPatchView(const UiState& s, const Patch& p, Engine& e) {
             int dy = 0;
             Module* inst = e.instance(m->id);
             if (inst && m->type->icon == Icon::Lfo) dy = (int)lroundf(sinf(inst->monitor(0) * 6.2831853f));
-            moduleTile(*m->type, col, row, false, dy);
+            moduleTile(*m->type, col, row, !inst, dy);  // dim: waiting for RAM ("NO RAM"), silent
             if (inst && m->type->numOuts > 0 && m->type->icon != Icon::Out) {  // activity: |out| peak
                 float a = inst->peak() * (1.f / kAudioVolts);
                 a = a > 1.f ? 1.f : a;

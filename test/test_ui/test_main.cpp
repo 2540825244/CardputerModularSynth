@@ -1541,6 +1541,47 @@ void test_icons_carry_fn_active() {
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
 }
 
+void test_fn_enter_forces_place() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.down(2, 1);
+    f.sideUp(Side::Fn);
+    f.tileTap(TOsc);
+    f.eng.setCpuLoad(0.99f);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL_STRING("NO CPU", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    f.sideDown(Side::Fn);
+    TEST_ASSERT_EQUAL_STRING("FORCE", icons(f).name[kEnt]);
+    f.side(Side::Enter);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL_STRING("FORCED", f.ui.state().toast);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+}
+
+// fn does something in every view, so its slot always shows what.
+void test_icons_fn_everywhere() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.down(2, 1);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
+    TEST_ASSERT_TRUE(icons(f).shown[kFnS]);
+    TEST_ASSERT_TRUE(icons(f).icon[kFnS] == Ic::Plus);  // fn+tile places it
+    f.side(Side::Esc);
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+    TEST_ASSERT_TRUE(icons(f).icon[kFnS] == Ic::Enter);  // fn+slot loads / saves
+    TEST_ASSERT_EQUAL_STRING("LOAD", icons(f).name[kFnS]);
+    for (int i = 0; i < 3; i++) f.side(Side::Tab);  // SYSTEM: fn only flips pages back
+    TEST_ASSERT_TRUE(icons(f).icon[kFnS] == Ic::Shift);
+    f.side(Side::Esc);
+    f.place(TKeys, 0, 0);
+    f.side(Side::Enter);
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
+    TEST_ASSERT_TRUE(icons(f).icon[kFnS] == Ic::Shift);  // fn+enter / fn+tab go back
+}
+
 void test_icons_enter_follows_selection() {
     Fx f;
     TEST_ASSERT_FALSE(icons(f).shown[kEnt]);
@@ -2022,6 +2063,8 @@ int main() {
     RUN_TEST(test_icons_move_esc_cancel);
     RUN_TEST(test_icons_carry_fn_active);
     RUN_TEST(test_icons_enter_follows_selection);
+    RUN_TEST(test_icons_fn_everywhere);
+    RUN_TEST(test_fn_enter_forces_place);
     RUN_TEST(test_icons_tab_page_text);
     RUN_TEST(test_icons_fn_held_redo);
     RUN_TEST(test_help_visible_after_fn_hold);

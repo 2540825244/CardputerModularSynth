@@ -56,6 +56,7 @@ void modulePage(SideIcons& r, const UiState& s, const ModuleRec& m, bool fnHeld)
         set(r, Side::Enter, Ic::Layout, "LAYOUT");
         set(r, Side::Del, Ic::Cancel, "PANIC");
         set(r, Side::Backslash, Ic::Latch, "LATCH", m.params[7] >= 0.5f);
+        set(r, Side::Fn, Ic::Shift, "PREV");  // fn+enter previous layout, fn+tab previous page
         return;
     }
     set(r, Side::Fn, Ic::Cable, s.carry.active ? "DROP" : "CABLE", s.carry.active);
@@ -90,7 +91,8 @@ SideIcons sideIcons(const UiState& s, const Patch& p, bool fnHeld) {
             snprintf(r.tabText, sizeof r.tabText, "%s", placePageName(s.placePage));
             r.shown[(int)Side::Tab] = true;
             r.name[(int)Side::Tab] = "CATEG";
-            if (s.placeType >= 0) set(r, Side::Enter, Ic::Enter, "PLACE");
+            set(r, Side::Fn, Ic::Plus, "PLACE");  // fn+tile places it at once
+            if (s.placeType >= 0) set(r, Side::Enter, Ic::Enter, fnHeld ? "FORCE" : "PLACE", fnHeld);
             break;
         case View::File: {
             static const char* const kPg[] = {"LOAD", "SAVE", "PRESET", "SYS"};
@@ -99,7 +101,9 @@ SideIcons sideIcons(const UiState& s, const Patch& p, bool fnHeld) {
             r.shown[(int)Side::Tab] = true;
             r.name[(int)Side::Tab] = "PAGE";
             undo(r, fnHeld);
-            if (s.fileSlot >= 0 && s.filePage < 3) set(r, Side::Enter, Ic::Enter, kPg[s.filePage < 4 ? s.filePage : 0]);
+            if (s.filePage < 3) set(r, Side::Fn, Ic::Enter, kPg[s.filePage]);  // fn+slot runs it
+            else set(r, Side::Fn, Ic::Shift, "PREV");                          // fn+tab only
+            if (s.fileSlot >= 0 && s.filePage < 3) set(r, Side::Enter, Ic::Enter, kPg[s.filePage]);
             break;
         }
     }

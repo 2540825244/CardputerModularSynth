@@ -16,19 +16,49 @@ Engine::~Engine() {
     for (auto& i : insts_) delete i.m;
 }
 
-Refusal Engine::canAdd(const Patch& p, const ModuleTypeInfo& t) const {
-    const int have = p.countOfType(t);
-    if (t.poolSlots) {
-        int used = 0;
-        for (int i = 0; i < p.moduleCount(); i++) used += p.moduleAt(i).type->poolSlots;
-        if (used + t.poolSlots > kDelaySlots) return {false, "NO BUFFER"};
-    }
-    if (t.maxInstances && have >= t.maxInstances) return {false, "MAX 1"};
+namespace {
+int poolUsed(const Patch& p) {
+    int used = 0;
+    for (int i = 0; i < p.moduleCount(); i++) used += p.moduleAt(i).type->poolSlots;
+    return used;
+}
+}  // namespace
+
+uint32_t Engine::ramFor(const Patch& p, const ModuleTypeInfo& t) {
+    return t.ramBytes + (t.poolSlots ? delayPoolHeapBytes(poolUsed(p), t.poolSlots) : 0);
+}
+
+Refusal Engine::fits(const Patch& p, const ModuleTypeInfo& t, bool cpu) const {
+    if (t.poolSlots && poolUsed(p) + t.poolSlots > kDelaySlots) return {false, "NO BUFFER"};
+    if (t.maxInstances && p.countOfType(t) >= t.maxInstances) return {false, "MAX 1"};
+    if (!cpu) return {true, nullptr};
     uint32_t cycles = costOf(t);
     for (int i = 0; i < p.moduleCount(); i++) cycles += costOf(*p.moduleAt(i).type);
     if (cycles > kCpuBudget) return {false, "NO CPU"};
-    if (heapFree_() < t.ramBytes + kRamReserve) return {false, "NO RAM"};
     return {true, nullptr};
+}
+
+Refusal Engine::canAdd(const Patch& p, const ModuleTypeInfo& t) const {
+    const Refusal r = fits(p, t);
+    if (!r.ok) return r;
+    if (heapFree_() < ramFor(p, t) + kRamReserve) return {false, "NO RAM"};
+    return {true, nullptr};
+}
+
+Refusal Engine::canLoad(const Patch& sofar, const ModuleTypeInfo& t) const { return fits(sofar, t, false); }
+
+bool Engine::canCreate(const ModuleTypeInfo& t) const {
+    uint32_t need = t.ramBytes, big = t.largestAlloc ? t.largestAlloc : t.ramBytes;
+    if (t.poolSlots) {
+        for (const auto& r : retired_)  // its slot comes back at the next collect()
+            if (r.m && r.m->type().poolSlots) return false;
+        if (delayPoolStaticFree() == 0) {
+            need += kDelaySlotBytes;
+            big = big > kDelaySlotBytes ? big : kDelaySlotBytes;
+        }
+    }
+    if (heapFree_() < need + kRamReserve) return false;
+    return !largestBlock_ || largestBlock_() >= big + 1024;
 }
 
 Engine::Live Engine::live() const {
@@ -38,12 +68,16 @@ Engine::Live Engine::live() const {
 Refusal Engine::canAddLive(const Patch& p, const ModuleTypeInfo& t) const { return canAddLive(p, t, live()); }
 
 Refusal Engine::canAddLive(const Patch& p, const ModuleTypeInfo& t, const Live& l) const {
-    const Refusal r = canAdd(p, t);
+    // CPU from the measured load alone: it holds the running patch, cables and mixing included.
+    // The per-type sum canAdd uses is each type's worst moment and over-counts a live patch.
+    const Refusal r = fits(p, t, false);
     if (!r.ok) return r;
-    // The costs miss the engine's own work (cables, mixing) and anything not measured yet.
     if (l.cycles + costOf(t) > kCpuBudget) return {false, "NO CPU"};
-    // Free heap can be plenty while no single block fits (GRD wants ~30 KB in one piece).
-    const uint32_t big = t.largestAlloc ? t.largestAlloc : t.ramBytes;
+    if (heapFree_() < ramFor(p, t) + kRamReserve) return {false, "NO RAM"};
+    // Free heap can be plenty while no single block fits (GRD's 16 KB buffer, a 96 KB heap
+    // delay slot).
+    uint32_t big = t.largestAlloc ? t.largestAlloc : t.ramBytes;
+    if (t.poolSlots && delayPoolHeapBytes(poolUsed(p), t.poolSlots) > big) big = kDelaySlotBytes;
     if (l.largest < big + 1024) return {false, "NO RAM"};
     return {true, nullptr};
 }
@@ -112,7 +146,7 @@ int Engine::instantiateAll(const Patch& p) {
         const ModuleRec& r = p.moduleAt(i);
         Module* m = instanceOf(r.id);
         if (!m) {
-            m = r.type->create();
+            m = tryCreate(*r.type);
             if (!m) {
                 missing++;
                 continue;
@@ -197,7 +231,7 @@ void Engine::collect() {
     for (int i = 0; i < patch_.moduleCount(); i++) {
         const ModuleRec& r = patch_.moduleAt(i);
         if (instanceOf(r.id)) continue;
-        Module* m = r.type->create();
+        Module* m = tryCreate(*r.type);
         if (!m) {
             missing++;
             continue;
