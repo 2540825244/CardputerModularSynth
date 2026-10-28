@@ -1,6 +1,7 @@
 #include <unity.h>
 #include <cstring>
 #include <map>
+#include "core/modules/env.h"
 #include "core/modules/keys.h"
 #include "core/modules/lfo.h"
 #include "core/modules/osc.h"
@@ -73,12 +74,16 @@ struct Fx {
     void hold(int c, int r) { down(c, r); send(KeyEvent::Hold, true, c, r, Side::Esc); }
     void holdSide(Side s) { sideDown(s); send(KeyEvent::Hold, false, 0, 0, s); }
     void slot(int c) { tap(c, 0); side(Side::Enter); }  // file menu: select a slot, then do it
+    // place-menu tile of type index `ty` (allTypes order)
+    void tileTap(int ty) { uint8_t r, c; placeCellOf(ty, &r, &c); tap(c, r); }
+    void tileHold(int ty) { uint8_t r, c; placeCellOf(ty, &r, &c); hold(c, r); }
+    void tileUp(int ty) { uint8_t r, c; placeCellOf(ty, &r, &c); up(c, r); }
     // place type `ty` at (c,r) on the current page via fn+cell
     void place(int ty, int c, int r) {
         sideDown(Side::Fn);
         tap(c, r);
         sideUp(Side::Fn);
-        tap(ty, 1);
+        tileTap(ty);
         side(Side::Enter);
     }
 };
@@ -90,7 +95,7 @@ void test_place_via_fn() {
     TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
     TEST_ASSERT_EQUAL(14, f.ui.state().placeCell);
     f.sideUp(Side::Fn);  // fn still held on the tile would place it at once (do-it)
-    f.tap(TOsc, 1);
+    f.tileTap(TOsc);
     TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
     TEST_ASSERT_EQUAL(TOsc, f.ui.state().placeType);
     TEST_ASSERT_EQUAL(0, gPatch.moduleCount());
@@ -123,7 +128,7 @@ void test_place_details_back() {
     f.sideDown(Side::Fn);
     f.down(0, 0);
     f.sideUp(Side::Fn);
-    f.tap(TOsc, 1);
+    f.tileTap(TOsc);
     f.side(Side::Esc);
     TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
     TEST_ASSERT_EQUAL(-1, f.ui.state().placeType);
@@ -146,7 +151,7 @@ void test_place_refused() {
     f.sideDown(Side::Fn);
     f.tap(1, 0);
     f.sideUp(Side::Fn);
-    f.tap(TOut, 1);
+    f.tileTap(TOut);
     f.side(Side::Enter);
     TEST_ASSERT_EQUAL_STRING("MAX 1", f.ui.state().toast);
     TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
@@ -967,12 +972,12 @@ void test_place_by_hold_tile() {
     f.tap(2, 1);
     f.sideUp(Side::Fn);
     TEST_ASSERT_EQUAL(View::Place, f.ui.state().view);
-    f.hold(TOsc, 1);
+    f.tileHold(TOsc);
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
     const ModuleRec* m = gPatch.findAt(0, 14);
     TEST_ASSERT_NOT_NULL(m);
     TEST_ASSERT_TRUE(m->type == &kOscType);
-    f.up(TOsc, 1);
+    f.tileUp(TOsc);
     TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
 }
 
@@ -980,7 +985,7 @@ void test_place_by_fn_tile() {
     Fx f;
     f.sideDown(Side::Fn);
     f.tap(2, 1);
-    f.tap(TOsc, 1);
+    f.tileTap(TOsc);
     f.sideUp(Side::Fn);
     TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
     TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
@@ -1074,6 +1079,47 @@ void test_keys_settings_esc_returns_to_play() {
     TEST_ASSERT_EQUAL(View::KeysPlay, f.ui.state().view);
 }
 
+// ---- v1.1: place menu by category ----
+void test_place_type_at_by_category() {
+    TEST_ASSERT_EQUAL(TKeys, placeTypeAt(1, 0));
+    TEST_ASSERT_EQUAL(TOsc, placeTypeAt(1, 1));
+    TEST_ASSERT_EQUAL(TEnv, placeTypeAt(2, 0));
+    TEST_ASSERT_EQUAL(TLfo, placeTypeAt(2, 1));
+    TEST_ASSERT_EQUAL(TVcf, placeTypeAt(3, 0));
+    TEST_ASSERT_EQUAL(TOut, placeTypeAt(3, 3));
+    TEST_ASSERT_EQUAL(-1, placeTypeAt(1, 5));
+    TEST_ASSERT_EQUAL(-1, placeTypeAt(0, 0));
+    TEST_ASSERT_EQUAL(-1, placeTypeAt(4, 0));
+}
+
+void test_place_cell_of_inverts() {
+    int n = 0;
+    allTypes(&n);
+    for (int i = 0; i < n; i++) {
+        uint8_t r = 0, c = 0;
+        TEST_ASSERT_TRUE(placeCellOf(i, &r, &c));
+        TEST_ASSERT_EQUAL(i, placeTypeAt(r, c));
+    }
+    uint8_t r, c;
+    TEST_ASSERT_FALSE(placeCellOf(n, &r, &c));
+    TEST_ASSERT_FALSE(placeCellOf(-1, &r, &c));
+}
+
+void test_place_menu_row2_tile() {
+    Fx f;
+    f.sideDown(Side::Fn);
+    f.tap(2, 1);
+    f.sideUp(Side::Fn);
+    f.tap(0, 2);
+    TEST_ASSERT_EQUAL(TEnv, f.ui.state().placeType);
+    f.tap(5, 0);  // the top row holds the details: no tile there
+    TEST_ASSERT_EQUAL(TEnv, f.ui.state().placeType);
+    f.side(Side::Enter);
+    const ModuleRec* m = gPatch.findAt(0, 14);
+    TEST_ASSERT_NOT_NULL(m);
+    TEST_ASSERT_TRUE(m->type == &kEnvType);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1143,5 +1189,8 @@ int main() {
     RUN_TEST(test_file_hold_slot_loads);
     RUN_TEST(test_file_slot_cleared_on_open);
     RUN_TEST(test_keys_settings_esc_returns_to_play);
+    RUN_TEST(test_place_type_at_by_category);
+    RUN_TEST(test_place_cell_of_inverts);
+    RUN_TEST(test_place_menu_row2_tile);
     return UNITY_END();
 }

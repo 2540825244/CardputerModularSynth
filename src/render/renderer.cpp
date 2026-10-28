@@ -16,8 +16,18 @@ void drawIcon(Ic ic, int x, int y, uint8_t color) {
 }
 
 void drawIcon(Icon ic, int x, int y, uint8_t color) {
-    static const Ic map[] = {Ic::Keys, Ic::Osc, Ic::Vcf, Ic::Vca, Ic::Env, Ic::Lfo, Ic::Dly, Ic::Out};
-    drawIcon(map[(int)ic], x, y, color);
+    Ic i = Ic::Plus;  // a module icon without art yet
+    switch (ic) {
+        case Icon::Keys: i = Ic::Keys; break;
+        case Icon::Osc: i = Ic::Osc; break;
+        case Icon::Vcf: i = Ic::Vcf; break;
+        case Icon::Vca: i = Ic::Vca; break;
+        case Icon::Env: i = Ic::Env; break;
+        case Icon::Lfo: i = Ic::Lfo; break;
+        case Icon::Dly: i = Ic::Dly; break;
+        case Icon::Out: i = Ic::Out; break;
+    }
+    drawIcon(i, x, y, color);
 }
 
 void dotted(int x, int y, int w, int h, uint8_t color) {

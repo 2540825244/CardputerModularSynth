@@ -1,4 +1,5 @@
 #include "core/registry.h"
+#include "layout.h"
 #include "views.h"
 
 namespace {
@@ -28,13 +29,7 @@ const char* errText(PatchError e) {
 
 namespace {
 
-// The type shown at a grid cell of the place menu, -1 if none.
-int typeAtCell(int cell) {
-    int n = 0;
-    allTypes(&n);
-    const int row = cell / kGridCols, col = cell % kGridCols;
-    return row == 1 && col < n ? col : -1;
-}
+int typeAtCell(int cell) { return placeTypeAt((uint8_t)(cell / kGridCols), (uint8_t)(cell % kGridCols)); }
 
 void place(UiController& ui) {
     UiState& s = ui.mut();
