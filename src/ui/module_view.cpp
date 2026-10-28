@@ -166,7 +166,7 @@ bool moduleViewAction(UiController& ui, const Action& a) {
     }
     switch (a.act) {
         case Act::Select:
-            if (ui.tiltActive() && a.cell >= kGridCols) ui.endTilt();  // the cursor leaves the swept param
+            ui.endTilt();  // a cursor move or a coarse value ends a sweep (a no-op when none runs)
             if (a.cell < kGridCols) {  // value strip: coarse value for the selected cell
                 const CellRef sel = selected(s, *m->type);
                 if (sel.kind == CellKind::Param || sel.kind == CellKind::Out)

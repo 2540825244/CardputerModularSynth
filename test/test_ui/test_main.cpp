@@ -1184,6 +1184,19 @@ void test_select_during_sweep_ends_it() {
     TEST_ASSERT_FALSE(f.ui.tiltActive());
 }
 
+void test_coarse_tap_during_sweep_ends_it() {
+    Fx f;
+    const ModuleRec* m = placeAndOpen(f, TVcf);
+    f.tap(0, 1);  // CUT
+    f.holdSide(Side::Enter);
+    f.ui.tilt(10.f);
+    f.tap(4, 0);  // coarse 50%
+    const float coarse = m->params[0];
+    TEST_ASSERT_FALSE(f.ui.tiltActive());
+    f.ui.tilt(20.f);  // the device keeps moving
+    TEST_ASSERT_EQUAL_FLOAT(coarse, m->params[0]);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -1261,5 +1274,6 @@ int main() {
     RUN_TEST(test_file_tab_clears_slot);
     RUN_TEST(test_ctrl_hold_pin_still_carries_in_module_view);
     RUN_TEST(test_select_during_sweep_ends_it);
+    RUN_TEST(test_coarse_tap_during_sweep_ends_it);
     return UNITY_END();
 }
