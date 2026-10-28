@@ -21,8 +21,8 @@ tilt, 7 new modules. Tasks 1–8 are done and reviewed (branch `feat/v1-firmware
    ran opposite on both axes, now negated in `src/hw/tilt.cpp` (d397671, not yet re-checked). Still to
    report: tilt feel after the flip, gestures, file menu, new modules, first-boot audio.
    Also fixed from the owner's report: the value strip now fills the last segment partly (not yet re-checked).
-   Open owner ask: automatic speaker/line volume switching. The probe found HP_DET on no readable GPIO,
-   so it needs a hardware path first (see the ledger's RESUME NOTE); `OutModule::setAutoDest` is ready for it.
+   Automatic speaker/line volume switching: owner decided 2026-10-28 to keep the manual DST toggle
+   (HP_DET is on no readable GPIO; a wire mod was offered and declined). Don't revisit unless asked.
 2. Fix what the report finds, then Task 10 (release notes, final whole-branch review, finish the branch).
 3. Execution mode the owner chose: native, plus one persistent Opus reviewer agent. No other subagents.
 
