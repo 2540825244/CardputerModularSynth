@@ -46,4 +46,4 @@ Module* create() { return new Vca(); }
 const ModuleTypeInfo kVcaType = {
     "vca", "VCA", "Amplifier, CV x level", Category::Processor, Icon::Vca, Drawing::None,
     1, kParams, 2, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
-    15, sizeof(Vca) + kBlock * sizeof(float), 0, create};
+    130, sizeof(Vca) + kBlock * sizeof(float), 0, create};

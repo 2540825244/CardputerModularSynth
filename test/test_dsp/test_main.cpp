@@ -1,7 +1,10 @@
 #include <unity.h>
 #include <cmath>
+#include <cstdio>
 #include "core/dsp_util.h"
+#include "core/ladder.h"
 #include "core/note_stack.h"
+#include "Filters/ladder.h"
 
 void setUp() {}
 void tearDown() {}
@@ -84,6 +87,54 @@ void test_slew_reaches_target_exactly() {
     TEST_ASSERT_TRUE(s.y == 0.f);
 }
 
+// The fast ladder must match DaisySP's on every mode, cutoff and resonance (same model).
+void test_ladder_matches_daisysp() {
+    const float cuts[] = {80.f, 800.f, 5000.f, 17000.f};
+    const float ress[] = {0.f, 0.6f, 1.8f};
+    for (int mode = 0; mode < 6; mode++)
+        for (float hz : cuts)
+            for (float res : ress) {
+                daisysp::LadderFilter d;
+                Ladder f;
+                d.Init(48000.f);
+                f.Init(48000.f);
+                d.SetFilterMode((daisysp::LadderFilter::FilterMode)mode);
+                f.SetFilterMode((Ladder::Mode)mode);
+                d.SetInputDrive(2.5f);
+                f.SetInputDrive(2.5f);
+                d.SetFreq(hz);
+                f.SetFreq(hz);
+                d.SetRes(res);
+                f.SetRes(res);
+                uint32_t seed = 1;
+                float worst = 0.f;
+                for (int i = 0; i < 4000; i++) {
+                    seed = seed * 1664525u + 1013904223u;
+                    const float x = ((float)(seed >> 8) / 16777216.f - 0.5f) * 1.6f + ((i / 60) & 1 ? 0.4f : -0.4f);
+                    const float e = fabsf(d.Process(x) - f.Process(x));
+                    worst = e > worst ? e : worst;
+                }
+                if (!(worst < 1e-4f)) {
+                    char m[96];
+                    snprintf(m, sizeof m, "mode %d %.0f Hz res %.1f: diff %g", mode, hz, res, worst);
+                    TEST_FAIL_MESSAGE(m);
+                }
+            }
+}
+
+void test_soft_clip_bounded() {
+    for (int i = -4000; i <= 4000; i++) {
+        const float x = (float)i * 0.001f;
+        const float y = softClip(x);
+        TEST_ASSERT_TRUE(y <= 1.f && y >= -1.f);
+        TEST_ASSERT_FLOAT_WITHIN(1e-6f, -y, softClip(-x));
+    }
+    TEST_ASSERT_EQUAL_FLOAT(0.f, sanitize(NAN));
+    TEST_ASSERT_EQUAL_FLOAT(0.f, sanitize(INFINITY));
+    TEST_ASSERT_EQUAL_FLOAT(50.f, sanitize(1e6f));
+    TEST_ASSERT_EQUAL_FLOAT(-50.f, sanitize(-1e6f));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_fast_exp2_accuracy);
@@ -93,5 +144,7 @@ int main() {
     RUN_TEST(test_sanitize);
     RUN_TEST(test_note_stack);
     RUN_TEST(test_slew_reaches_target_exactly);
+    RUN_TEST(test_ladder_matches_daisysp);
+    RUN_TEST(test_soft_clip_bounded);
     return UNITY_END();
 }

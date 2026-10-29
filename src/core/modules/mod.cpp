@@ -85,7 +85,7 @@ Module* create() { return new Ad(); }
 const ModuleTypeInfo kAdType = {
     "ad", "AD", "AD envelope: curve, loop, EOC", Category::Modulator, Icon::Env, Drawing::None,
     4, ad::kParams, 1, ad::kInKeys, ad::kInLabels, 2, ad::kOutKeys, ad::kOutLabels,
-    30, sizeof(ad::Ad) + 2 * kBlock * sizeof(float), 0, ad::create};
+    600, sizeof(ad::Ad) + 2 * kBlock * sizeof(float), 0, ad::create};
 
 // ---------------------------------------------------------------- RND
 // Random voltages: SMO glides between random targets RATE times a second; STP holds a new one on
@@ -138,7 +138,7 @@ Module* create() { return new Rnd(); }
 const ModuleTypeInfo kRndType = {
     "rnd", "RND", "Random: smooth and stepped", Category::Modulator, Icon::Dice, Drawing::None,
     3, rnd::kParams, 1, rnd::kInKeys, rnd::kInLabels, 2, rnd::kOutKeys, rnd::kOutLabels,
-    15, sizeof(rnd::Rnd) + 2 * kBlock * sizeof(float), 0, rnd::create};
+    170, sizeof(rnd::Rnd) + 2 * kBlock * sizeof(float), 0, rnd::create};
 
 // ---------------------------------------------------------------- SEQ
 // 12-step pitch sequencer. Page STEP: row 1 = step pitches, row 2 = step gates (bits of GATES),
@@ -212,7 +212,7 @@ Module* create() { return new Seq(); }
 const ModuleTypeInfo kSeqType = {
     "seq", "SEQ", "12-step pitch sequencer", Category::Modulator, Icon::Seq, Drawing::None,
     16, seq::kParams, 2, kClkRst, kClkRstLbl, 3, seq::kOutKeys, seq::kOutLabels,
-    15, sizeof(seq::Seq) + 3 * kBlock * sizeof(float), 0, seq::create, seq::kPages, 2};
+    260, sizeof(seq::Seq) + 3 * kBlock * sizeof(float), 0, seq::create, seq::kPages, 2};
 
 // ---------------------------------------------------------------- TRG
 // Three trigger lanes x 12 steps, one row each; an output follows the clock while its step is set.
@@ -273,7 +273,7 @@ Module* create() { return new Trg(); }
 const ModuleTypeInfo kTrgType = {
     "trg", "TRG", "3-lane x 12-step triggers", Category::Modulator, Icon::Steps, Drawing::None,
     5, trg::kParams, 2, kClkRst, kClkRstLbl, 3, trg::kOutKeys, trg::kOutLabels,
-    10, sizeof(trg::Trg) + 3 * kBlock * sizeof(float), 0, trg::create, trg::kPages, 2};
+    370, sizeof(trg::Trg) + 3 * kBlock * sizeof(float), 0, trg::create, trg::kPages, 2};
 
 // ---------------------------------------------------------------- EUC
 namespace euc {
@@ -322,7 +322,7 @@ Module* create() { return new Euc(); }
 const ModuleTypeInfo kEucType = {
     "euc", "EUC", "Euclidean rhythm", Category::Modulator, Icon::Euclid, Drawing::None,
     3, euc::kParams, 2, kClkRst, kClkRstLbl, 2, euc::kOutKeys, euc::kOutLabels,
-    8, sizeof(euc::Euc) + 2 * kBlock * sizeof(float), 0, euc::create};
+    200, sizeof(euc::Euc) + 2 * kBlock * sizeof(float), 0, euc::create};
 
 // ---------------------------------------------------------------- QNT
 namespace qnt {
@@ -362,7 +362,7 @@ Module* create() { return new Qnt(); }
 const ModuleTypeInfo kQntType = {
     "qnt", "QNT", "Quantizer to a scale", Category::Utility, Icon::Quant, Drawing::None,
     3, qnt::kParams, 1, kInOnly, kInLbl, 2, qnt::kOutKeys, qnt::kOutLabels,
-    30, sizeof(qnt::Qnt) + 2 * kBlock * sizeof(float), 0, qnt::create};
+    750, sizeof(qnt::Qnt) + 2 * kBlock * sizeof(float), 0, qnt::create};
 
 // ---------------------------------------------------------------- TUR
 // Turing machine: a LEN-bit loop; on each clock the last bit comes back to the front, flipped with
@@ -406,7 +406,7 @@ Module* create() { return new Tur(); }
 const ModuleTypeInfo kTurType = {
     "tur", "TUR", "Turing machine: looping random", Category::Modulator, Icon::Dice, Drawing::None,
     3, tur::kParams, 2, kClkRst, kClkRstLbl, 2, tur::kOutKeys, tur::kOutLabels,
-    10, sizeof(tur::Tur) + 2 * kBlock * sizeof(float), 0, tur::create};
+    260, sizeof(tur::Tur) + 2 * kBlock * sizeof(float), 0, tur::create};
 
 // ---------------------------------------------------------------- LGC
 namespace lgc {
@@ -438,7 +438,7 @@ Module* create() { return new Lgc(); }
 const ModuleTypeInfo kLgcType = {
     "lgc", "LGC", "Logic: AND OR XOR NOT", Category::Utility, Icon::Logic, Drawing::None,
     0, nullptr, 2, lgc::kInKeys, lgc::kInLabels, 4, lgc::kOutKeys, lgc::kOutLabels,
-    8, sizeof(lgc::Lgc) + 4 * kBlock * sizeof(float), 0, lgc::create};
+    260, sizeof(lgc::Lgc) + 4 * kBlock * sizeof(float), 0, lgc::create};
 
 // ---------------------------------------------------------------- BRN
 // Bernoulli gate: each rising IN goes to A with probability PROB, else to B; the chosen output
@@ -477,7 +477,7 @@ Module* create() { return new Brn(); }
 const ModuleTypeInfo kBrnType = {
     "brn", "BRN", "Bernoulli gate: coin toss", Category::Utility, Icon::Dice, Drawing::None,
     1, brn::kParams, 2, brn::kInKeys, brn::kInLabels, 2, brn::kOutKeys, brn::kOutLabels,
-    8, sizeof(brn::Brn) + 2 * kBlock * sizeof(float), 0, brn::create};
+    180, sizeof(brn::Brn) + 2 * kBlock * sizeof(float), 0, brn::create};
 
 // ---------------------------------------------------------------- CHS
 // Lorenz attractor (sigma 10, rho 28, beta 8/3), Euler steps scaled by RATE; X/Y/Z ~ +-5 V.
@@ -519,7 +519,7 @@ const char* const kInLabels[] = {"RAT"};
 const ModuleTypeInfo kChsType = {
     "chs", "CHS", "Lorenz chaos: X Y Z", Category::Modulator, Icon::Chaos, Drawing::None,
     2, chs::kParams, 1, chs::kInKeys, chs::kInLabels, 3, chs::kOutKeys, chs::kOutLabels,
-    20, sizeof(chs::Chs) + 3 * kBlock * sizeof(float), 0, chs::create};
+    430, sizeof(chs::Chs) + 3 * kBlock * sizeof(float), 0, chs::create};
 
 // ---------------------------------------------------------------- KNB
 // Four knobs as voltages: macro controls to sweep with tilt or to patch into several places.
@@ -551,7 +551,7 @@ Module* create() { return new Knb(); }
 const ModuleTypeInfo kKnbType = {
     "knb", "KNB", "Four knobs as CV", Category::Utility, Icon::Knob, Drawing::None,
     4, knb::kParams, 0, nullptr, nullptr, 4, knb::kOutKeys, knb::kOutLabels,
-    8, sizeof(knb::Knb) + 4 * kBlock * sizeof(float), 0, knb::create};
+    340, sizeof(knb::Knb) + 4 * kBlock * sizeof(float), 0, knb::create};
 
 // ---------------------------------------------------------------- SCO
 // Scope + tuner. Keeps 96 points of IN, one per ZOOM samples, re-armed on a rising zero crossing
@@ -613,5 +613,5 @@ Module* create() { return new Sco(); }
 const ModuleTypeInfo kScoType = {
     "sco", "SCO", "Scope and tuner", Category::Utility, Icon::Scope, Drawing::Scope,
     2, sco::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
-    10, sizeof(sco::Sco) + kBlock * sizeof(float), 0, sco::create};
+    120, sizeof(sco::Sco) + kBlock * sizeof(float), 0, sco::create};
 

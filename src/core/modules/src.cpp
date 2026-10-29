@@ -102,7 +102,7 @@ Module* create() { return new Noi(); }
 const ModuleTypeInfo kNoiType = {
     "noi", "NOI", "Noise: white pink brown S&H dust", Category::Source, Icon::Noise, Drawing::None,
     2, noi::kParams, 1, noi::kInKeys, noi::kInLabels, 1, kOutOnly, kOutLbl,
-    20, sizeof(noi::Noi) + kBlock * sizeof(float), 0, noi::create};
+    360, sizeof(noi::Noi) + kBlock * sizeof(float), 0, noi::create};
 
 // ---------------------------------------------------------------- VSO
 namespace vso {
@@ -154,7 +154,7 @@ Module* create() { return new Vso(); }
 const ModuleTypeInfo kVsoType = {
     "vso", "VSO", "Saw-square morph, PW, sync", Category::Source, Icon::Saw, Drawing::None,
     6, vso::kParams, 4, vso::kInKeys, vso::kInLabels, 1, kOutOnly, kOutLbl,
-    120, sizeof(vso::Vso) + kBlock * sizeof(float), 0, vso::create};
+    770, sizeof(vso::Vso) + kBlock * sizeof(float), 0, vso::create};
 
 // ---------------------------------------------------------------- FMO
 namespace fmo {
@@ -193,7 +193,7 @@ Module* create() { return new Fmo(); }
 const ModuleTypeInfo kFmoType = {
     "fmo", "FMO", "2-op FM: ratio, index CV", Category::Source, Icon::Fm, Drawing::None,
     4, fmo::kParams, 2, fmo::kInKeys, fmo::kInLabels, 1, kOutOnly, kOutLbl,
-    80, sizeof(fmo::Fmo) + kBlock * sizeof(float), 0, fmo::create};
+    980, sizeof(fmo::Fmo) + kBlock * sizeof(float), 0, fmo::create};
 
 // ---------------------------------------------------------------- FOR
 namespace fmt {
@@ -230,7 +230,7 @@ Module* create() { return new For(); }
 const ModuleTypeInfo kForType = {
     "for", "FOR", "Formant oscillator", Category::Source, Icon::Osc, Drawing::None,
     4, fmt::kParams, 2, fmt::kInKeys, fmt::kInLabels, 1, kOutOnly, kOutLbl,
-    70, sizeof(fmt::For) + kBlock * sizeof(float), 0, fmt::create};
+    790, sizeof(fmt::For) + kBlock * sizeof(float), 0, fmt::create};
 
 // ---------------------------------------------------------------- SSW
 // Supersaw: 7 polyBLEP saws spread by DETUNE; MIX balances the centre saw against the six others.
@@ -290,7 +290,7 @@ Module* create() { return new Ssw(); }
 const ModuleTypeInfo kSswType = {
     "ssw", "SSW", "Supersaw, 7 detuned saws", Category::Source, Icon::Saw, Drawing::None,
     4, ssw::kParams, 2, ssw::kInKeys, ssw::kInLabels, 1, kOutOnly, kOutLbl,
-    150, sizeof(ssw::Ssw) + kBlock * sizeof(float), 0, ssw::create};
+    1460, sizeof(ssw::Ssw) + kBlock * sizeof(float), 0, ssw::create};
 
 // ---------------------------------------------------------------- STR / MDL
 // String and modal voices (Rings-style, from DaisySP): TRIG strikes, PITCH tunes, ACC in adds accent.
@@ -346,11 +346,11 @@ Module* create() { return new phys::Phys<daisysp::ModalVoice, kMdlType>(0.5f); }
 const ModuleTypeInfo kStrType = {
     "str", "STR", "Plucked string (Karplus)", Category::Source, Icon::String, Drawing::None,
     6, phys::kParams, 4, phys::kInKeys, phys::kInLabels, 1, kOutOnly, kOutLbl,
-    260, sizeof(phys::Phys<daisysp::StringVoice, kStrType>) + kBlock * sizeof(float), 0, str::create};
+    2830, sizeof(phys::Phys<daisysp::StringVoice, kStrType>) + kBlock * sizeof(float), 0, str::create};
 const ModuleTypeInfo kMdlType = {
     "mdl", "MDL", "Modal voice: bells, bars", Category::Source, Icon::Bell, Drawing::None,
     6, phys::kParams, 4, phys::kInKeys, phys::kInLabels, 1, kOutOnly, kOutLbl,
-    320, sizeof(phys::Phys<daisysp::ModalVoice, kMdlType>) + kBlock * sizeof(float), 0, mdl::create};
+    9700, sizeof(phys::Phys<daisysp::ModalVoice, kMdlType>) + kBlock * sizeof(float), 0, mdl::create};
 
 // ---------------------------------------------------------------- RES
 // Modal resonator excited by IN (24 modes, Rings' resonator).
@@ -387,7 +387,7 @@ Module* create() { return new Res(); }
 const ModuleTypeInfo kResType = {
     "res", "RES", "Modal resonator for any input", Category::Processor, Icon::Bell, Drawing::None,
     5, res::kParams, 2, res::kInKeys, res::kInLabels, 1, kOutOnly, kOutLbl,
-    300, sizeof(res::Res) + kBlock * sizeof(float), 0, res::create};
+    6310, sizeof(res::Res) + kBlock * sizeof(float), 0, res::create};
 
 // ---------------------------------------------------------------- KCK / SNR / HAT
 namespace drum {
@@ -437,7 +437,7 @@ Module* create() { return new Kck(); }
 const ModuleTypeInfo kKckType = {
     "kck", "KCK", "Analog kick drum", Category::Source, Icon::Drum, Drawing::None,
     6, kck::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
-    60, sizeof(kck::Kck) + kBlock * sizeof(float), 0, kck::create};
+    3300, sizeof(kck::Kck) + kBlock * sizeof(float), 0, kck::create};
 
 namespace snr {
 enum { kFreq, kTone, kDecay, kSnappy, kAccent };
@@ -479,7 +479,7 @@ Module* create() { return new Snr(); }
 const ModuleTypeInfo kSnrType = {
     "snr", "SNR", "Analog snare drum", Category::Source, Icon::Drum, Drawing::None,
     5, snr::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
-    90, sizeof(snr::Snr) + kBlock * sizeof(float), 0, snr::create};
+    10740, sizeof(snr::Snr) + kBlock * sizeof(float), 0, snr::create};
 
 namespace hat {
 enum { kFreq, kTone, kDecay, kNoise, kAccent };
@@ -521,7 +521,7 @@ Module* create() { return new Hat(); }
 const ModuleTypeInfo kHatType = {
     "hat", "HAT", "Metallic hi-hat", Category::Source, Icon::Hat, Drawing::None,
     5, hat::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
-    110, sizeof(hat::Hat) + kBlock * sizeof(float), 0, hat::create};
+    6870, sizeof(hat::Hat) + kBlock * sizeof(float), 0, hat::create};
 
 // ---------------------------------------------------------------- PRT
 namespace prt {
@@ -560,7 +560,7 @@ Module* create() { return new Prt(); }
 const ModuleTypeInfo kPrtType = {
     "prt", "PRT", "Particles: resonant dust", Category::Source, Icon::Noise, Drawing::None,
     5, prt::kParams, 2, prt::kInKeys, prt::kInLabels, 1, kOutOnly, kOutLbl,
-    60, sizeof(prt::Prt) + kBlock * sizeof(float), 0, prt::create};
+    410, sizeof(prt::Prt) + kBlock * sizeof(float), 0, prt::create};
 
 // ---------------------------------------------------------------- VOS
 namespace vos {
@@ -600,7 +600,7 @@ Module* create() { return new Vos(); }
 const ModuleTypeInfo kVosType = {
     "vos", "VOS", "VOSIM: two formants", Category::Source, Icon::Osc, Drawing::None,
     5, vos::kParams, 2, vos::kInKeys, vos::kInLabels, 1, kOutOnly, kOutLbl,
-    70, sizeof(vos::Vos) + kBlock * sizeof(float), 0, vos::create};
+    2140, sizeof(vos::Vos) + kBlock * sizeof(float), 0, vos::create};
 
 // ---------------------------------------------------------------- ZOS
 namespace zos {
@@ -639,7 +639,7 @@ Module* create() { return new Zos(); }
 const ModuleTypeInfo kZosType = {
     "zos", "ZOS", "Z oscillator: formant sync", Category::Source, Icon::Osc, Drawing::None,
     5, zos::kParams, 2, zos::kInKeys, zos::kInLabels, 1, kOutOnly, kOutLbl,
-    70, sizeof(zos::Zos) + kBlock * sizeof(float), 0, zos::create};
+    1580, sizeof(zos::Zos) + kBlock * sizeof(float), 0, zos::create};
 
 // ---------------------------------------------------------------- HRM
 // Additive: 16 harmonics, amplitudes peaked at CENTRE, falling by ROLLOFF per harmonic of distance.
@@ -690,4 +690,4 @@ Module* create() { return new Hrm(); }
 const ModuleTypeInfo kHrmType = {
     "hrm", "HRM", "Additive, 16 harmonics", Category::Source, Icon::Osc, Drawing::None,
     5, hrm::kParams, 2, hrm::kInKeys, hrm::kInLabels, 1, kOutOnly, kOutLbl,
-    180, sizeof(hrm::Hrm) + kBlock * sizeof(float), 0, hrm::create};
+    790, sizeof(hrm::Hrm) + kBlock * sizeof(float), 0, hrm::create};

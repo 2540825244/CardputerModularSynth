@@ -61,4 +61,4 @@ Module* create() { return new Osc(); }
 const ModuleTypeInfo kOscType = {
     "osc", "OSC", "Sine tri saw square, 1V/oct, FM", Category::Source, Icon::Osc, Drawing::None,
     4, kParams, 2, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
-    60, sizeof(Osc) + kBlock * sizeof(float), 0, create};
+    290, sizeof(Osc) + kBlock * sizeof(float), 0, create};

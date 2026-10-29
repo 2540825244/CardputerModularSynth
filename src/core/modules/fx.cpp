@@ -120,7 +120,7 @@ Module* create() {
 const ModuleTypeInfo kRevType = {
     "rev", "REV", "Plate reverb", Category::Effect, Icon::Rev, Drawing::None,
     5, rev::kParams, 1, kInOnly, kInLbl, 2, rev::kOutKeys, rev::kOutLabels,
-    140, sizeof(rev::Rev) + 2 * kBlock * sizeof(float), kDelaySlots, rev::create, nullptr, 0, 1};
+    1790, sizeof(rev::Rev) + 2 * kBlock * sizeof(float), kDelaySlots, rev::create, nullptr, 0, 1};
 
 // ---------------------------------------------------------------- CHO
 // Mono chorus: two taps of a 25 ms line swept in opposite phase.
@@ -171,7 +171,7 @@ Module* create() { return new Cho(); }
 const ModuleTypeInfo kChoType = {
     "cho", "CHO", "Chorus, two swept taps", Category::Effect, Icon::Fx, Drawing::None,
     4, cho::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
-    40, sizeof(cho::Cho) + kBlock * sizeof(float), 0, cho::create};
+    290, sizeof(cho::Cho) + kBlock * sizeof(float), 0, cho::create};
 
 // ---------------------------------------------------------------- FLG
 namespace flg {
@@ -211,7 +211,7 @@ Module* create() { return new Flg(); }
 const ModuleTypeInfo kFlgType = {
     "flg", "FLG", "Flanger with feedback", Category::Effect, Icon::Fx, Drawing::None,
     4, flg::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
-    40, sizeof(flg::Flg) + kBlock * sizeof(float), 0, flg::create};
+    210, sizeof(flg::Flg) + kBlock * sizeof(float), 0, flg::create};
 
 // ---------------------------------------------------------------- PHA
 // Phaser: 6 first-order allpasses, their corner swept by an LFO around FREQ.
@@ -265,7 +265,7 @@ Module* create() { return new Pha(); }
 const ModuleTypeInfo kPhaType = {
     "pha", "PHA", "6-stage phaser", Category::Effect, Icon::Fx, Drawing::None,
     5, pha::kParams, 2, pha::kInKeys, pha::kInLabels, 1, kOutOnly, kOutLbl,
-    90, sizeof(pha::Pha) + kBlock * sizeof(float), 0, pha::create};
+    560, sizeof(pha::Pha) + kBlock * sizeof(float), 0, pha::create};
 
 // ---------------------------------------------------------------- TRM
 namespace trm {
@@ -300,7 +300,7 @@ Module* create() { return new Trm(); }
 const ModuleTypeInfo kTrmType = {
     "trm", "TRM", "Tremolo", Category::Effect, Icon::Fx, Drawing::None,
     3, trm::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
-    25, sizeof(trm::Trm) + kBlock * sizeof(float), 0, trm::create};
+    390, sizeof(trm::Trm) + kBlock * sizeof(float), 0, trm::create};
 
 // ---------------------------------------------------------------- PSH
 // Pitch shifter: two read heads sweep a 2048-sample window half a window apart, each faded by a
@@ -357,4 +357,4 @@ Module* create() { return new Psh(); }
 const ModuleTypeInfo kPshType = {
     "psh", "PSH", "Pitch shifter, +-2 oct", Category::Effect, Icon::Psh, Drawing::None,
     4, psh::kParams, 2, psh::kInKeys, psh::kInLabels, 1, kOutOnly, kOutLbl,
-    50, sizeof(psh::Psh) + kBlock * sizeof(float), 0, psh::create};
+    540, sizeof(psh::Psh) + kBlock * sizeof(float), 0, psh::create};

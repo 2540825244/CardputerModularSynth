@@ -84,4 +84,4 @@ void KeysModule::process(const float* const*, const bool*) {
 const ModuleTypeInfo kKeysType = {
     "keys", "KEY", "Keyboard: 6 layouts, latch", Category::Source, Icon::Keys, Drawing::None,
     8, kParams, 0, nullptr, nullptr, 3, kOutKeys, kOutLabels,
-    10, sizeof(KeysModule) + 3 * kBlock * sizeof(float), 1, create, kKeyPages, 2};
+    160, sizeof(KeysModule) + 3 * kBlock * sizeof(float), 1, create, kKeyPages, 2};

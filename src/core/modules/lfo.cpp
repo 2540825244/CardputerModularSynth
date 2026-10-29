@@ -87,4 +87,4 @@ Module* create() { return new Lfo(); }
 const ModuleTypeInfo kLfoType = {
     "lfo", "LFO", "LFO: 7 waves, reset, 90deg out", Category::Modulator, Icon::Lfo,
     Drawing::None, 2, kParams, 2, kInKeys, kInLabels, 2, kOutKeys, kOutLabels,
-    18, sizeof(Lfo) + 2 * kBlock * sizeof(float), 0, create};
+    420, sizeof(Lfo) + 2 * kBlock * sizeof(float), 0, create};

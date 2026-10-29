@@ -110,4 +110,4 @@ Module* create() {
 const ModuleTypeInfo kDlyType = {
     "dly", "DLY", "Delay 1 s, tone, clock sync", Category::Effect, Icon::Dly,
     Drawing::None, 5, kParams, 3, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
-    30, sizeof(Dly) + kBlock * sizeof(float), kDelaySlots, create, nullptr, 0, 1};
+    510, sizeof(Dly) + kBlock * sizeof(float), kDelaySlots, create, nullptr, 0, 1};

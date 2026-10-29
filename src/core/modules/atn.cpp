@@ -44,4 +44,4 @@ Module* create() { return new Atn(); }
 const ModuleTypeInfo kAtnType = {
     "atn", "ATN", "Attenuverter + offset (DC)", Category::Utility, Icon::Atn, Drawing::None,
     2, kParams, 1, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
-    25, sizeof(Atn) + kBlock * sizeof(float), 0, create};
+    120, sizeof(Atn) + kBlock * sizeof(float), 0, create};

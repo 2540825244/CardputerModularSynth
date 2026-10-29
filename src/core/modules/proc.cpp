@@ -3,7 +3,7 @@
 #include "Effects/autowah.h"
 #include "Effects/overdrive.h"
 #include "Effects/wavefolder.h"
-#include "Filters/ladder.h"
+#include "../ladder.h"
 #include "common.h"
 
 using namespace mods;
@@ -38,7 +38,7 @@ class Lad : public Module {
         const float* cut = inOrNull(ins, c, 1);
         const float* rcv = inOrNull(ins, c, 2);
         int md = (int)param(kMode);
-        f_.SetFilterMode((daisysp::LadderFilter::FilterMode)(md < 0 ? 0 : (md > 5 ? 5 : md)));
+        f_.SetFilterMode((Ladder::Mode)(md < 0 ? 0 : (md > 5 ? 5 : md)));
         f_.SetInputDrive(1.f + 3.f * param(kDrive));
         const float base = log2f(param(kCut) / kC4Hz);
         if (!seeded_) {
@@ -57,7 +57,7 @@ class Lad : public Module {
     }
 
    private:
-    daisysp::LadderFilter f_;
+    Ladder f_;
     Slew slew_;
     bool seeded_ = false;
 };
@@ -67,7 +67,7 @@ Module* create() { return new Lad(); }
 const ModuleTypeInfo kLadType = {
     "lad", "LAD", "Ladder filter 24/12 dB, 6 modes", Category::Processor, Icon::Vcf, Drawing::None,
     4, lad::kParams, 3, lad::kInKeys, lad::kInLabels, 1, kOutOnly, kOutLbl,
-    260, sizeof(lad::Lad) + kBlock * sizeof(float), 0, lad::create};
+    810, sizeof(lad::Lad) + kBlock * sizeof(float), 0, lad::create};
 
 // ---------------------------------------------------------------- FLD
 namespace fld {
@@ -101,7 +101,7 @@ Module* create() { return new Fld(); }
 const ModuleTypeInfo kFldType = {
     "fld", "FLD", "Wavefolder, gain CV", Category::Processor, Icon::Fold, Drawing::None,
     2, fld::kParams, 2, fld::kInKeys, fld::kInLabels, 1, kOutOnly, kOutLbl,
-    30, sizeof(fld::Fld) + kBlock * sizeof(float), 0, fld::create};
+    400, sizeof(fld::Fld) + kBlock * sizeof(float), 0, fld::create};
 
 // ---------------------------------------------------------------- OVD
 namespace ovd {
@@ -139,7 +139,7 @@ Module* create() { return new Ovd(); }
 const ModuleTypeInfo kOvdType = {
     "ovd", "OVD", "Overdrive with tone", Category::Processor, Icon::Drive, Drawing::None,
     3, ovd::kParams, 2, ovd::kInKeys, ovd::kInLabels, 1, kOutOnly, kOutLbl,
-    40, sizeof(ovd::Ovd) + kBlock * sizeof(float), 0, ovd::create};
+    250, sizeof(ovd::Ovd) + kBlock * sizeof(float), 0, ovd::create};
 
 // ---------------------------------------------------------------- CRU
 // Bit crusher + sample-rate reducer: hold every Nth sample, quantise to BITS.
@@ -181,7 +181,7 @@ Module* create() { return new Cru(); }
 const ModuleTypeInfo kCruType = {
     "cru", "CRU", "Bit crusher + rate reducer", Category::Processor, Icon::Crush, Drawing::None,
     3, cru::kParams, 2, cru::kInKeys, cru::kInLabels, 1, kOutOnly, kOutLbl,
-    20, sizeof(cru::Cru) + kBlock * sizeof(float), 0, cru::create};
+    460, sizeof(cru::Cru) + kBlock * sizeof(float), 0, cru::create};
 
 // ---------------------------------------------------------------- LPG
 // Low-pass gate: a vactrol-like envelope (fast rise, DECAY fall) opens a VCA and, with COLOR, a
@@ -235,7 +235,7 @@ Module* create() { return new Lpg(); }
 const ModuleTypeInfo kLpgType = {
     "lpg", "LPG", "Low-pass gate, vactrol decay", Category::Processor, Icon::Lpg, Drawing::None,
     3, lpg::kParams, 3, lpg::kInKeys, lpg::kInLabels, 1, kOutOnly, kOutLbl,
-    35, sizeof(lpg::Lpg) + kBlock * sizeof(float), 0, lpg::create};
+    320, sizeof(lpg::Lpg) + kBlock * sizeof(float), 0, lpg::create};
 
 // ---------------------------------------------------------------- RNG
 // Ring modulator and math: A x B / 5 V, A + B, max, min.
@@ -265,7 +265,7 @@ Module* create() { return new Ring(); }
 const ModuleTypeInfo kRingType = {
     "ring", "RNG", "Ring mod, sum, max, min", Category::Processor, Icon::Ring, Drawing::None,
     0, nullptr, 2, ring::kInKeys, ring::kInLabels, 4, ring::kOutKeys, ring::kOutLabels,
-    10, sizeof(ring::Ring) + 4 * kBlock * sizeof(float), 0, ring::create};
+    260, sizeof(ring::Ring) + 4 * kBlock * sizeof(float), 0, ring::create};
 
 // ---------------------------------------------------------------- XFD
 namespace xfd {
@@ -298,7 +298,7 @@ Module* create() { return new Xfd(); }
 const ModuleTypeInfo kXfdType = {
     "xfd", "XFD", "Crossfade A to B, CV", Category::Utility, Icon::Mix, Drawing::None,
     1, xfd::kParams, 3, xfd::kInKeys, xfd::kInLabels, 1, kOutOnly, kOutLbl,
-    10, sizeof(xfd::Xfd) + kBlock * sizeof(float), 0, xfd::create};
+    220, sizeof(xfd::Xfd) + kBlock * sizeof(float), 0, xfd::create};
 
 // ---------------------------------------------------------------- DYN
 // Compressor/limiter with an optional sidechain. Detector: peak, attack/release one-pole.
@@ -351,7 +351,7 @@ Module* create() { return new Dyn(); }
 const ModuleTypeInfo kDynType = {
     "dyn", "DYN", "Compressor, sidechain in", Category::Processor, Icon::Drive, Drawing::None,
     5, dyn::kParams, 2, dyn::kInKeys, dyn::kInLabels, 2, dyn::kOutKeys, dyn::kOutLabels,
-    70, sizeof(dyn::Dyn) + 2 * kBlock * sizeof(float), 0, dyn::create};
+    580, sizeof(dyn::Dyn) + 2 * kBlock * sizeof(float), 0, dyn::create};
 
 // ---------------------------------------------------------------- AWH
 namespace awh {
@@ -382,7 +382,7 @@ Module* create() { return new Awh(); }
 const ModuleTypeInfo kAwhType = {
     "awh", "AWH", "Auto-wah", Category::Effect, Icon::Fx, Drawing::None,
     3, awh::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
-    60, sizeof(awh::Awh) + kBlock * sizeof(float), 0, awh::create};
+    2670, sizeof(awh::Awh) + kBlock * sizeof(float), 0, awh::create};
 
 // ---------------------------------------------------------------- ENF
 // Envelope follower: |in| through attack/release, x GAIN; GATE is high while it is over THRESH.
@@ -422,7 +422,7 @@ Module* create() { return new Enf(); }
 const ModuleTypeInfo kEnfType = {
     "enf", "ENF", "Envelope follower + gate", Category::Modulator, Icon::Env, Drawing::None,
     4, enf::kParams, 1, kInOnly, kInLbl, 2, enf::kOutKeys, enf::kOutLabels,
-    20, sizeof(enf::Enf) + 2 * kBlock * sizeof(float), 0, enf::create};
+    160, sizeof(enf::Enf) + 2 * kBlock * sizeof(float), 0, enf::create};
 
 // ---------------------------------------------------------------- SLW
 // Slew limiter: the output moves towards IN at most 10 V per RISE (up) or FALL (down) ms.
@@ -456,4 +456,4 @@ Module* create() { return new Slw(); }
 const ModuleTypeInfo kSlwType = {
     "slw", "SLW", "Slew limiter, rise and fall", Category::Utility, Icon::Slew, Drawing::None,
     2, slw::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
-    8, sizeof(slw::Slw) + kBlock * sizeof(float), 0, slw::create};
+    100, sizeof(slw::Slw) + kBlock * sizeof(float), 0, slw::create};

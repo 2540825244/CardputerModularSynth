@@ -3,7 +3,7 @@
 #include <new>
 #include "common.h"
 #include "Control/adsr.h"
-#include "Filters/ladder.h"
+#include "../ladder.h"
 #include "plaits/dsp/voice.h"
 
 using namespace mods;
@@ -110,8 +110,7 @@ class Grd : public Module {
         env_.SetDecayTime(param(kDcy) * 0.001f);
         env_.SetReleaseTime(param(kDcy) * 0.001f);
         env_.SetSustainLevel(param(kSus));
-        lad_.SetFilterMode(flt == kFltHp ? daisysp::LadderFilter::FilterMode::HP24
-                                         : daisysp::LadderFilter::FilterMode::LP24);
+        lad_.SetFilterMode(flt == kFltHp ? Ladder::HP24 : Ladder::LP24);
         lad_.SetRes(param(kRes) * 1.8f);
         const float base = log2f(param(kCut) / kC4Hz);
         if (!seeded_) {
@@ -190,7 +189,7 @@ class Grd : public Module {
     plaits::Voice::Frame fifo_[kChunk];
     int pos_ = kChunk;  // next frame to play; kChunk = render first
     float trigMax_ = 0.f;
-    daisysp::LadderFilter lad_;
+    Ladder lad_;
     daisysp::Adsr env_;
     GateDetector gate_;
     Slew cutSlew_;
@@ -218,6 +217,7 @@ int grdEngineIndex(int v) {
 const ModuleTypeInfo kGrdType = {
     "grd", "GRD", "Grind voice: Plaits+ladder+ADS", Category::Source, Icon::Grind, Drawing::None,
     22, kParams, 9, kInKeys, kInLabels, 4, kOutKeys, kOutLabels,
-    // cpuCycles: a guess until measured on the device (Engine learns it); the engine can change
-    // live, so a lower measurement never lowers it.
-    2400, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kLargest, true};
+    // cpuCycles: measured on the device (bench, UI at 30 fps), ENG 0 = the default and the
+    // heaviest engine with the ladder on; the engine can change live, so a lower measurement
+    // never lowers it.
+    3270, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kLargest, true};
