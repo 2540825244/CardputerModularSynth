@@ -35,7 +35,7 @@ static void uiTask(void*) {
     if (audioI2sError() == 0) codecBegin();
     uint32_t lastStatus = 0, lastDraw = 0;
     bool steadyPrinted = false;
-    uint32_t lastTiltGen = 0, settingsGen = 0;
+    uint32_t lastTiltGen = 0, settingsGen = 0, lastTiltPoll = 0;
     bool inputPending = false;  // redraw soon after a key, not at the next 30 fps tick
     float rollAtStart = 0.f;
     KeyPos pressed[16];
@@ -47,7 +47,13 @@ static void uiTask(void*) {
         gDecoder.update(pressed, n, now, ev, &ne, 16);
         for (int i = 0; i < ne; i++) gUi.handle(ev[i], now);
         if (ne > 0) inputPending = true;
-        tiltPoll(now);
+        // The IMU read is an I2C transfer: only while something uses the tilt (a TILT module or a
+        // hold-and-tilt sweep) at <= 50 Hz, else 4 Hz to keep the angles warm.
+        const bool tiltWanted = gUi.tiltActive() || gPatch.countOfType(kTiltType) > 0;
+        if (now - lastTiltPoll >= (tiltWanted ? 20u : 250u)) {
+            lastTiltPoll = now;
+            tiltPoll(now);
+        }
         if (tiltValid()) tiltPublish(tiltAngles().roll, tiltAngles().pitch);  // TILT modules
         if (gUi.tiltActive() && tiltValid()) {
             const float roll = tiltAngles().roll;  // within +-90, no wrap
@@ -95,7 +101,10 @@ static void uiTask(void*) {
     }
 }
 
-void setup() {
+// Everything that installs an interrupt (I2C via M5.begin, the keyboard's GPIO ISR, USB serial,
+// I2S, the display's SPI) runs here, on core 0: an ESP-IDF interrupt lives on the core that
+// allocates it, and on core 1 it would run inside the audio task's time. Then this task is the UI.
+static void initTask(void*) {
     auto cfg = M5.config();
     cfg.internal_spk = false;  // we own the codec
     cfg.internal_mic = false;
@@ -114,11 +123,15 @@ void setup() {
     gUi.bootLoad();
     gEngine.setCycleCounter(cycleCount);
     gEngine.setLargestBlock(largestBlock);
-    if (!audioBegin(gEngine)) Serial.println("audioBegin FAILED");
+    if (!audioBegin(gEngine)) Serial.println("audioBegin FAILED");  // the audio task goes to core 1
     printHeap("init");
     Serial.printf("[grd] needs %u B: one block of %u + the rest\n", (unsigned)kGrdType.ramBytes,
                   (unsigned)kGrdType.largestAlloc);
-    xTaskCreatePinnedToCore(uiTask, "ui", 12288, nullptr, 1, nullptr, 0);
+    uiTask(nullptr);
+}
+
+void setup() {
+    xTaskCreatePinnedToCore(initTask, "ui", 12288, nullptr, 1, nullptr, 0);
     vTaskDelete(nullptr);  // loop() never runs
 }
 

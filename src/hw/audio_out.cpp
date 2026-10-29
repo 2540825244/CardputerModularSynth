@@ -54,8 +54,10 @@ bool audioBegin(Engine& engine) {
     cfg.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
     cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
     cfg.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
+    // 4 x 120 frames = 10 ms: few DMA interrupts and task wake-ups (the ISR sits on the core
+    // that calls audioBegin: core 0, see main.cpp)
     cfg.dma_buf_count = 4;
-    cfg.dma_buf_len = 64;
+    cfg.dma_buf_len = 120;
     cfg.use_apll = false;
     cfg.tx_desc_auto_clear = true;
     esp_err_t e = i2s_driver_install(kI2sPort, &cfg, 0, nullptr);
