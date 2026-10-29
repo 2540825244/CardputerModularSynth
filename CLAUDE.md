@@ -11,12 +11,14 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 
-## Next step (as of 2026-10-29, session 6)
-v1.3 plan `docs/superpowers/plans/2026-10-29-v1.3-perf-and-sampling.md` (perf, SD fix, flash budget,
-bypass, KIT demand-driven drum sampler, PO-33 presets, screen sleep). Ledger:
-`.superpowers/sdd/2026-10-29-v1.3-perf-and-sampling/progress.md` (trust it and git log after compaction).
-Execution: one persistent Opus implementer subagent (impl-v13) does all code; Claude coordinates and
-feeds ideas; reviewer rev-v12. The device is on USB: only ever write the Launcher's `modsyn` slot
+## Next step (as of 2026-10-29, session 7)
+v1.3 plan `docs/superpowers/plans/2026-10-29-v1.3-perf-and-sampling.md` is built and reviewed (Tasks 1-10;
+ledger `.superpowers/sdd/2026-10-29-v1.3-perf-and-sampling/progress.md`, trust it and git log after
+compaction). Handed to the owner: `dist/modsynth-v1.3-test1.bin` (36199db) + `dist/test-6-script.md`,
+made without the device. Next: the owner's device results, then the deferred Task 9 perf items
+(IRAM, ladder 2x, Plaits division, GRD per-engine cost: each needs the device bench) and the
+deferred minors in the ledger. Execution: Claude implements inline, one Opus reviewer subagent.
+The device is on USB only when the owner says so: only ever write the Launcher's `modsyn` slot
 (0x650000, image <= 1 MB) via `tools/dev/flash_slot.sh`; full flash backup in `dist/`.
 Backlog not in the plan: `docs/todo.md`.
 
