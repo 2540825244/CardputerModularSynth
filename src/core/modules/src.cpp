@@ -355,11 +355,11 @@ Module* create() { return new phys::Phys<daisysp::ModalVoice, kMdlType>(0.5f); }
 }
 
 const ModuleTypeInfo kStrType = {
-    "str", "STR", "Plucked string (Karplus)", Category::Source, Icon::String, Drawing::None,
+    "str", "STR", "Plucked string (Karplus)", Category::Source, Icon::String, Drawing::Picture,
     6, phys::kParams, 4, phys::kInKeys, phys::kInLabels, 1, kOutOnly, kOutLbl,
     1050, sizeof(phys::Phys<daisysp::StringVoice, kStrType>) + kBlock * sizeof(float), 0, str::create};
 const ModuleTypeInfo kMdlType = {
-    "mdl", "MDL", "Modal voice: bells, bars", Category::Source, Icon::Bell, Drawing::None,
+    "mdl", "MDL", "Modal voice: bells, bars", Category::Source, Icon::Bell, Drawing::Picture,
     6, phys::kParams, 4, phys::kInKeys, phys::kInLabels, 1, kOutOnly, kOutLbl,
     1460, sizeof(phys::Phys<daisysp::ModalVoice, kMdlType>) + kBlock * sizeof(float), 0, mdl::create};
 
@@ -397,7 +397,7 @@ Module* create() { return new Res(); }
 }  // namespace res
 
 const ModuleTypeInfo kResType = {
-    "res", "RES", "Modal resonator for any input", Category::Processor, Icon::Bell, Drawing::None,
+    "res", "RES", "Modal resonator for any input", Category::Processor, Icon::Bell, Drawing::Picture,
     5, res::kParams, 2, res::kInKeys, res::kInLabels, 1, kOutOnly, kOutLbl,
     940, sizeof(res::Res) + kBlock * sizeof(float), 0, res::create};
 
@@ -448,7 +448,7 @@ Module* create() { return new Kck(); }
 }  // namespace kck
 
 const ModuleTypeInfo kKckType = {
-    "kck", "KCK", "Analog kick drum", Category::Source, Icon::Drum, Drawing::None,
+    "kck", "KCK", "Analog kick drum", Category::Source, Icon::Drum, Drawing::Picture,
     6, kck::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
     730, sizeof(kck::Kck) + kBlock * sizeof(float), 0, kck::create};
 
@@ -491,7 +491,7 @@ Module* create() { return new Snr(); }
 }  // namespace snr
 
 const ModuleTypeInfo kSnrType = {
-    "snr", "SNR", "Analog snare drum", Category::Source, Icon::Drum, Drawing::None,
+    "snr", "SNR", "Analog snare drum", Category::Source, Icon::Drum, Drawing::Picture,
     5, snr::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
     950, sizeof(snr::Snr) + kBlock * sizeof(float), 0, snr::create};
 
@@ -534,7 +534,7 @@ Module* create() { return new Hat(); }
 }  // namespace hat
 
 const ModuleTypeInfo kHatType = {
-    "hat", "HAT", "Metallic hi-hat", Category::Source, Icon::Hat, Drawing::None,
+    "hat", "HAT", "Metallic hi-hat", Category::Source, Icon::Hat, Drawing::Picture,
     5, hat::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
     750, sizeof(hat::Hat) + kBlock * sizeof(float), 0, hat::create};
 
@@ -573,7 +573,7 @@ Module* create() { return new Prt(); }
 }  // namespace prt
 
 const ModuleTypeInfo kPrtType = {
-    "prt", "PRT", "Particles: resonant dust", Category::Source, Icon::Noise, Drawing::None,
+    "prt", "PRT", "Particles: resonant dust", Category::Source, Icon::Noise, Drawing::Picture,
     5, prt::kParams, 2, prt::kInKeys, prt::kInLabels, 1, kOutOnly, kOutLbl,
     410, sizeof(prt::Prt) + kBlock * sizeof(float), 0, prt::create};
 

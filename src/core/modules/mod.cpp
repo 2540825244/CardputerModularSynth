@@ -83,7 +83,7 @@ Module* create() { return new Ad(); }
 }  // namespace ad
 
 const ModuleTypeInfo kAdType = {
-    "ad", "AD", "AD envelope: curve, loop, EOC", Category::Modulator, Icon::Env, Drawing::None,
+    "ad", "AD", "AD envelope: curve, loop, EOC", Category::Modulator, Icon::Env, Drawing::Picture,
     4, ad::kParams, 1, ad::kInKeys, ad::kInLabels, 2, ad::kOutKeys, ad::kOutLabels,
     600, sizeof(ad::Ad) + 2 * kBlock * sizeof(float), 0, ad::create};
 

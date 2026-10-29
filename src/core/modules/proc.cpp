@@ -235,7 +235,7 @@ Module* create() { return new Lpg(); }
 }  // namespace lpg
 
 const ModuleTypeInfo kLpgType = {
-    "lpg", "LPG", "Low-pass gate, vactrol decay", Category::Processor, Icon::Lpg, Drawing::None,
+    "lpg", "LPG", "Low-pass gate, vactrol decay", Category::Processor, Icon::Lpg, Drawing::Picture,
     3, lpg::kParams, 3, lpg::kInKeys, lpg::kInLabels, 1, kOutOnly, kOutLbl,
     320, sizeof(lpg::Lpg) + kBlock * sizeof(float), 0, lpg::create};
 
@@ -422,7 +422,7 @@ Module* create() { return new Enf(); }
 }  // namespace enf
 
 const ModuleTypeInfo kEnfType = {
-    "enf", "ENF", "Envelope follower + gate", Category::Modulator, Icon::Env, Drawing::None,
+    "enf", "ENF", "Envelope follower + gate", Category::Modulator, Icon::Env, Drawing::Picture,
     4, enf::kParams, 1, kInOnly, kInLbl, 2, enf::kOutKeys, enf::kOutLabels,
     160, sizeof(enf::Enf) + 2 * kBlock * sizeof(float), 0, enf::create};
 
@@ -456,6 +456,6 @@ Module* create() { return new Slw(); }
 }  // namespace slw
 
 const ModuleTypeInfo kSlwType = {
-    "slw", "SLW", "Slew limiter, rise and fall", Category::Utility, Icon::Slew, Drawing::None,
+    "slw", "SLW", "Slew limiter, rise and fall", Category::Utility, Icon::Slew, Drawing::Picture,
     2, slw::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
     100, sizeof(slw::Slw) + kBlock * sizeof(float), 0, slw::create};

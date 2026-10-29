@@ -196,10 +196,139 @@ void chs(const PicCtx& c) {
     captions(c, "X / Z", PDim, r, isSel(c, 1) ? PAccent : PText);
 }
 
+void msText(float ms, char* out, int len) {
+    if (ms >= 1000.f) snprintf(out, (size_t)len, "%.1fS", (double)(ms / 1000.f));
+    else snprintf(out, (size_t)len, "%dMS", (int)lroundf(ms));
+}
+
+// ---- AD: DaisySP AdEnv's segments, (1 - e^(crv x)) / (1 - e^crv), in real time ----
+float adSeg(float x, float crv) {
+    if (fabsf(crv) < 1e-3f) return x;
+    return (1.f - expf(crv * x)) / (1.f - expf(crv));
+}
+void ad(const PicCtx& c) {
+    const float atk = par(c, 0), dec = par(c, 1), crv = par(c, 2), total = atk + dec;
+    const Box all = body(c);
+    const Box b = c.small ? all : Box{all.x, all.y + 2, all.w - 8, all.h - 4};
+    const float xa = atk / total;
+    auto f = [&](float u) { return u < xa ? adSeg(u / xa, crv) : 1.f - adSeg((u - xa) / (1.f - xa), crv); };
+    const ParamSpec* sp = c.m.type->params;
+    if (!c.small) {
+        const float ga = sp[0].def, gd = sp[1].def, gxa = ga / (ga + gd);
+        traceUnit(c.g, b, [&](float u) { return u < gxa ? adSeg(u / gxa, sp[2].def) : 1.f - adSeg((u - gxa) / (1.f - gxa), sp[2].def); },
+                  PFaint, false, 2);
+        stipple(c.g, b, f);
+    }
+    const Box ba = {b.x, b.y, xUnit(b, xa) - b.x + 1, b.h}, bd = {xUnit(b, xa), b.y, b.x + b.w - xUnit(b, xa), b.h};
+    traceUnit(c.g, ba, [&](float u) { return adSeg(u, crv); }, c.sel < 0 || c.sel == 0 || c.sel == 2 ? PAccent : PText, isSel(c, 0));
+    traceUnit(c.g, bd, [&](float u) { return 1.f - adSeg(u, crv); }, c.sel < 0 || c.sel == 1 || c.sel == 2 ? PAccent : PText, isSel(c, 1));
+    if (c.small) return;
+    if (par(c, 3) >= 0.5f) label(c, "LOOP", b.x + b.w - 1, b.y + b.h - 7, isSel(c, 3) ? PAccent : PText, Align::Right);
+    if (live(c)) {  // monitor 0 = the level now: a tick on the right edge
+        const int y = yUnit(b, mon(c, 0, 0.f));
+        c.g.fillRect(all.x + all.w - 5, y - 1, 5, 3, PText);
+    }
+    char t[12], l[16];
+    msText(total, t, sizeof t);
+    snprintf(l, sizeof l, "CRV %+.1f", (double)crv);
+    captions(c, l, isSel(c, 2) ? PAccent : PDim, t, PText);
+}
+bool adGlyph(Gfx& g, const ModuleRec& m, Box b, uint8_t col) {
+    const float xa = m.params[0] / (m.params[0] + m.params[1]), crv = m.params[2];
+    traceUnit(g, b, [&](float u) { return u < xa ? adSeg(u / xa, crv) : 1.f - adSeg((u - xa) / (1.f - xa), crv); }, col);
+    return true;
+}
+
+// ---- ENF: a fixed burst in, the follower out (ATK / REL / GAN), THR and the gate ----
+void enf(const PicCtx& c) {
+    const float atkMs = par(c, 0), relMs = par(c, 1), gain = par(c, 2), thr = par(c, 3);
+    const float winMs = clampf(4.f * relMs + 200.f, 300.f, 8000.f);
+    const Box all = body(c);
+    const Box b = c.small ? all : band(all, 0.f, 0.84f), gt = {all.x, all.y + all.h - 3, all.w, 3};
+    const float burst0 = 0.1f, burst1 = 0.45f;  // the input: 2.5 V from 10 % to 45 % of the window
+    const float dtMs = winMs / (float)(b.w - 1);
+    const float ka = 1.f - expf(-dtMs / atkMs), kr = 1.f - expf(-dtMs / relMs);
+    float env = 0.f;
+    int prev = yUnit(b, 0.f), prevIn = prev;
+    for (int px = 1; px < b.w; px++) {
+        const float u = (float)px / (float)(b.w - 1);
+        const float x = u > burst0 && u < burst1 ? 2.5f : 0.f;
+        env += (x > env ? ka : kr) * (x - env);
+        const float e = clampf(env * gain, 0.f, 10.f);
+        const int y = yUnit(b, e / 5.f), yi = yUnit(b, x / 5.f);
+        if (!c.small) c.g.line(b.x + px - 1, prevIn, b.x + px, yi, PFaint);
+        c.g.line(b.x + px - 1, prev, b.x + px, y, c.sel < 0 || c.sel <= 2 ? PAccent : PText);
+        if (!c.small && e > thr) c.g.vline(gt.x + px, gt.y, gt.h, isSel(c, 3) ? PAccent : PText);
+        prev = y;
+        prevIn = yi;
+    }
+    if (c.small) return;
+    dashH(c.g, b.x, yUnit(b, thr / 5.f), b.w, isSel(c, 3) ? PAccent : PDim);
+    char t[12];
+    msText(winMs, t, sizeof t);
+    captions(c, "IN 2.5V BURST", PFaint, t, PDim);
+}
+
+// ---- SLW: a square in, the slewed out (10 V per RISE / FALL ms) ----
+void slw(const PicCtx& c) {
+    const float rise = par(c, 0), fall = par(c, 1);
+    const float winMs = clampf(2.5f * (rise > fall ? rise : fall) + 100.f, 200.f, 14000.f);
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 4);
+    const float dtMs = winMs / (float)(b.w - 1);
+    const float up = rise < 0.05f ? 1e9f : 10.f * dtMs / rise, dn = fall < 0.05f ? 1e9f : 10.f * dtMs / fall;
+    float y = -5.f;
+    int prev = ySigned(b, -1.f), prevIn = prev;
+    for (int px = 1; px < b.w; px++) {
+        const float u = (float)px / (float)(b.w - 1);
+        const float x = u > 0.05f && u < 0.5f ? 5.f : -5.f;
+        const float d = x - y;
+        y += d > 0.f ? (d < up ? d : up) : (-d < dn ? d : -dn);
+        const int yy = ySigned(b, y / 5.f), yi = ySigned(b, x / 5.f);
+        if (!c.small) c.g.line(b.x + px - 1, prevIn, b.x + px, yi, PFaint);
+        const bool rising = d > 0.f;
+        c.g.line(b.x + px - 1, prev, b.x + px, yy, c.sel < 0 || (rising ? c.sel == 0 : c.sel == 1) ? PAccent : PText);
+        prev = yy;
+        prevIn = yi;
+    }
+    if (c.small) return;
+    char t[12];
+    msText(winMs, t, sizeof t);
+    captions(c, "IN +-5V", PFaint, t, PDim);
+}
+
+// ---- S&H: a ramp in, held at 4 clocks, rounded by SLW; the live held value ----
+void snh(const PicCtx& c) {
+    const Box all = body(c);
+    const Box b = c.small ? all : Box{all.x, all.y + 2, all.w - 8, all.h - 4};
+    const float slewMs = par(c, 0), winMs = 1000.f;
+    const float k = slewMs < 0.05f ? 1.f : 1.f - expf(-(winMs / (float)(b.w - 1)) / slewMs);
+    if (!c.small) trace(c.g, b, [&](float u) { return -0.9f + 1.8f * u; }, PFaint, false, 2);
+    float y = -0.9f, held = -0.9f;
+    int prev = ySigned(b, y);
+    for (int px = 1; px < b.w; px++) {
+        const float u = (float)px / (float)(b.w - 1);
+        const int step = (int)(u * 4.f);
+        held = -0.9f + 1.8f * ((float)step / 4.f);
+        y += k * (held - y);
+        const int yy = ySigned(b, y);
+        c.g.line(b.x + px - 1, prev, b.x + px, yy, PAccent);
+        prev = yy;
+    }
+    if (c.small) return;
+    if (live(c)) {
+        const int yv = ySigned(b, clampf(mon(c, 0, 0.f) / 5.f, -1.f, 1.f));
+        c.g.fillRect(all.x + all.w - 5, yv - 1, 5, 3, PText);
+    }
+    char t[16];
+    msText(slewMs, t, sizeof t);
+    captions(c, "RAMP IN", PFaint, slewMs < 0.05f ? "NO SLEW" : t, isSel(c, 0) ? PAccent : PDim);
+}
+
 }  // namespace
 
 const Entry kModPics[] = {
     {"env", env, envGlyph}, {"lfo", lfo, lfoGlyph}, {"rnd", rnd, nullptr}, {"chs", chs, nullptr},
+    {"ad", ad, adGlyph},    {"enf", enf, nullptr},   {"slw", slw, nullptr}, {"snh", snh, nullptr},
 };
 const int kNumModPics = sizeof kModPics / sizeof kModPics[0];
 

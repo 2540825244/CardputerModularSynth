@@ -1,5 +1,6 @@
 // Pictures: oscillators, voices, drums.
 #include <cstdio>
+#include <initializer_list>
 #include "Synthesis/fm2.h"
 #include "Synthesis/formantosc.h"
 #include "Synthesis/variableshapeosc.h"
@@ -301,12 +302,190 @@ void noi(const PicCtx& c) {
     captions(c, enumName(c, 0), isSel(c, 0) ? PAccent : PDim, kind >= 3 ? r : "10 MS", isSel(c, 1) ? PAccent : PDim);
 }
 
+template <class F>
+void stipple(Gfx& g, Box b, F f) {
+    for (int px = 1; px < b.w - 1; px += 3) {
+        const int top = yUnit(b, f((float)px / (float)(b.w - 1)));
+        for (int yy = b.y + b.h - 2; yy > top + 1; yy -= 3) g.pixel(b.x + px, yy, PBorder);
+    }
+}
+
+// ---- drums and struck voices: sketches of what the knobs do (the real voices cost up to 10k
+// cycles a sample: too heavy to run for a picture) ----
+void secText(float s, char* out, int len) {
+    if (s >= 1.f) snprintf(out, (size_t)len, "%.1fS", (double)s);
+    else snprintf(out, (size_t)len, "%dMS", (int)lroundf(s * 1000.f));
+}
+// A voice over winS seconds: y = (tone(t) mixed with noise) x amp(t), drawn as each column's
+// min..max (a filled band where the pitch is high for the window).
+template <class Amp, class Freq, class Noise>
+void voice(Gfx& g, Box b, float winS, Amp amp, Freq freq, Noise noise, uint8_t col) {
+    mods::Rng rng;
+    const int n = b.w * 6;
+    float ph = 0.f, lo = 0.f, hi = 0.f;
+    int colX = 0;
+    for (int i = 0; i <= n; i++) {
+        const float t = winS * (float)i / (float)n;
+        ph += freq(t) * winS / (float)n;
+        ph -= floorf(ph);
+        const float nz = noise(t);
+        const float y = (sinf(6.2831853f * ph) * (1.f - nz) + rng.bi() * nz) * amp(t);
+        const int x = i * (b.w - 1) / n;
+        if (x != colX || i == n) {
+            g.line(b.x + colX, ySigned(b, hi), b.x + colX, ySigned(b, lo), col);
+            colX = x;
+            lo = hi = y;
+        } else {
+            lo = y < lo ? y : lo;
+            hi = y > hi ? y : hi;
+        }
+    }
+}
+template <class Amp>
+void envelopeLines(Gfx& g, Box b, float winS, Amp amp, uint8_t col) {
+    trace(g, b, [&](float u) { return amp(u * winS); }, col, false, 2);
+    trace(g, b, [&](float u) { return -amp(u * winS); }, col, false, 2);
+}
+
+enum { kKFrq, kKTone, kKDec, kKAfm, kKSfm };
+void kck(const PicCtx& c) {
+    const float f0 = par(c, kKFrq), tau = 0.06f + 0.55f * par(c, kKDec), afm = par(c, kKAfm), sfm = par(c, kKSfm);
+    const float win = clampf(4.f * tau, 0.25f, 2.5f);
+    auto amp = [&](float t) { return expf(-t / tau) * 0.95f; };
+    auto freq = [&](float t) { return f0 * (1.f + 4.f * afm * expf(-t / 0.012f) + 0.6f * sfm * amp(t)); };
+    auto noise = [&](float t) { return t < 0.003f ? 0.3f + 0.6f * par(c, kKTone) : 0.f; };
+    const uint8_t col = c.sel < 0 || c.sel == kKFrq || c.sel == kKAfm || c.sel == kKSfm || c.sel == kKTone ? PAccent : PText;
+    // top: the first 120 ms, where the pitch sweep is; bottom: the whole decay
+    const Box top = c.small ? body(c) : band(body(c), 0.f, 0.62f);
+    voice(c.g, top, 0.12f, amp, freq, noise, col);
+    if (c.small) return;
+    const Box low = band(body(c), 0.7f, 1.f);
+    auto env = [&](float u) { return amp(u * win); };
+    stipple(c.g, low, env);
+    traceUnit(c.g, low, env, isSel(c, kKDec) ? PAccent : PText, isSel(c, kKDec));
+    char f[12], t[12];
+    fmt(c, kKFrq, f, sizeof f, true);
+    secText(win, t, sizeof t);
+    captions(c, f, isSel(c, kKFrq) ? PAccent : PText, "FIRST 120MS", PDim);
+    label(c, t, c.x + c.w - 3, low.y + 1, PDim, Align::Right);
+}
+
+enum { kSFrq, kSTone, kSDec, kSSnp };
+void snr(const PicCtx& c) {
+    const float f0 = par(c, kSFrq), dec = par(c, kSDec), snp = par(c, kSSnp);
+    const float tb = 0.04f + 0.25f * dec, tn = 0.03f + 0.2f * dec, win = clampf(4.f * (tb > tn ? tb : tn), 0.15f, 1.5f);
+    auto bodyA = [&](float t) { return (1.f - 0.6f * snp) * expf(-t / tb); };
+    auto noiseA = [&](float t) { return snp * expf(-t / tn); };
+    auto amp = [&](float t) { return clampf(bodyA(t) + noiseA(t), 0.f, 1.f) * 0.95f; };
+    auto noise = [&](float t) { const float a = bodyA(t) + noiseA(t); return a > 0.f ? noiseA(t) / a : 0.f; };
+    auto freq = [&](float t) { return f0 * (1.f + 0.4f * par(c, kSTone) * expf(-t / 0.01f)); };
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 2);
+    voice(c.g, b, win, amp, freq, noise, c.sel < 0 || c.sel == kSSnp || c.sel == kSTone ? PAccent : PText);
+    if (c.small) return;
+    envelopeLines(c.g, b, win, [&](float t) { return bodyA(t) * 0.95f; }, isSel(c, kSDec) || isSel(c, kSFrq) ? PAccent : PDim);
+    char f[12], t[12];
+    fmt(c, kSFrq, f, sizeof f, true);
+    secText(win, t, sizeof t);
+    captions(c, f, isSel(c, kSFrq) ? PAccent : PText, t, PDim);
+    label(c, "- - BODY", c.x + c.w - 3, c.y + c.h - 7, PDim, Align::Right);
+}
+
+enum { kHFrq, kHTone, kHDec, kHNoi };
+void hat(const PicCtx& c) {
+    const float dec = par(c, kHDec), tau = 0.008f + 0.3f * dec * dec, win = clampf(5.f * tau, 0.05f, 1.6f);
+    static const float kRatios[6] = {1.f, 1.304f, 1.466f, 1.787f, 1.932f, 2.536f};  // the 808's six squares
+    const float f0 = par(c, kHFrq) / 8.f, noi = par(c, kHNoi);  // drawn an octave group lower to read
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 2);
+    mods::Rng rng;
+    const int n = b.w * 6;
+    float lo = 0.f, hi = 0.f;
+    int colX = 0;
+    for (int i = 0; i <= n; i++) {
+        const float t = win * (float)i / (float)n;
+        float m = 0.f;
+        for (float r : kRatios) m += sinf(6.2831853f * f0 * r * t) > 0.f ? 1.f : -1.f;
+        const float y = (m / 6.f * (1.f - noi) + rng.bi() * noi) * expf(-t / tau) * 0.95f;
+        const int x = i * (b.w - 1) / n;
+        if (x != colX || i == n) {
+            c.g.line(b.x + colX, ySigned(b, hi), b.x + colX, ySigned(b, lo), c.sel < 0 || c.sel == kHNoi || c.sel == kHFrq ? PAccent : PText);
+            colX = x;
+            lo = hi = y;
+        } else {
+            lo = y < lo ? y : lo;
+            hi = y > hi ? y : hi;
+        }
+    }
+    if (c.small) return;
+    envelopeLines(c.g, b, win, [&](float t) { return expf(-t / tau) * 0.95f; }, isSel(c, kHDec) ? PAccent : PDim);
+    char f[12], t[12];
+    fmt(c, kHFrq, f, sizeof f, true);
+    secText(win, t, sizeof t);
+    captions(c, f, isSel(c, kHFrq) ? PAccent : PText, t, PDim);
+}
+
+// Modal / string voices: the partials STR spreads and BRI tilts (top), the ring DMP sets (bottom).
+void modal(const PicCtx& c, int strIdx, float stiffScale, bool harmonicFirst) {
+    const float str = par(c, strIdx), bri = par(c, strIdx + 1), dmp = par(c, strIdx + 2);
+    const float stiff = harmonicFirst ? str * stiffScale : (str - 0.25f) * stiffScale;
+    const float tau = 0.08f + 2.5f * (1.f - dmp) * (1.f - dmp);
+    const Box top = c.small ? band(body(c), 0.f, 0.55f) : band(body(c), 0.f, 0.52f);
+    const Box low = c.small ? band(body(c), 0.62f, 1.f) : band(body(c), 0.6f, 1.f);
+    c.g.hline(top.x, top.y + top.h - 1, top.w, PBorder);
+    for (int k = 1; k <= 10; k++) {
+        const float f = (float)k * (1.f + stiff * (float)(k - 1));
+        if (f <= 0.f || f > 12.f) continue;
+        const float a = expf(-(float)(k - 1) * (1.f - bri) * 0.7f);
+        const int x = top.x + (int)lroundf(f / 12.f * (top.w - 1)), h = (int)lroundf(a * (top.h - 2));
+        const uint8_t col = c.sel < 0 || c.sel == strIdx || c.sel == strIdx + 1 ? PAccent : PText;
+        c.g.vline(x, top.y + top.h - 1 - h, h, col);
+        if (k == 1 && x + 1 < top.x + top.w) c.g.vline(x + 1, top.y + top.h - 1 - h, h, col);
+    }
+    const float win = clampf(3.f * tau, 0.3f, 8.f);
+    auto env = [&](float u) { return expf(-u * win / tau); };
+    if (!c.small) stipple(c.g, low, env);
+    traceUnit(c.g, low, env, c.sel < 0 || c.sel == strIdx + 2 ? PAccent : PText, isSel(c, strIdx + 2));
+    if (c.small) return;
+    char note[16], t[12];
+    baseNote(c, 0, 0.f, note, sizeof note);
+    secText(win, t, sizeof t);
+    captions(c, harmonicFirst ? "PARTIALS" : "MODES", PDim, note, c.sel == 0 || c.sel == 1 ? PAccent : PText);
+    label(c, t, c.x + c.w - 3, low.y + 1, PDim, Align::Right);
+}
+void strPic(const PicCtx& c) { modal(c, 2, 0.03f, true); }
+void mdlPic(const PicCtx& c) { modal(c, 2, 0.16f, false); }
+void resPic(const PicCtx& c) { modal(c, 2, 0.16f, false); }
+
+// ---- PRT: the dust: DEN grains around FRQ, SPR wide, RES sharp (seeded positions) ----
+enum { kPFrq, kPRes, kPDen, kPSpr };
+void prt(const PicCtx& c) {
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 2);
+    if (!c.small)
+        for (float f : {100.f, 1000.f, 10000.f}) dashV(c.g, b.x + (int)lroundf(log10f(f / 50.f) / log10f(200.f) * (b.w - 1)), b.y, b.h, PBorder, 1, 2);
+    const float cu = log10f(clampf(par(c, kPFrq), 50.f, 10000.f) / 50.f) / log10f(200.f);
+    const int n = 4 + (int)lroundf(par(c, kPDen) * 40.f), r = 1 + (int)lroundf(par(c, kPRes) * 2.f);
+    mods::Rng rng;
+    for (int i = 0; i < n; i++) {
+        const float u = clampf(cu + par(c, kPSpr) * 0.35f * rng.bi(), 0.f, 1.f), v = rng.uni();
+        const int x = b.x + r + (int)lroundf(u * (b.w - 1 - 2 * r)), y = b.y + r + (int)lroundf(v * (b.h - 1 - 2 * r));
+        const uint8_t col = c.sel < 0 || c.sel == kPDen || c.sel == kPSpr || c.sel == kPRes ? PAccent : PText;
+        if (c.small) c.g.pixel(x, y, col);
+        else c.g.fillCircle(x, y, r, col);
+    }
+    if (c.small) return;
+    dashV(c.g, b.x + (int)lroundf(cu * (b.w - 1)), b.y, b.h, isSel(c, kPFrq) ? PAccent : PDim);
+    char f[12], d[16];
+    fmt(c, kPFrq, f, sizeof f, true);
+    snprintf(d, sizeof d, "%d GRAINS", n);
+    captions(c, d, isSel(c, kPDen) ? PAccent : PDim, f, isSel(c, kPFrq) ? PAccent : PText);
+}
+
 }  // namespace
 
 const Entry kSourcePics[] = {
     {"osc", osc, oscGlyph}, {"vso", vso, vsoGlyph}, {"fmo", fmo, nullptr}, {"for", forPic, nullptr},
     {"vos", vosPic, nullptr}, {"zos", zosPic, nullptr}, {"ssw", ssw, nullptr}, {"hrm", hrm, nullptr},
-    {"noi", noi, nullptr},
+    {"noi", noi, nullptr}, {"kck", kck, nullptr}, {"snr", snr, nullptr}, {"hat", hat, nullptr},
+    {"str", strPic, nullptr}, {"mdl", mdlPic, nullptr}, {"res", resPic, nullptr}, {"prt", prt, nullptr},
 };
 const int kNumSourcePics = sizeof kSourcePics / sizeof kSourcePics[0];
 

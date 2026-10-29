@@ -81,10 +81,34 @@ void trm(const PicCtx& c) {
     captions(c, kW[w < 0 ? 0 : (w > 2 ? 2 : w)], isSel(c, 2) ? PAccent : PDim, r, isSel(c, 0) ? PAccent : PText);
 }
 
+// ---- LPG: after a strike, the vactrol's level (solid) and its cutoff (dashed, by COL) ----
+void lpg(const PicCtx& c) {
+    const float decMs = par(c, 0), color = par(c, 1), level = par(c, 2);
+    const float winMs = clampf(4.f * decMs, 60.f, 12000.f);
+    auto env = [&](float u) { return level + (1.f - level) * expf(-u * winMs / decMs); };
+    auto cut = [&](float u) {
+        const float hz = 40.f * powf(400.f, env(u) * color + (1.f - color));
+        return log10f(clampf(hz, 20.f, 18000.f) / 20.f) / log10f(900.f);
+    };
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 3);
+    if (!c.small) dashH(c.g, b.x, yUnit(b, level), b.w, isSel(c, 2) ? PAccent : PBorder);
+    traceUnit(c.g, b, cut, isSel(c, 1) ? PAccent : PDim, false, c.small ? 0 : 2);
+    traceUnit(c.g, b, env, c.sel < 0 || c.sel == 0 ? PAccent : PText, isSel(c, 0));
+    if (c.small) return;
+    if (live(c)) {
+        const int y = yUnit(b, mon(c, 0, 0.f));
+        c.g.fillRect(c.x + c.w - 5, y - 1, 4, 3, PText);
+    }
+    char t[12];
+    if (winMs >= 1000.f) snprintf(t, sizeof t, "%.1fS", (double)(winMs / 1000.f));
+    else snprintf(t, sizeof t, "%dMS", (int)lroundf(winMs));
+    captions(c, "LEVEL  - - CUTOFF", PDim, t, PDim);
+}
+
 }  // namespace
 
 const Entry kProcPics[] = {
-    {"vcf", vcf, vcfGlyph}, {"trm", trm, nullptr},
+    {"vcf", vcf, vcfGlyph}, {"trm", trm, nullptr}, {"lpg", lpg, nullptr},
 };
 const int kNumProcPics = sizeof kProcPics / sizeof kProcPics[0];
 
