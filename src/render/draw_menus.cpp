@@ -152,9 +152,12 @@ void slotsPage(const UiState& s, const bool filled[kSlots]) {
     }
 }
 
-void presetsPage(const UiState& s) {
+// first: the preset in cell 0 (page 1: 0, page 2: 36)
+void presetsPage(const UiState& s, int first) {
     int n = 0;
-    const Preset* ps = presets(&n);
+    const Preset* all = presets(&n);
+    const Preset* ps = all + (first < n ? first : n);
+    n = n > first ? n - first : 0;
     for (int cell = 0; cell < 36; cell++) {
         const int col = cell % kGridCols, row = cell / kGridCols;
         if (cell >= n) {
@@ -171,7 +174,7 @@ void presetsPage(const UiState& s) {
         smallText(b, x + w / 2, y + 18, PText);
         if (cell == s.fileSlot) outline(col, row, PAccent);
     }
-    bandText(s.fileSlot >= 0 && s.fileSlot < n ? ps[s.fileSlot].name : "PRESETS",
+    bandText(s.fileSlot >= 0 && s.fileSlot < n ? ps[s.fileSlot].name : (first ? "PRESETS 2" : "PRESETS"),
              s.fileSlot >= 0 && s.fileSlot < n ? "ENTER = LOAD" : "FACTORY PATCHES");
 }
 
@@ -205,7 +208,8 @@ void drawFileView(const UiState& s, const bool filled[kSlots]) {
     switch (s.filePage) {
         case 0:
         case 1: slotsPage(s, filled); break;
-        case 2: presetsPage(s); break;
+        case 2: presetsPage(s, 0); break;
+        case 3: presetsPage(s, 36); break;
         default: systemPage(s); break;
     }
 }

@@ -296,17 +296,136 @@ lay("GRDSWM", [
 ], [("k", "pitch", "g", "pitch"), ("k", "gate", "g", "trig"), ("c", "out", "g", "trig"), ("g", "out", "h", "in"),
     ("h", "out", "x", "in")])
 
+
+# v1.4: the second PRESETS page: the new modules (ARP, CLP, PRC, VOW, EQ3)
+lay("ARPEG", [
+    ("k", "keys", {}), ("a", "arp", {"chord": 0, "mode": 0, "oct": 2, "rate": 8, "gatelen": 0.5}),
+    ("o", "osc", {"wave": 2}), ("f", "vcf", {"cutoff": 1600, "res": 0.4}),
+    ("e", "env", {"a": 2, "d": 140, "s": 0, "r": 90}), ("v", "vca", {}),
+    ("d", "dly", {"time": 375, "fdbk": 0.45, "mix": 0.3}), ("x", "out", {}),
+], [("k", "pitch", "a", "pitch"), ("a", "pitch", "o", "pitch"), ("a", "gate", "e", "gate"), ("o", "out", "f", "in"),
+    ("e", "out", "f", "cut", 0.4), ("f", "out", "v", "in"), ("e", "out", "v", "cv"), ("v", "out", "d", "in"),
+    ("d", "out", "x", "in")])
+
+lay("ARPSYN", [
+    ("k", "keys", {}), ("a", "arp", {"chord": 1, "mode": 2, "oct": 2, "rate": 10, "gatelen": 0.4}),
+    ("o", "vso", {"oct": -1, "shape": 0.2, "sync": 1, "ratio": 2.6}), ("f", "lad", {"cutoff": 900, "res": 0.5}),
+    ("e", "ad", {"atk": 1, "dec": 160, "curve": -3}), ("v", "vca", {}), ("c", "cho", {"mix": 0.4}), ("x", "out", {}),
+], [("k", "pitch", "a", "pitch"), ("a", "pitch", "o", "pitch"), ("a", "gate", "e", "trig"), ("o", "out", "f", "in"),
+    ("e", "out", "f", "cut", 0.5), ("f", "out", "v", "in"), ("e", "out", "v", "cv"), ("v", "out", "c", "in"),
+    ("c", "out", "x", "in")])
+
+lay("ARPBEL", [
+    ("k", "keys", {}), ("a", "arp", {"chord": 2, "mode": 0, "oct": 3, "rate": 5}),
+    ("m", "mdl", {"struct": 0.6, "bright": 0.6, "damp": 0.5}),
+    ("d", "dly", {"time": 400, "fdbk": 0.5, "mix": 0.35, "tone": 0.6}), ("x", "out", {}),
+], [("k", "pitch", "a", "pitch"), ("a", "pitch", "m", "pitch"), ("a", "gate", "m", "trig"), ("m", "out", "d", "in"),
+    ("d", "out", "x", "in")])
+
+lay("ARPPAD", [
+    ("k", "keys", {}), ("a", "arp", {"chord": 4, "mode": 0, "oct": 3, "rate": 3, "gatelen": 0.9}),
+    ("o", "for", {"formant": 1200}), ("l", "lpg", {"decay": 500, "color": 0.6}),
+    ("c", "cho", {"mix": 0.5}), ("d", "dly", {"time": 600, "fdbk": 0.5, "mix": 0.35}), ("x", "out", {}),
+], [("k", "pitch", "a", "pitch"), ("a", "pitch", "o", "pitch"), ("o", "out", "l", "in"), ("a", "gate", "l", "trig"),
+    ("l", "out", "c", "in"), ("c", "out", "d", "in"), ("d", "out", "x", "in")])
+
+lay("VOWEL", [
+    ("k", "keys", {}), ("s", "ssw", {"oct": -1, "detune": 0.35}), ("w", "vow", {"vowel": 2, "res": 0.75}),
+    ("l", "lfo", {"wave": 2, "rate": 0.2}), ("c", "cho", {"mix": 0.4}),
+    ("d", "dly", {"time": 500, "fdbk": 0.5, "mix": 0.3}), ("x", "out", {}),
+], [("k", "pitch", "s", "pitch"), ("s", "out", "w", "in"), ("l", "out", "w", "vowel", 0.5), ("w", "out", "c", "in"),
+    ("c", "out", "d", "in"), ("d", "out", "x", "in")])
+
+lay("TALKBX", [
+    ("c", "clk", {"bpm": 110}), ("q", "seq", {"s1": 0, "s2": 0, "s3": 7, "s4": 5, "s5": 0, "s6": 3, "s7": 10, "s8": 7,
+                                            "len": 8, "gatelen": 0.6}),
+    ("o", "osc", {"wave": 2, "oct": -1}), ("r", "rnd", {"rate": 2}), ("w", "vow", {"vowel": 2, "res": 0.8}),
+    ("e", "ad", {"atk": 3, "dec": 220}), ("v", "vca", {}), ("d", "dly", {"time": 272, "fdbk": 0.35, "mix": 0.25}),
+    ("x", "out", {}),
+], [("c", "out", "q", "clk"), ("q", "pitch", "o", "pitch"), ("o", "out", "w", "in"), ("c", "out", "r", "trig"),
+    ("r", "stp", "w", "vowel", 0.5), ("q", "gate", "e", "trig"), ("w", "out", "v", "in"), ("e", "out", "v", "cv"),
+    ("v", "out", "d", "in"), ("d", "out", "x", "in")])
+
+lay("CLAPS", [
+    ("t", "kit", {"len": 8, "gap": 400, "l1": 0b00010001, "l2": 0b01000100, "l3": 0b10101010}),
+    ("k", "kck", {"freq": 50, "decay": 0.5}), ("p", "clp", {"tone": 1300, "decay": 220}),
+    ("h", "hat", {"decay": 0.15}), ("m", "mix", {"lvl3": 0.5}), ("e", "eq3", {"low": 4, "high": 2}), ("x", "out", {}),
+], [("t", "t1", "k", "trig"), ("t", "t2", "p", "trig"), ("t", "t3", "h", "trig"), ("k", "out", "m", "in1"),
+    ("p", "out", "m", "in2"), ("h", "out", "m", "in3"), ("m", "out", "e", "in"), ("e", "out", "x", "in")])
+
+lay("CLAPVR", [
+    ("t", "kit", {"len": 4, "gap": 700, "l1": 0b0101}), ("p", "clp", {"tone": 1100, "decay": 300, "spread": 11}),
+    ("r", "rev", {"size": 0.9, "decay": 0.8, "mix": 0.45}), ("x", "out", {}),
+], [("t", "t1", "p", "trig"), ("p", "out", "r", "in"), ("r", "out", "x", "in")])
+
+lay("PERCKT", [
+    ("t", "kit", {"len": 8, "gap": 400, "l1": 0b00010001, "l2": 0b01100100, "l3": 0b10001010, "l4": 0b00110011}),
+    ("a", "prc", {"mode": 0, "decay": 0.5}), ("b", "prc", {"mode": 1, "tune": 5}), ("c", "prc", {"mode": 2}),
+    ("d", "prc", {"mode": 3, "decay": 0.3}), ("m", "mix", {"lvl3": 0.6, "lvl4": 0.6}), ("x", "out", {}),
+], [("t", "t1", "a", "trig"), ("t", "t2", "b", "trig"), ("t", "t3", "c", "trig"), ("t", "t4", "d", "trig"),
+    ("a", "out", "m", "in1"), ("b", "out", "m", "in2"), ("c", "out", "m", "in3"), ("d", "out", "m", "in4"),
+    ("m", "out", "x", "in")])
+
+lay("TOMFIL", [
+    ("t", "kit", {"len": 8, "gap": 160, "l1": 0b00000011, "l2": 0b00001100, "l3": 0b00110000, "l4": 0b11000000}),
+    ("a", "prc", {"mode": 0, "tune": 10, "decay": 0.5}), ("b", "prc", {"mode": 0, "tune": 5, "decay": 0.5}),
+    ("c", "prc", {"mode": 0, "tune": 0, "decay": 0.6}), ("d", "prc", {"mode": 0, "tune": -5, "decay": 0.7}),
+    ("m", "mix", {}), ("x", "out", {}),
+], [("t", "t1", "a", "trig"), ("t", "t2", "b", "trig"), ("t", "t3", "c", "trig"), ("t", "t4", "d", "trig"),
+    ("a", "out", "m", "in1"), ("b", "out", "m", "in2"), ("c", "out", "m", "in3"), ("d", "out", "m", "in4"),
+    ("m", "out", "x", "in")])
+
+lay("CONGAS", [
+    ("c", "clk", {"bpm": 112, "div": 0}), ("e", "euc", {"steps": 8, "fills": 5}),
+    ("f", "euc", {"steps": 8, "fills": 3, "rot": 2}), ("a", "prc", {"mode": 1, "decay": 0.4}),
+    ("b", "prc", {"mode": 1, "tune": 7, "decay": 0.3}), ("r", "prc", {"mode": 4}),
+    ("m", "mix", {"lvl3": 0.5}), ("d", "dly", {"time": 268, "fdbk": 0.25, "mix": 0.2}), ("x", "out", {}),
+], [("c", "out", "e", "clk"), ("c", "out", "f", "clk"), ("e", "gate", "a", "trig"), ("f", "gate", "b", "trig"),
+    ("e", "inv", "r", "trig"), ("a", "out", "m", "in1"), ("b", "out", "m", "in2"), ("r", "out", "m", "in3"),
+    ("m", "out", "d", "in"), ("d", "out", "x", "in")])
+
+lay("COWBEL", [
+    ("c", "clk", {"bpm": 104}), ("q", "seq", {"s1": 0, "s2": 0, "s3": 5, "s4": 0, "s5": 7, "s6": 0, "s7": 3, "s8": 0,
+                                            "gates": 0b10110101, "len": 8}),
+    ("p", "prc", {"mode": 2, "decay": 0.3}), ("d", "dly", {"time": 430, "fdbk": 0.4, "mix": 0.3}), ("x", "out", {}),
+], [("c", "out", "q", "clk"), ("q", "pitch", "p", "pitch"), ("q", "gate", "p", "trig"), ("p", "out", "d", "in"),
+    ("d", "out", "x", "in")])
+
+lay("EQBASS", [
+    ("k", "keys", {}), ("o", "osc", {"wave": 3, "oct": -2}), ("f", "lad", {"cutoff": 700, "res": 0.3}),
+    ("e", "env", {"a": 2, "d": 300, "s": 0.5, "r": 150}), ("v", "vca", {}),
+    ("q", "eq3", {"low": 6, "mid": -6, "freq": 700, "high": 4}), ("x", "out", {}), ("c", "clk", {"bpm": 60}),
+], [("k", "pitch", "o", "pitch"), ("o", "out", "f", "in"), ("k", "gate", "e", "gate"), ("c", "out", "e", "gate"),
+    ("e", "out", "f", "cut", 0.3), ("f", "out", "v", "in"), ("e", "out", "v", "cv"), ("v", "out", "q", "in"),
+    ("q", "out", "x", "in")])
+
+lay("RIMSHT", [
+    ("t", "kit", {"len": 8, "gap": 300, "l1": 0b01001001, "l2": 0b10110110}),
+    ("r", "prc", {"mode": 4, "decay": 0.5}), ("c", "prc", {"mode": 3, "tune": -3, "decay": 0.5}),
+    ("m", "mix", {}), ("d", "dly", {"time": 200, "fdbk": 0.3, "mix": 0.25}), ("x", "out", {}),
+], [("t", "t1", "r", "trig"), ("t", "t2", "c", "trig"), ("r", "out", "m", "in1"), ("c", "out", "m", "in2"),
+    ("m", "out", "d", "in"), ("d", "out", "x", "in")])
+
 # OUT gain (dB) per preset for about -3 dBFS peak at the line volume: written by tools/preset_levels.py
 GAIN.update({
     "808KIT": 2.1,
     "909KIT": -3.0,
     "ACID": 7.0,
+    "ARPBEL": 8.9,
+    "ARPEG": 1.8,
+    "ARPPAD": -1.3,
+    "ARPSYN": 10.5,
     "BASIC": -5.1,
     "CHOIR": 5.0,
     "CHORDS": 12.3,
+    "CLAPS": -3.2,
+    "CLAPVR": 3.6,
+    "CONGAS": -3.9,
+    "COWBEL": 4.9,
     "DRONE": 3.1,
     "DRUMS": -6.9,
     "ECHO": 1.9,
+    "EQBASS": 7.6,
     "FMBELL": 7.2,
     "GLASS": 1.3,
     "GRDBAS": 11.4,
@@ -318,17 +437,22 @@ GAIN.update({
     "LOFIKT": -1.7,
     "LPGPLK": 2.6,
     "METKIT": 2.2,
-    "PLTKIT": -2.2,
+    "PERCKT": -3.1,
+    "PLTKIT": -1.5,
     "PLUCK": 1.0,
     "REESE": 1.3,
+    "RIMSHT": 1.2,
     "RISER": -1.6,
     "RUBBER": -1.7,
     "SQRLD": -5.6,
     "STACK": -14.1,
     "SUBBAS": -3.5,
     "SYNCLD": -2.2,
+    "TALKBX": -5.1,
     "TILT": -7.4,
+    "TOMFIL": -2.8,
     "TURING": 10.6,
+    "VOWEL": -6.8,
     "VOXLD": 0.6,
     "WARM": 1.9,
     "WIND": -4.5,

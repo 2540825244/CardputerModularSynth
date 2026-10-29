@@ -102,15 +102,15 @@ SideIcons sideIcons(const UiState& s, const Patch& p, bool fnHeld) {
             if (s.placeType >= 0) set(r, Side::Enter, Ic::Enter, fnHeld ? "FORCE" : "PLACE", fnHeld);
             break;
         case View::File: {
-            static const char* const kPg[] = {"LOAD", "SAVE", "PRESET", "SYS"};
+            static const char* const kPg[] = {"LOAD", "SAVE", "PRESET", "PRESET", "SYS"};
             set(r, Side::Esc, Ic::Back, "BACK");
-            snprintf(r.tabText, sizeof r.tabText, "%d/4", s.filePage + 1);
+            snprintf(r.tabText, sizeof r.tabText, "%d/5", s.filePage + 1);
             r.shown[(int)Side::Tab] = true;
             r.name[(int)Side::Tab] = "PAGE";
             undo(r, fnHeld);
-            if (s.filePage < 3) set(r, Side::Fn, Ic::Enter, kPg[s.filePage]);  // fn+slot runs it
+            if (s.filePage < 4) set(r, Side::Fn, Ic::Enter, kPg[s.filePage]);  // fn+slot runs it
             else set(r, Side::Fn, Ic::Shift, "PREV");                          // fn+tab only
-            if (s.fileSlot >= 0 && s.filePage < 3) set(r, Side::Enter, Ic::Enter, kPg[s.filePage]);
+            if (s.fileSlot >= 0 && s.filePage < 4) set(r, Side::Enter, Ic::Enter, kPg[s.filePage]);
             break;
         }
     }

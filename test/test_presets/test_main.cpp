@@ -112,7 +112,7 @@ void test_preset_library() {
     int n = 0;
     const Preset* ps = presets(&n);
     TEST_ASSERT_TRUE(n >= 30);
-    TEST_ASSERT_TRUE(n <= 36);  // the PRESETS page shows 36 cells
+    TEST_ASSERT_TRUE(n <= 72);  // v1.4: two PRESETS pages of 36 cells
     for (int i = 0; i < n; i++) {
         std::unique_ptr<Patch> p(new Patch());
         patchFromJson(ps[i].json, *p, nullptr);

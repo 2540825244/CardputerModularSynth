@@ -1659,7 +1659,7 @@ void test_icons_fn_everywhere() {
     TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
     TEST_ASSERT_TRUE(icons(f).icon[kFnS] == Ic::Enter);  // fn+slot loads / saves
     TEST_ASSERT_EQUAL_STRING("LOAD", icons(f).name[kFnS]);
-    for (int i = 0; i < 3; i++) f.side(Side::Tab);  // SYSTEM: fn only flips pages back
+    for (int i = 0; i < 4; i++) f.side(Side::Tab);  // SYSTEM: fn only flips pages back
     TEST_ASSERT_TRUE(icons(f).icon[kFnS] == Ic::Shift);
     f.side(Side::Esc);
     f.place(TKeys, 0, 0);
@@ -1802,14 +1802,37 @@ void test_first_boot_loads_basic() {
 void test_file_tab_pages() {
     Fx f;
     f.side(Side::Esc);
-    for (int i = 1; i <= 4; i++) {
+    for (int i = 1; i <= 5; i++) {  // v1.4: LOAD SAVE PRESETS PRESETS-2 SYSTEM
         f.side(Side::Tab);
-        TEST_ASSERT_EQUAL(i % 4, f.ui.state().filePage);
+        TEST_ASSERT_EQUAL(i % 5, f.ui.state().filePage);
     }
     f.sideDown(Side::Fn);
     f.side(Side::Tab);
     f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(4, f.ui.state().filePage);
+}
+
+// v1.4: the second PRESETS page holds presets 37..72; its cell 0 is preset 37
+void test_preset_page_two() {
+    Fx f;
+    int n = 0;
+    const Preset* ps = presets(&n);
+    TEST_ASSERT_TRUE(n > 36);
+    f.side(Side::Esc);
+    for (int i = 0; i < 3; i++) f.side(Side::Tab);
     TEST_ASSERT_EQUAL(3, f.ui.state().filePage);
+    f.tap(0, 0);
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);
+    TEST_ASSERT_EQUAL_STRING("LOADED", f.ui.state().toast);
+    std::string shown;  // the loaded patch is preset 37's: same modules, same order
+    for (int i = 0; i < gPatch.moduleCount(); i++) shown += std::string(gPatch.moduleAt(i).type->id) + " ";
+    char msg[24];
+    TEST_ASSERT_TRUE(f.ui.loadPreset(36, false, msg, sizeof msg));
+    std::string want;
+    for (int i = 0; i < gPatch.moduleCount(); i++) want += std::string(gPatch.moduleAt(i).type->id) + " ";
+    TEST_ASSERT_EQUAL_STRING(want.c_str(), shown.c_str());
+    (void)ps;
 }
 
 void test_slot_36_save() {
@@ -1825,8 +1848,8 @@ void test_slot_36_save() {
 void test_system_settings_saved() {
     Fx f;
     f.side(Side::Esc);
-    for (int i = 0; i < 3; i++) f.side(Side::Tab);
-    TEST_ASSERT_EQUAL(3, f.ui.state().filePage);
+    for (int i = 0; i < 4; i++) f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(4, f.ui.state().filePage);
     const uint32_t gen = f.ui.state().settingsGen;
     f.tap(0, 0);  // theme toggles on a tap
     TEST_ASSERT_EQUAL(1, f.ui.state().settings.theme);
@@ -2234,7 +2257,7 @@ void test_wake_modifier_is_no_modifier() {
 void test_sleep_setting_saved() {
     Fx f;
     f.side(Side::Esc);
-    for (int i = 0; i < 3; i++) f.side(Side::Tab);
+    for (int i = 0; i < 4; i++) f.side(Side::Tab);
     TEST_ASSERT_EQUAL(2, f.ui.state().settings.sleep);  // default 2 min
     f.tap(0, 2);  // OFF
     TEST_ASSERT_EQUAL(0, f.ui.state().settings.sleep);
@@ -2431,6 +2454,7 @@ int main() {
     RUN_TEST(test_new_patch_undoable);
     RUN_TEST(test_first_boot_loads_basic);
     RUN_TEST(test_file_tab_pages);
+    RUN_TEST(test_preset_page_two);
     RUN_TEST(test_slot_36_save);
     RUN_TEST(test_system_settings_saved);
     RUN_TEST(test_bit_cell_tap_toggles);

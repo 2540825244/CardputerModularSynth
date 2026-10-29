@@ -33,7 +33,7 @@ struct UiState {
     uint8_t escPresses;
     char toast[24];
     uint32_t toastUntilMs;
-    uint8_t filePage;   // file menu: 0 LOAD, 1 SAVE, 2 PRESETS, 3 SYSTEM
+    uint8_t filePage;   // file menu: 0 LOAD, 1 SAVE, 2 PRESETS, 3 PRESETS 2, 4 SYSTEM
     int8_t fileSlot;    // file menu: selected cell 0..47 on the page, -1 none
     Settings settings;
     uint32_t settingsGen;  // bumps on every settings change (main applies theme, brightness, hold)

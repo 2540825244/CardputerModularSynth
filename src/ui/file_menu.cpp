@@ -4,16 +4,18 @@
 
 namespace {
 
-enum { kLoad, kSave, kPresets, kSystem, kFilePages };
+enum { kLoad, kSave, kPresets, kPresets2, kSystem, kFilePages };  // v1.4: 36 presets a page
+constexpr int kPresetsPerPage = 36;
 constexpr int kNewCell = 47;  // LOAD page, bottom-right: a new empty patch
 
-// Do-it on the selected cell of the LOAD / SAVE / PRESETS page.
+// Do-it on the selected cell of the LOAD / SAVE / PRESETS (1 and 2) page.
 void run(UiController& ui) {
     UiState& s = ui.mut();
     if (s.fileSlot < 0) return;
     char msg[24];
-    if (s.filePage == kPresets) {
-        if (ui.loadPreset(s.fileSlot, true, msg, sizeof msg)) ui.toast(msg, ui.now());
+    if (s.filePage == kPresets || s.filePage == kPresets2) {
+        const int i = s.fileSlot + (s.filePage - kPresets) * kPresetsPerPage;
+        if (ui.loadPreset(i, true, msg, sizeof msg)) ui.toast(msg, ui.now());
         else ui.toast(msg, ui.now());
         return;
     }
@@ -55,7 +57,7 @@ void system(UiController& ui, int cell) {
 }  // namespace
 
 // Tap a cell to select it; do-it loads, saves or loads the preset, so a stray tap never
-// overwrites. tab / fn+tab flips LOAD, SAVE, PRESETS, SYSTEM.
+// overwrites. tab / fn+tab flips LOAD, SAVE, PRESETS, PRESETS 2, SYSTEM.
 bool fileViewAction(UiController& ui, const Action& a) {
     UiState& s = ui.mut();
     switch (a.act) {
