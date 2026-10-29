@@ -763,6 +763,20 @@ void test_kit_groups() {
     TEST_ASSERT_EQUAL(kNoGroup, dg(ddly));
     TEST_ASSERT_EQUAL(kNoGroup, dg(dseq));
     TEST_ASSERT_EQUAL(kNoGroup, dg(dosc));  // tuned by the lane, never struck: it never rests
+    // final review M1: a voice's CV outs (GRD env/lfo) are no audio: driving an always-on module,
+    // the voice runs always
+    Patch v;
+    const uint16_t vk = add(v, kKitType, 0), vg = add(v, kGrdType, 1), vo = add(v, kOscType, 2),
+                   vx = add(v, kOutType, 3);
+    wire(v, vk, 0, vg, 1);
+    wire(v, vg, 3, vo, 1);  // GRD lfo -> OSC fm
+    wire(v, vo, 0, vx, 0);
+    wire(v, vg, 0, vx, 0);
+    kitGroups(v, g);
+    TEST_ASSERT_EQUAL(kNoGroup, g[1]);
+    v.removeCablesAtPin(vg, true, 3);
+    kitGroups(v, g);
+    TEST_ASSERT_EQUAL(0, g[1]);
     TEST_ASSERT_EQUAL(2, dg(denv));
     TEST_ASSERT_EQUAL(2, dg(dsnr));
     // no KIT: nothing is grouped
@@ -902,11 +916,21 @@ void test_input_read_in_place() {
 
 // Review I1: a voice cut while ringing starts its next hit fresh, as the first one did.
 void test_kit_cut_voice_restarts_clean() {
-    const ModuleTypeInfo* voices[] = {&kResType, &kStrType, &kMdlType, &kKckType};
+    const ModuleTypeInfo* voices[] = {&kResType, &kStrType, &kMdlType, &kKckType, &kGrdType};
     for (const ModuleTypeInfo* vt : voices) {
         Patch p;
         const uint16_t kit = add(p, kKitType, 0), v = add(p, *vt, 1), out = add(p, kOutType, 2);
-        wire(p, kit, 0, v, 0);
+        int strike = 0;  // the trig (or audio in) pin
+        while (strcmp(vt->inKeys[strike], "trig") && strcmp(vt->inKeys[strike], "in")) strike++;
+        wire(p, kit, 0, v, strike);
+        if (vt == &kGrdType) {  // PLTKIT's Plaits bass drum (review: its tail outlived the cut)
+            float* g = p.find(v)->params;
+            g[0] = 13.f;   // eng BD
+            g[1] = -1.f;   // oct
+            g[9] = 0.6f;   // decay
+            g[11] = 1.f;   // vca LPG
+            g[12] = 2.f;   // flt OFF
+        }
         wire(p, v, 0, out, 0);
         p.find(kit)->params[kit::kL1] = (float)0b101;  // T1 on steps 1 and 3; step 2 cuts it
         p.find(kit)->params[kit::kLen] = 3.f;

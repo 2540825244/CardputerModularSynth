@@ -378,8 +378,8 @@ just map keys to virtual midi/oct/gate/etc out".
   sleep time (OFF / 1 / 2 / 5 / 10 min, default 2) dims the backlight to its lowest; 3 min later it
   goes off and nothing is drawn. Audio keeps running. The first key only wakes (swallowed down to
   its Up). Frames are drawn only when what they show changes: a key, the patch, the CPU/RAM bars,
-  the meters of modules in view, a toast, a blink. After a change they run at 30 fps for 300 ms,
-  and at least once a second otherwise.
+  the meters of modules in view, a toast, a blink. After a UI change they run at 30 fps for 300 ms;
+  meters and bars alone redraw at most every 100 ms (not while dim); at least once a second.
 
 ## 11. Patch storage **[owner: SD; format details proposed]**
 

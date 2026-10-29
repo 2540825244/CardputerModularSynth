@@ -18,3 +18,5 @@
     four-mode loop unrolled.
   - `plaits/dsp/oscillator/harmonic_oscillator.h`: the harmonic loop unrolled (same arithmetic).
   - The unmodified classes are kept for `test/test_plaits_fast` in `test/test_plaits_fast/ref_plaits.h`.
+- v1.3 KIT edit, marked `// modsynth:`: `plaits/dsp/voice.h/.cc` `Voice::Silence()` re-inits the
+  active engine, the envelopes and the trigger delay (GRD's `silence()` when its KIT group stops).

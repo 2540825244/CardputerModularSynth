@@ -167,6 +167,9 @@ class Voice {
   };
   
   void Init(stmlib::BufferAllocator* allocator);
+  // modsynth: forget the sound (a KIT group switched off mid-hit): the active engine is
+  // re-initialised into the shared buffer (no heap), the envelopes and trigger delay cleared.
+  void Silence(stmlib::BufferAllocator* allocator);
   void ReloadUserData() {
     reload_user_data_ = true;
   }

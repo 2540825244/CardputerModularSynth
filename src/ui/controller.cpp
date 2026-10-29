@@ -401,7 +401,9 @@ bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceK
 // With a KIT, a cable or a step can raise the worst step past the budget; one overloaded step is
 // too short for the measured-load warning, so say it at the edit.
 void UiController::warnKitCpu() {
-    if (patch_.countOfType(kKitType) && engine_.patchCycles(patch_) > kCpuBudget) toast("CPU FULL", now_);
+    const bool showing = !strcmp(s_.toast, "CPU FULL") && (int32_t)(now_ - s_.toastUntilMs) < 0;
+    if (!showing && patch_.countOfType(kKitType) && engine_.patchCycles(patch_) > kCpuBudget)
+        toast("CPU FULL", now_);  // not re-armed while it shows (a tilt sweep edits at 50 Hz)
 }
 
 bool UiController::editValue(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {

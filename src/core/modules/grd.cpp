@@ -90,6 +90,16 @@ class Grd : public Module {
         cutSlew_.setTimeMs(10.f, kSampleRate / 8.f);
     }
     ~Grd() override { delete[] shared_; }
+    // Its KIT group stopped mid-hit: the next hit starts as the first did.
+    void silence() override {
+        stmlib::BufferAllocator a(shared_, kShared);
+        voice_.Silence(&a);
+        lad_.Init(kSampleRate);
+        env_.Init(kSampleRate);
+        gate_ = GateDetector();
+        pos_ = kChunk;
+        trigMax_ = 0.f;
+    }
 
     MODSYNTH_IRAM void process(const float* const* ins, const bool* c) override {
         const int vca = (int)param(kVca), flt = (int)param(kFlt);

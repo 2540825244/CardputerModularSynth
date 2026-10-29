@@ -80,8 +80,12 @@ int kitGroups(const Patch& p, uint8_t* g, const bool* present) {
             const int f = indexOf(p, cb.fromId), t = indexOf(p, cb.toId);
             if (f < 0 || t < 0 || f == t || g[f] == kNoGroup || g[t] == g[f]) continue;
             if (present && !present[t]) continue;
-            const Category cat = p.moduleAt(f).type->category;
-            if (cat == Category::Modulator || cat == Category::Utility) {
+            const ModuleTypeInfo& ft = *p.moduleAt(f).type;
+            const Category cat = ft.category;
+            const char* pin = cb.fromOut < ft.numOuts ? ft.outKeys[cb.fromOut] : "";
+            const bool cv = cat == Category::Modulator || cat == Category::Utility ||
+                            (cat == Category::Source && strcmp(pin, "out") && strcmp(pin, "aux"));  // GRD env/lfo
+            if (cv) {
                 never[f] = true;
                 again = true;
             }

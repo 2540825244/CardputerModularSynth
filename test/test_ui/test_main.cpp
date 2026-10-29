@@ -2073,6 +2073,10 @@ void test_kit_step_overload_warns() {
     f.tap(0, 2);          // T2 on step 1 too: GRD + MDL at once
     TEST_ASSERT_TRUE(f.eng.patchCycles(gPatch) > kCpuBudget);
     TEST_ASSERT_EQUAL_STRING("CPU FULL", f.ui.state().toast);
+    // final review M3: still over budget, a further edit does not re-arm the showing toast
+    const uint32_t until = f.ui.state().toastUntilMs;
+    f.tap(1, 2);
+    TEST_ASSERT_EQUAL_UINT32(until, f.ui.state().toastUntilMs);
 }
 
 void test_kit_enter_starts_pass() {

@@ -35,6 +35,21 @@ namespace plaits {
 using namespace std;
 using namespace stmlib;
 
+// modsynth: see voice.h.
+void Voice::Silence(BufferAllocator* allocator) {
+  if (previous_engine_index_ >= 0) {
+    allocator->Free();
+    engines_.get(previous_engine_index_)->Init(allocator);
+    previous_engine_index_ = -1;  // the next Render loads and resets it, as on an engine change
+  }
+  trigger_state_ = false;
+  trigger_delay_.Init(trigger_delay_line_);
+  decay_envelope_.Init();
+  lpg_envelope_.Init();
+  out_post_processor_.Init();
+  aux_post_processor_.Init();
+}
+
 void Voice::Init(BufferAllocator* allocator) {
   engines_.Init();
 
