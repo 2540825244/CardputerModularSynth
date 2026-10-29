@@ -49,6 +49,6 @@ Module* create() { return new Mix(); }
 }  // namespace
 
 const ModuleTypeInfo kMixType = {
-    "mix", "MIX", "4-input mixer", Category::Utility, Icon::Mix, Drawing::None,
+    "mix", "MIX", "4-input mixer", Category::Utility, Icon::Mix, Drawing::Picture,
     4, kParams, 4, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     230, sizeof(Mix) + kBlock * sizeof(float), 0, create};

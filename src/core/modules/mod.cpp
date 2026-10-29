@@ -163,13 +163,13 @@ const CellRef kStepCells[36] = {
     cI(0), cI(1), c_, cO(0), cO(1), cO(2), c_, c_, c_, c_, c_, c_,
 };
 const CellRef kSetCells[36] = {
-    cP(13), cP(14), cP(15), c_, c_, c_, c_, c_, c_, c_, c_, c_,
-    c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_,
-    c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_,
+    cP(13), cP(14), cP(15), c_, c_, cD, cD, cD, cD, cD, cD, cD,
+    c_, c_, c_, c_, c_, cD, cD, cD, cD, cD, cD, cD,
+    c_, c_, c_, c_, c_, cD, cD, cD, cD, cD, cD, cD,
 };
 const PageDef kPages[] = {
     {"STEP", PageKind::Cells, Drawing::Playhead, kStepCells},
-    {"SET", PageKind::Cells, Drawing::None, kSetCells},
+    {"SET", PageKind::Cells, Drawing::Picture, kSetCells},
 };
 class Seq : public Module {
    public:
@@ -320,7 +320,7 @@ Module* create() { return new Euc(); }
 }  // namespace euc
 
 const ModuleTypeInfo kEucType = {
-    "euc", "EUC", "Euclidean rhythm", Category::Modulator, Icon::Euclid, Drawing::None,
+    "euc", "EUC", "Euclidean rhythm", Category::Modulator, Icon::Euclid, Drawing::Picture,
     3, euc::kParams, 2, kClkRst, kClkRstLbl, 2, euc::kOutKeys, euc::kOutLabels,
     200, sizeof(euc::Euc) + 2 * kBlock * sizeof(float), 0, euc::create};
 
@@ -360,7 +360,7 @@ Module* create() { return new Qnt(); }
 }  // namespace qnt
 
 const ModuleTypeInfo kQntType = {
-    "qnt", "QNT", "Quantizer to a scale", Category::Utility, Icon::Quant, Drawing::None,
+    "qnt", "QNT", "Quantizer to a scale", Category::Utility, Icon::Quant, Drawing::Picture,
     3, qnt::kParams, 1, kInOnly, kInLbl, 2, qnt::kOutKeys, qnt::kOutLabels,
     630, sizeof(qnt::Qnt) + 2 * kBlock * sizeof(float), 0, qnt::create};
 
@@ -393,6 +393,7 @@ class Tur : public Module {
             out(0)[i] = cv;
             out(1)[i] = clk_.high && (reg_ & 1u) ? kHigh : 0.f;
         }
+        setMonitor(0, (float)reg_);  // the picture's register (<= 16 bits: exact in a float)
     }
 
    private:
@@ -404,7 +405,7 @@ Module* create() { return new Tur(); }
 }  // namespace tur
 
 const ModuleTypeInfo kTurType = {
-    "tur", "TUR", "Turing machine: looping random", Category::Modulator, Icon::Dice, Drawing::None,
+    "tur", "TUR", "Turing machine: looping random", Category::Modulator, Icon::Dice, Drawing::Picture,
     3, tur::kParams, 2, kClkRst, kClkRstLbl, 2, tur::kOutKeys, tur::kOutLabels,
     260, sizeof(tur::Tur) + 2 * kBlock * sizeof(float), 0, tur::create};
 
@@ -436,7 +437,7 @@ Module* create() { return new Lgc(); }
 }  // namespace lgc
 
 const ModuleTypeInfo kLgcType = {
-    "lgc", "LGC", "Logic: AND OR XOR NOT", Category::Utility, Icon::Logic, Drawing::None,
+    "lgc", "LGC", "Logic: AND OR XOR NOT", Category::Utility, Icon::Logic, Drawing::Picture,
     0, nullptr, 2, lgc::kInKeys, lgc::kInLabels, 4, lgc::kOutKeys, lgc::kOutLabels,
     260, sizeof(lgc::Lgc) + 4 * kBlock * sizeof(float), 0, lgc::create};
 
@@ -475,7 +476,7 @@ Module* create() { return new Brn(); }
 }  // namespace brn
 
 const ModuleTypeInfo kBrnType = {
-    "brn", "BRN", "Bernoulli gate: coin toss", Category::Utility, Icon::Dice, Drawing::None,
+    "brn", "BRN", "Bernoulli gate: coin toss", Category::Utility, Icon::Dice, Drawing::Picture,
     1, brn::kParams, 2, brn::kInKeys, brn::kInLabels, 2, brn::kOutKeys, brn::kOutLabels,
     180, sizeof(brn::Brn) + 2 * kBlock * sizeof(float), 0, brn::create};
 
@@ -551,7 +552,7 @@ Module* create() { return new Knb(); }
 }  // namespace knb
 
 const ModuleTypeInfo kKnbType = {
-    "knb", "KNB", "Four knobs as CV", Category::Utility, Icon::Knob, Drawing::None,
+    "knb", "KNB", "Four knobs as CV", Category::Utility, Icon::Knob, Drawing::Picture,
     4, knb::kParams, 0, nullptr, nullptr, 4, knb::kOutKeys, knb::kOutLabels,
     340, sizeof(knb::Knb) + 4 * kBlock * sizeof(float), 0, knb::create};
 

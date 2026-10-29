@@ -42,6 +42,6 @@ Module* create() { return new Dmx(); }
 }  // namespace
 
 const ModuleTypeInfo kDmxType = {
-    "dmx", "DMX", "1-to-3 switch", Category::Utility, Icon::Dmx, Drawing::None,
+    "dmx", "DMX", "1-to-3 switch", Category::Utility, Icon::Dmx, Drawing::Picture,
     2, selector::kParams, 2, kInKeys, kInLabels, 3, kOutKeys, kOutLabels,
     290, sizeof(Dmx) + 3 * kBlock * sizeof(float), 0, create};

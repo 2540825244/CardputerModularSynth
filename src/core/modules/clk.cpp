@@ -85,6 +85,6 @@ Module* create() { return new Clk(); }
 }  // namespace
 
 const ModuleTypeInfo kClkType = {
-    "clk", "CLK", "Clock 20-300 BPM + divider", Category::Modulator, Icon::Clk, Drawing::None,
+    "clk", "CLK", "Clock 20-300 BPM + divider", Category::Modulator, Icon::Clk, Drawing::Picture,
     2, kParams, 2, kInKeys, kInLabels, 2, kOutKeys, kOutLabels,
     170, sizeof(Clk) + 2 * kBlock * sizeof(float), 0, create};

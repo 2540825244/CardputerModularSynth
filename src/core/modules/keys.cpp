@@ -24,14 +24,16 @@ const char* const kOutLabels[] = {"PIT", "GAT", "VEL"};
 Module* create() { return new KeysModule(); }
 
 // Page 1 plays notes (the whole grid goes to the play handler); page 2 holds the settings.
+// v1.4: the layout, scale and root first (row 1), the playing feel on row 2, the outs on row 3;
+// the picture (the scale on a keyboard, the held note) on cols 5..11.
 const CellRef kSetCells[36] = {
-    cP(4), cP(5), cP(6), cP(0), cP(1), cP(2), cP(3), cP(7), c_, c_, c_, c_,
-    c_,    c_,    c_,    c_,    c_, c_, c_, c_, c_, c_, c_, c_,
-    cO(0), cO(1), cO(2), c_,    c_, c_, c_, c_, c_, c_, c_, c_,
+    cP(4), cP(5), cP(6), cP(0), cP(1), cD, cD, cD, cD, cD, cD, cD,
+    cP(2), cP(3), cP(7), c_,    c_,    cD, cD, cD, cD, cD, cD, cD,
+    cO(0), cO(1), cO(2), c_,    c_,    cD, cD, cD, cD, cD, cD, cD,
 };
 const PageDef kKeyPages[] = {
     {"PLAY", PageKind::Play, Drawing::None, nullptr},
-    {"SET", PageKind::Cells, Drawing::None, kSetCells},
+    {"SET", PageKind::Cells, Drawing::Picture, kSetCells},
 };
 
 }  // namespace

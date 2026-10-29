@@ -21,6 +21,10 @@ bool hasPicture(const ModuleTypeInfo& t);
 void drawPicture(const PicCtx& c);
 // Patch tile glyph (about 13 x 11) that follows the params; false: the type keeps its icon.
 bool drawTileGlyph(Gfx& g, const ModuleRec& m, int x, int y, int w, int h, uint8_t color);
+// A param's cell label (<= 3 chars) and strip name as the module view shows them: GRD's HAR / TIM
+// / MOR take the engine's own names; everything else is its ParamSpec (label, key upper-cased).
+const char* paramLabel(const ModuleRec& m, int idx);
+const char* paramName(const ModuleRec& m, int idx, char* buf, int len);
 // A record of type t with every param at its default (thumbnails).
 ModuleRec defaultRecord(const ModuleTypeInfo& t);
 

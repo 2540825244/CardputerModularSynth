@@ -56,6 +56,6 @@ void tiltPublish(float rollDeg, float pitchDeg) {
 }
 
 const ModuleTypeInfo kTiltType = {
-    "tilt", "TLT", "Device tilt as CV", Category::Modulator, Icon::Tilt, Drawing::None,
+    "tilt", "TLT", "Device tilt as CV", Category::Modulator, Icon::Tilt, Drawing::Picture,
     2, kParams, 0, nullptr, nullptr, 2, kOutKeys, kOutLabels,
     130, sizeof(Tilt) + 2 * kBlock * sizeof(float), 0, create};

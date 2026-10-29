@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 #include "render_internal.h"
 #include "ui/anim.h"
 #include "core/scales.h"
@@ -142,7 +143,8 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
     }
     char name[16], val[16];
     if (sel.spec) {
-        upper(sel.c.kind == CellKind::Param ? sel.spec->key : "AMT", name, sizeof name);
+        if (sel.c.kind == CellKind::Param) paramName(m, sel.c.index, name, sizeof name);  // GRD: the engine's names
+        else upper("AMT", name, sizeof name);
         paramFormat(*sel.spec, sel.value, val, sizeof val, true);
     } else {
         upper(m.type->name, name, sizeof name);
@@ -164,13 +166,26 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
     cv.drawString(val, cellX(11) + cellW(11) - 3, cellY(0) + 3);
 }
 
-void paramCell(const ModuleRec& m, int col, int row, uint8_t idx, bool selected) {
+// stepBar: a sequencer step's pitch (a Playhead page): a vertical bar from the cell's middle, so a
+// row of steps reads as the melody.
+void paramCell(const ModuleRec& m, int col, int row, uint8_t idx, bool selected, bool stepBar) {
     const int x = cellX(col), y = cellY(row), w = cellW(col), h = cellH(row);
     const ParamSpec& sp = m.type->params[idx];
     cv.fillRect(x, y, w, h, PEmpty);
     char val[8];
     paramFormat(sp, m.params[idx], val, sizeof val, false);
-    smallText(sp.label, x + w / 2, y + h / 2 - 6, PText);
+    if (stepBar) {
+        const int mid = y + h / 2 + 2, span = h / 2 - 6;
+        const float span01 = sp.max > sp.min ? (m.params[idx] - (sp.min + sp.max) * 0.5f) / ((sp.max - sp.min) * 0.5f) : 0.f;
+        const int bh = (int)lroundf((span01 < -1.f ? -1.f : (span01 > 1.f ? 1.f : span01)) * span);
+        cv.drawFastHLine(x + 2, mid, w - 4, PBorder);
+        if (bh > 0) cv.fillRect(x + 4, mid - bh, w - 8, bh, selected ? PAccent : PText);
+        else if (bh < 0) cv.fillRect(x + 4, mid + 1, w - 8, -bh, selected ? PAccent : PText);
+        smallText(val, x + w / 2, y + h - 7, selected ? PText : PDim);
+        if (selected) outline(col, row, PAccent);
+        return;
+    }
+    smallText(paramLabel(m, idx), x + w / 2, y + h / 2 - 6, PText);
     smallText(val, x + w / 2, y + h / 2 + 2, PDim);
     if (sp.curve != Curve::Stepped) {  // value bar along the bottom
         const int bw = (int)lroundf((w - 4) * paramToNorm(sp, m.params[idx]));
@@ -285,13 +300,29 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
             const bool selected = s.modCell == row * kGridCols + col;
             switch (c.kind) {
                 case CellKind::Empty: emptyCell(col, row, keyLabel(row, col), selected); break;
-                case CellKind::Param: paramCell(*m, col, row, c.index, selected); break;
+                case CellKind::Param: paramCell(*m, col, row, c.index, selected, drawing == Drawing::Playhead); break;
                 case CellKind::In: pinCell(s, p, *m, col, row, false, c.index, selected); break;
                 case CellKind::Out: pinCell(s, p, *m, col, row, true, c.index, selected); break;
                 case CellKind::Bit: bitCell(*m, col, row, c, selected); break;
                 default: break;
             }
         }
+    }
+    if (drawing == Drawing::Playhead) {  // steps past LEN: hatched, they do not play
+        int len = kGridCols;
+        for (int i = 0; i < t.numParams; i++)
+            if (!strcmp(t.params[i].key, "len")) len = (int)lroundf(m->params[i]);
+        for (int col = len < 0 ? 0 : len; col < kGridCols; col++)
+            for (int row = 1; row < kGridRows; row++) {
+                const CellRef c = moduleCell(t, s.modPage, (uint8_t)row, (uint8_t)col);
+                if (c.kind != CellKind::Bit && c.kind != CellKind::Param) continue;
+                const int x = cellX(col), y = cellY(row), w = cellW(col), h = cellH(row);
+                for (int k = -h; k < w; k += 4)  // diagonals, clipped to the cell
+                    for (int j = 0; j < h; j++) {
+                        const int xx = x + k + j;
+                        if (xx >= x && xx < x + w && (j & 1) == 0) cv.drawPixel(xx, y + h - 1 - j, PBorder);
+                    }
+            }
     }
     if (drawing == Drawing::Playhead) {  // the playing step's column: a bar over its cells
         Module* inst = e.instance(m->id);

@@ -53,25 +53,33 @@ const char* const kInLabels[] = {"PIT", "TRG", "FM", "HAR", "TIM", "MOR", "LVL",
 const char* const kOutKeys[] = {"out", "aux", "env", "lfo"};
 const char* const kOutLabels[] = {"OUT", "AUX", "ENV", "LFO"};
 
-const CellRef kMainCells[36] = {
-    cP(0), cP(1), cP(2), cP(3), cP(4), cP(5), c_, c_, c_, c_, c_, c_,
+// v1.4: TONE = the engine and its three knobs (named per engine) beside an XY pad; PATCH = the
+// pins; VOICE = ladder + ADS beside their picture; MOD = the LFO beside its picture.
+const CellRef kToneCells[36] = {
+    cP(0), cP(3), cP(4), cP(5), cP(1), cD, cD, cD, cD, cD, cD, cD,
+    cP(2), cP(6), cP(7), cP(8), c_,    cD, cD, cD, cD, cD, cD, cD,
+    cP(11), cP(9), cP(10), c_,  c_,    cD, cD, cD, cD, cD, cD, cD,
+};
+const CellRef kPatchCells[36] = {
+    c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_,
     cI(0), cI(1), cI(2), cI(3), cI(4), cI(5), cI(6), cI(7), cI(8), c_, c_, c_,
     cO(0), cO(1), cO(2), cO(3), c_, c_, c_, c_, c_, c_, c_, c_,
 };
 const CellRef kVoiceCells[36] = {
-    cP(12), cP(13), cP(14), cP(15), c_, c_, c_, c_, c_, c_, c_, c_,
-    cP(11), cP(16), cP(17), cP(18), c_, c_, c_, c_, c_, c_, c_, c_,
-    cP(19), cP(20), cP(21), c_, c_, c_, c_, c_, c_, c_, c_, c_,
+    cP(12), cP(13), cP(14), cP(15), c_, cD, cD, cD, cD, cD, cD, cD,
+    cP(16), cP(17), cP(18), c_,     c_, cD, cD, cD, cD, cD, cD, cD,
+    c_,     c_,     c_,     c_,     c_, cD, cD, cD, cD, cD, cD, cD,
 };
 const CellRef kModCells[36] = {
-    cP(6), cP(7), cP(8), cP(9), cP(10), c_, c_, c_, c_, c_, c_, c_,
-    c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_,
-    c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_, c_,
+    cP(19), cP(20), cP(21), c_, c_, cD, cD, cD, cD, cD, cD, cD,
+    c_,     c_,     c_,     c_, c_, cD, cD, cD, cD, cD, cD, cD,
+    c_,     c_,     c_,     c_, c_, cD, cD, cD, cD, cD, cD, cD,
 };
 const PageDef kGrdPages[] = {
-    {"MAIN", PageKind::Cells, Drawing::None, kMainCells},
-    {"VOICE", PageKind::Cells, Drawing::None, kVoiceCells},
-    {"MOD", PageKind::Cells, Drawing::None, kModCells},
+    {"TONE", PageKind::Cells, Drawing::Picture, kToneCells},
+    {"PATCH", PageKind::Cells, Drawing::None, kPatchCells},
+    {"VOICE", PageKind::Cells, Drawing::Picture, kVoiceCells},
+    {"MOD", PageKind::Cells, Drawing::Picture, kModCells},
 };
 
 constexpr size_t kShared = 16384;            // Plaits' engine buffer

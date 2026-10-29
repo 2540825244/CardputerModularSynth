@@ -347,8 +347,9 @@ void test_layout_vcf() {
     TEST_ASSERT_TRUE(is(moduleCell(kVcfType, 3, 4), CellKind::Empty));
 }
 
-void test_layout_vca_no_drawing() {
-    TEST_ASSERT_TRUE(is(moduleCell(kVcaType, 1, 6), CellKind::Empty));
+void test_layout_vca_picture() {  // v1.4: every module with automatic pages has a picture
+    TEST_ASSERT_TRUE(is(moduleCell(kVcaType, 1, 6), CellKind::Drawing));
+    TEST_ASSERT_TRUE(is(moduleCell(kVcaType, 1, 0), CellKind::Param, 0));
 }
 
 // Places `ty` at cell (c,r) on page 0, opens it, returns its id.
@@ -2309,7 +2310,7 @@ int main() {
     RUN_TEST(test_toast_expiry);
     RUN_TEST(test_edit_coalescing_breaks);
     RUN_TEST(test_layout_vcf);
-    RUN_TEST(test_layout_vca_no_drawing);
+    RUN_TEST(test_layout_vca_picture);
     RUN_TEST(test_coarse_edit);
     RUN_TEST(test_fine_and_undo_coalesce);
     RUN_TEST(test_fine_minus_and_cursor_breaks);

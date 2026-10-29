@@ -55,6 +55,6 @@ Module* create() { return new Mux(); }
 }  // namespace
 
 const ModuleTypeInfo kMuxType = {
-    "mux", "MUX", "3-to-1 switch", Category::Utility, Icon::Mux, Drawing::None,
+    "mux", "MUX", "3-to-1 switch", Category::Utility, Icon::Mux, Drawing::Picture,
     2, selector::kParams, 4, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     350, sizeof(Mux) + kBlock * sizeof(float), 0, create};

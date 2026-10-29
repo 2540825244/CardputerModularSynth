@@ -109,3 +109,20 @@ ModuleRec defaultRecord(const ModuleTypeInfo& t) {
     for (auto& a : r.inAmount) a = 1.f;
     return r;
 }
+
+namespace {
+bool isGrdKnob(const ModuleRec& m, int idx) { return !strcmp(m.type->id, "grd") && idx >= 3 && idx <= 5; }
+}  // namespace
+
+const char* paramLabel(const ModuleRec& m, int idx) {
+    if (isGrdKnob(m, idx)) return pic::grdKnobLabel((int)lroundf(m.params[0]), idx - 3);
+    return m.type->params[idx].label;
+}
+
+const char* paramName(const ModuleRec& m, int idx, char* buf, int len) {
+    const char* s = isGrdKnob(m, idx) ? pic::grdKnobName((int)lroundf(m.params[0]), idx - 3) : m.type->params[idx].key;
+    int i = 0;
+    for (; s[i] && i + 1 < len; i++) buf[i] = (char)(s[i] >= 'a' && s[i] <= 'z' ? s[i] - 32 : s[i]);
+    buf[i] = 0;
+    return buf;
+}

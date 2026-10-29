@@ -324,6 +324,27 @@ void test_dump_pictures() {
     TEST_PASS();
 }
 
+void test_grd_knob_labels_follow_the_engine() {
+    const ModuleTypeInfo* grd = findType("grd");
+    ModuleRec m = defaultRecord(*grd);
+    m.params[0] = 2;  // FM
+    TEST_ASSERT_EQUAL_STRING("RAT", paramLabel(m, 3));
+    TEST_ASSERT_EQUAL_STRING("IDX", paramLabel(m, 4));
+    TEST_ASSERT_EQUAL_STRING("FBK", paramLabel(m, 5));
+    char buf[24];
+    TEST_ASSERT_EQUAL_STRING("INDEX", paramName(m, 4, buf, sizeof buf));
+    TEST_ASSERT_EQUAL_STRING("OCT", paramLabel(m, 1));  // the rest keep theirs
+    TEST_ASSERT_EQUAL_STRING("OCT", paramName(m, 1, buf, sizeof buf));
+    const ModuleRec o = defaultRecord(*findType("osc"));
+    TEST_ASSERT_EQUAL_STRING("WAV", paramLabel(o, 0));
+    TEST_ASSERT_EQUAL_STRING("WAVE", paramName(o, 0, buf, sizeof buf));
+    for (int e = 0; e < 24; e++)
+        for (int k = 0; k < 3; k++) {
+            TEST_ASSERT_TRUE(strlen(pic::grdKnobLabel(e, k)) <= 3);
+            TEST_ASSERT_TRUE(strlen(pic::grdKnobName(e, k)) <= 16);
+        }
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_block_matches_the_grid);
@@ -332,6 +353,7 @@ int main() {
     RUN_TEST(test_tile_glyphs_stay_in_their_box);
     RUN_TEST(test_note_name);
     RUN_TEST(test_basic_waves);
+    RUN_TEST(test_grd_knob_labels_follow_the_engine);
     RUN_TEST(test_dump_pictures);
     return UNITY_END();
 }
