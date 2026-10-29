@@ -298,7 +298,7 @@ Module* create() { return new Trm(); }
 }  // namespace trm
 
 const ModuleTypeInfo kTrmType = {
-    "trm", "TRM", "Tremolo", Category::Effect, Icon::Fx, Drawing::None,
+    "trm", "TRM", "Tremolo", Category::Effect, Icon::Fx, Drawing::Picture,
     3, trm::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
     390, sizeof(trm::Trm) + kBlock * sizeof(float), 0, trm::create};
 

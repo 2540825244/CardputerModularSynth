@@ -1340,13 +1340,33 @@ void test_auto_pages_overflow() {
 
 void test_drawing_page0_width5() {
     const ModuleTypeInfo& t = bigType(Drawing::Picture);
-    TEST_ASSERT_EQUAL(2, modulePageCount(t));  // page 0 holds params 0-4, page 1 holds 5-13
+    // v1.4: page 0 holds params 0-4 on row 1 and 5-8 on row 3 after the one out; page 1 holds 9-13
+    TEST_ASSERT_EQUAL(2, modulePageCount(t));
     TEST_ASSERT_TRUE(is(moduleCell(t, 0, 1, 5), CellKind::Drawing));
-    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 0), CellKind::Param, 5));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 0), CellKind::Out, 0));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 1), CellKind::Param, 5));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 4), CellKind::Param, 8));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 5), CellKind::Drawing));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 0), CellKind::Param, 9));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 4), CellKind::Param, 13));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 5), CellKind::Empty));
     TEST_ASSERT_TRUE(is(moduleCell(t, 1, 2, 2), CellKind::In, 7));
-    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 9), CellKind::Empty));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 1, 3, 0), CellKind::Empty));
     TEST_ASSERT_EQUAL(Drawing::Picture, modulePageDrawing(t, 0));
     TEST_ASSERT_EQUAL(Drawing::None, modulePageDrawing(t, 1));
+}
+
+void test_drawing_page0_fits_seven_params() {
+    static ParamSpec ps[7];
+    for (auto& p : ps) p = {"p", "P", 0.f, 1.f, 0.f, Curve::Lin, Unit::Percent, nullptr};
+    static ModuleTypeInfo t;
+    t = ModuleTypeInfo{"seven", "SVN", "test", Category::Source, Icon::Osc, Drawing::Picture, 7, ps, 2, kBigIn,
+                       kBigIn, 2, kBigIn, kBigIn, 10, 100, 0, createNone};
+    TEST_ASSERT_EQUAL(1, modulePageCount(t));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 1), CellKind::Out, 1));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 2), CellKind::Param, 5));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 3), CellKind::Param, 6));
+    TEST_ASSERT_TRUE(is(moduleCell(t, 0, 3, 4), CellKind::Empty));
 }
 
 void test_keys_pages() {
@@ -2356,6 +2376,7 @@ int main() {
     RUN_TEST(test_input_amount_edit);
     RUN_TEST(test_auto_pages_overflow);
     RUN_TEST(test_drawing_page0_width5);
+    RUN_TEST(test_drawing_page0_fits_seven_params);
     RUN_TEST(test_keys_pages);
     RUN_TEST(test_fn_tab_previous_page);
     RUN_TEST(test_tab_flip_releases_notes);

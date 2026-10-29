@@ -6,16 +6,21 @@ namespace {
 
 int width0(const ModuleTypeInfo& t) { return t.drawing != Drawing::None ? 5 : kGridCols; }
 int offsetOf(const ModuleTypeInfo& t, int page) { return page == 0 ? 0 : width0(t) + (page - 1) * kGridCols; }
-int pagesFor(const ModuleTypeInfo& t, int n) {
-    const int w0 = width0(t);
-    return n <= w0 ? 1 : 1 + (n - w0 + kGridCols - 1) / kGridCols;
+// v1.4: with a drawing, params past row 1 continue on row 3 after the outs (cols numOuts..4), so
+// most modules keep every knob next to their picture.
+int params0(const ModuleTypeInfo& t) {
+    if (t.drawing == Drawing::None) return kGridCols;
+    return 5 + (t.numOuts < 5 ? 5 - t.numOuts : 0);
 }
+int paramOffset(const ModuleTypeInfo& t, int page) { return page == 0 ? 0 : params0(t) + (page - 1) * kGridCols; }
+int pagesFor(int n, int first) { return n <= first ? 1 : 1 + (n - first + kGridCols - 1) / kGridCols; }
+int pagesFor(const ModuleTypeInfo& t, int n) { return pagesFor(n, width0(t)); }
 
 }  // namespace
 
 int modulePageCount(const ModuleTypeInfo& t) {
     if (t.pages) return t.numPages;
-    int n = pagesFor(t, t.numParams);
+    int n = pagesFor(t.numParams, params0(t));
     if (pagesFor(t, t.numIns) > n) n = pagesFor(t, t.numIns);
     if (pagesFor(t, t.numOuts) > n) n = pagesFor(t, t.numOuts);
     return n;
@@ -45,10 +50,14 @@ CellRef moduleCell(const ModuleTypeInfo& t, int page, uint8_t row, uint8_t col) 
     }
     const int usable = page == 0 ? width0(t) : kGridCols;
     if (col >= usable) return cD;
-    const int i = offsetOf(t, page) + col;
-    if (row == 1 && i < t.numParams) return cP((uint8_t)i);
+    const int i = offsetOf(t, page) + col, pi = paramOffset(t, page) + col;
+    if (row == 1 && pi < t.numParams) return cP((uint8_t)pi);
     if (row == 2 && i < t.numIns) return cI((uint8_t)i);
     if (row == 3 && i < t.numOuts) return cO((uint8_t)i);
+    if (row == 3 && page == 0 && t.drawing != Drawing::None) {  // overflow params after the outs
+        const int k = 5 + col - t.numOuts;
+        if (k < t.numParams) return cP((uint8_t)k);
+    }
     return c_;
 }
 

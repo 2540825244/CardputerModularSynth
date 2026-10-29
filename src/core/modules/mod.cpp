@@ -136,7 +136,7 @@ Module* create() { return new Rnd(); }
 }  // namespace rnd
 
 const ModuleTypeInfo kRndType = {
-    "rnd", "RND", "Random: smooth and stepped", Category::Modulator, Icon::Dice, Drawing::None,
+    "rnd", "RND", "Random: smooth and stepped", Category::Modulator, Icon::Dice, Drawing::Picture,
     3, rnd::kParams, 1, rnd::kInKeys, rnd::kInLabels, 2, rnd::kOutKeys, rnd::kOutLabels,
     170, sizeof(rnd::Rnd) + 2 * kBlock * sizeof(float), 0, rnd::create};
 
@@ -506,6 +506,8 @@ class Chs : public Module {
             out(1)[i] = clampf(y_ * 0.18f, -10.f, 10.f);
             out(2)[i] = clampf((z_ - 25.f) * 0.2f, -10.f, 10.f);
         }
+        setMonitor(0, x_);  // the picture's live point (ui/pic_mod.cpp)
+        setMonitor(1, z_);
     }
 
    private:
@@ -517,7 +519,7 @@ const char* const kInLabels[] = {"RAT"};
 }  // namespace chs
 
 const ModuleTypeInfo kChsType = {
-    "chs", "CHS", "Lorenz chaos: X Y Z", Category::Modulator, Icon::Chaos, Drawing::None,
+    "chs", "CHS", "Lorenz chaos: X Y Z", Category::Modulator, Icon::Chaos, Drawing::Picture,
     2, chs::kParams, 1, chs::kInKeys, chs::kInLabels, 3, chs::kOutKeys, chs::kOutLabels,
     430, sizeof(chs::Chs) + 3 * kBlock * sizeof(float), 0, chs::create};
 

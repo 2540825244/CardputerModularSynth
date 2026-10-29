@@ -121,14 +121,16 @@ void chunk(std::vector<uint8_t>& out, const char* type, const std::vector<uint8_
     out.insert(out.end(), td.begin(), td.end());
     be32(out, crc32(td.data(), td.size()));
 }
-void writePng(const char* path, const FbGfx& f, int x0, int y0, int w, int h, int scale, int theme) {
+// pix(x, y) -> palette index
+template <class Pix>
+void writePngOf(const char* path, Pix pix, int w, int h, int scale, int theme) {
     const uint32_t* pal = theme ? kStyleA : kStyleB;
     const int W = w * scale, H = h * scale;
     std::vector<uint8_t> raw;
     for (int y = 0; y < H; y++) {
         raw.push_back(0);
         for (int x = 0; x < W; x++) {
-            const uint32_t c = pal[f.px[y0 + y / scale][x0 + x / scale] & 15];
+            const uint32_t c = pal[pix(x / scale, y / scale) & 15];
             raw.push_back((uint8_t)(c >> 16)); raw.push_back((uint8_t)(c >> 8)); raw.push_back((uint8_t)c);
         }
     }
@@ -154,6 +156,9 @@ void writePng(const char* path, const FbGfx& f, int x0, int y0, int w, int h, in
     if (!fp) return;
     fwrite(png.data(), 1, png.size(), fp);
     fclose(fp);
+}
+void writePng(const char* path, const FbGfx& f, int x0, int y0, int w, int h, int scale, int theme) {
+    writePngOf(path, [&](int x, int y) { return f.px[y0 + y][x0 + x]; }, w, h, scale, theme);
 }
 
 // The module-view picture block (render/draw_module.cpp): cols 5..11, rows 1..3.
@@ -276,6 +281,28 @@ void test_basic_waves() {
 void test_dump_pictures() {
     mkdir(".pio/pictures", 0755);
     FbGfx f;
+    // contact sheet: every big picture (selection on param 0), 5 a row, with its id
+    constexpr int kTW = kBigW + 4, kTH = kBigH + 10, kCols = 5;
+    std::vector<std::pair<const ModuleTypeInfo*, int>> all;
+    for (const ModuleTypeInfo* t : pictured()) for (int page : picturePages(*t)) all.push_back({t, page});
+    const int rows = ((int)all.size() + kCols - 1) / kCols;
+    std::vector<uint8_t> sheet((size_t)(kTW * kCols * kTH * rows), PStrip);
+    for (size_t k = 0; k < all.size(); k++) {
+        f.clear(PEmpty);
+        const ModuleRec m = defaultRecord(*all[k].first);
+        paint(f, m, all[k].second, -1, kBigX, kBigY, kBigW, kBigH, false);
+        f.box(0, 0, kW, kH);
+        f.fillRect(0, 0, kW, 9, PStrip);
+        char id[24];
+        snprintf(id, sizeof id, "%s %d", all[k].first->id, all[k].second);
+        f.text(id, kBigX, 2, PText, Align::Left);
+        const int ox = (int)(k % kCols) * kTW, oy = (int)(k / kCols) * kTH;
+        for (int y = 0; y < kBigH + 9; y++)
+            for (int x = 0; x < kBigW; x++)
+                sheet[(size_t)((oy + y) * kTW * kCols + ox + x)] = y < 9 ? f.px[y][kBigX + x] : f.px[kBigY + y - 9][kBigX + x];
+    }
+    writePngOf(".pio/pictures/_sheet.png", [&](int x, int y) { return sheet[(size_t)(y * kTW * kCols + x)]; }, kTW * kCols,
+               kTH * rows, 2, 0);
     for (const ModuleTypeInfo* t : pictured()) {
         for (int page : picturePages(*t)) {
             const ModuleRec m = defaultRecord(*t);

@@ -100,7 +100,7 @@ Module* create() { return new Noi(); }
 }  // namespace noi
 
 const ModuleTypeInfo kNoiType = {
-    "noi", "NOI", "Noise: white pink brown S&H dust", Category::Source, Icon::Noise, Drawing::None,
+    "noi", "NOI", "Noise: white pink brown S&H dust", Category::Source, Icon::Noise, Drawing::Picture,
     2, noi::kParams, 1, noi::kInKeys, noi::kInLabels, 1, kOutOnly, kOutLbl,
     360, sizeof(noi::Noi) + kBlock * sizeof(float), 0, noi::create};
 
@@ -152,7 +152,7 @@ Module* create() { return new Vso(); }
 }  // namespace vso
 
 const ModuleTypeInfo kVsoType = {
-    "vso", "VSO", "Saw-square morph, PW, sync", Category::Source, Icon::Saw, Drawing::None,
+    "vso", "VSO", "Saw-square morph, PW, sync", Category::Source, Icon::Saw, Drawing::Picture,
     6, vso::kParams, 4, vso::kInKeys, vso::kInLabels, 1, kOutOnly, kOutLbl,
     770, sizeof(vso::Vso) + kBlock * sizeof(float), 0, vso::create};
 
@@ -191,7 +191,7 @@ Module* create() { return new Fmo(); }
 }  // namespace fmo
 
 const ModuleTypeInfo kFmoType = {
-    "fmo", "FMO", "2-op FM: ratio, index CV", Category::Source, Icon::Fm, Drawing::None,
+    "fmo", "FMO", "2-op FM: ratio, index CV", Category::Source, Icon::Fm, Drawing::Picture,
     4, fmo::kParams, 2, fmo::kInKeys, fmo::kInLabels, 1, kOutOnly, kOutLbl,
     980, sizeof(fmo::Fmo) + kBlock * sizeof(float), 0, fmo::create};
 
@@ -228,7 +228,7 @@ Module* create() { return new For(); }
 }  // namespace fmt
 
 const ModuleTypeInfo kForType = {
-    "for", "FOR", "Formant oscillator", Category::Source, Icon::Osc, Drawing::None,
+    "for", "FOR", "Formant oscillator", Category::Source, Icon::Osc, Drawing::Picture,
     4, fmt::kParams, 2, fmt::kInKeys, fmt::kInLabels, 1, kOutOnly, kOutLbl,
     740, sizeof(fmt::For) + kBlock * sizeof(float), 0, fmt::create};
 
@@ -298,7 +298,7 @@ Module* create() { return new Ssw(); }
 }  // namespace ssw
 
 const ModuleTypeInfo kSswType = {
-    "ssw", "SSW", "Supersaw, 7 detuned saws", Category::Source, Icon::Saw, Drawing::None,
+    "ssw", "SSW", "Supersaw, 7 detuned saws", Category::Source, Icon::Saw, Drawing::Picture,
     4, ssw::kParams, 2, ssw::kInKeys, ssw::kInLabels, 1, kOutOnly, kOutLbl,
     1050, sizeof(ssw::Ssw) + kBlock * sizeof(float), 0, ssw::create};
 
@@ -613,7 +613,7 @@ Module* create() { return new Vos(); }
 }  // namespace vos
 
 const ModuleTypeInfo kVosType = {
-    "vos", "VOS", "VOSIM: two formants", Category::Source, Icon::Osc, Drawing::None,
+    "vos", "VOS", "VOSIM: two formants", Category::Source, Icon::Osc, Drawing::Picture,
     5, vos::kParams, 2, vos::kInKeys, vos::kInLabels, 1, kOutOnly, kOutLbl,
     1030, sizeof(vos::Vos) + kBlock * sizeof(float), 0, vos::create};
 
@@ -652,7 +652,7 @@ Module* create() { return new Zos(); }
 }  // namespace zos
 
 const ModuleTypeInfo kZosType = {
-    "zos", "ZOS", "Z oscillator: formant sync", Category::Source, Icon::Osc, Drawing::None,
+    "zos", "ZOS", "Z oscillator: formant sync", Category::Source, Icon::Osc, Drawing::Picture,
     5, zos::kParams, 2, zos::kInKeys, zos::kInLabels, 1, kOutOnly, kOutLbl,
     900, sizeof(zos::Zos) + kBlock * sizeof(float), 0, zos::create};
 
@@ -703,6 +703,6 @@ Module* create() { return new Hrm(); }
 }  // namespace hrm
 
 const ModuleTypeInfo kHrmType = {
-    "hrm", "HRM", "Additive, 16 harmonics", Category::Source, Icon::Osc, Drawing::None,
+    "hrm", "HRM", "Additive, 16 harmonics", Category::Source, Icon::Osc, Drawing::Picture,
     5, hrm::kParams, 2, hrm::kInKeys, hrm::kInLabels, 1, kOutOnly, kOutLbl,
     660, sizeof(hrm::Hrm) + kBlock * sizeof(float), 0, hrm::create};

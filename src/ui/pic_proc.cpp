@@ -56,10 +56,35 @@ bool vcfGlyph(Gfx& g, const ModuleRec& m, Box b, uint8_t col) {
     return true;
 }
 
+
+// ---- TRM: a fast carrier under the tremolo's gain (2 LFO cycles of WAV at DEP) ----
+void trm(const PicCtx& c) {
+    const int w = ipar(c, 2);
+    const float dep = clampf(par(c, 1), 0.f, 1.f);
+    auto lfoU = [&](float t) {  // 0..1
+        const float p = t - floorf(t);
+        if (w == 1) return p < 0.5f ? 2.f * p : 2.f - 2.f * p;
+        if (w == 2) return p < 0.5f ? 1.f : 0.f;
+        return 0.5f + 0.5f * sinf(6.2831853f * p);
+    };
+    auto gain = [&](float u) { return 1.f - dep * lfoU(u * 2.f); };
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 3);
+    if (!c.small) {
+        trace(c.g, b, [&](float u) { return gain(u) * 0.95f; }, isSel(c, 1) ? PAccent : PDim);
+        trace(c.g, b, [&](float u) { return -gain(u) * 0.95f; }, isSel(c, 1) ? PAccent : PDim);
+    }
+    trace(c.g, b, [&](float u) { return sinf(6.2831853f * u * 11.f) * gain(u) * 0.95f; }, c.sel < 0 || c.sel == 2 ? PAccent : PText);
+    if (c.small) return;
+    char r[16];
+    fmt(c, 0, r, sizeof r, true);
+    static const char* const kW[] = {"SIN", "TRI", "SQR"};
+    captions(c, kW[w < 0 ? 0 : (w > 2 ? 2 : w)], isSel(c, 2) ? PAccent : PDim, r, isSel(c, 0) ? PAccent : PText);
+}
+
 }  // namespace
 
 const Entry kProcPics[] = {
-    {"vcf", vcf, vcfGlyph},
+    {"vcf", vcf, vcfGlyph}, {"trm", trm, nullptr},
 };
 const int kNumProcPics = sizeof kProcPics / sizeof kProcPics[0];
 
