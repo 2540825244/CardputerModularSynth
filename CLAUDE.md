@@ -11,13 +11,17 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 
-## Next step (as of 2026-10-29, session 7)
-v1.3 plan `docs/superpowers/plans/2026-10-29-v1.3-perf-and-sampling.md` is built and reviewed (Tasks 1-10;
-ledger `.superpowers/sdd/2026-10-29-v1.3-perf-and-sampling/progress.md`, trust it and git log after
-compaction). Handed to the owner: `dist/modsynth-v1.3-test1.bin` (36199db) + `dist/test-6-script.md`,
-made without the device. Next: the owner's device results, then the deferred Task 9 perf items
-(IRAM, ladder 2x, Plaits division, GRD per-engine cost: each needs the device bench) and the
-deferred minors in the ledger. Execution: Claude implements inline, one Opus reviewer subagent.
+## Next step (as of 2026-10-29, session 8)
+v1.4 plan `docs/superpowers/plans/2026-10-29-v1.4-pictures-modules-presets.md` is built and reviewed
+(ledger `.superpowers/sdd/2026-10-29-v1.4-pictures-modules-presets/progress.md`; trust it and git log).
+v1.4 = a picture for every module (`ui/pictures*`, `ui/pic_*.cpp`, drawn through `ui/gfx.h`), ARP CLP
+PRC VOW EQ3, PRESETS 2 page; also the keyboard-freeze and false CPU FULL fixes. Handed to the owner:
+`dist/modsynth-v1.4-test1.bin` (406235c, 981 KB of the 1 MB slot: ~67 KB left) + `dist/test-7-script.md`,
+made without the device; v1.3's test 6 results never came back. Next: the owner's device results,
+then the deferred items in both ledgers (v1.3 Task 9 perf needs the device bench; v1.4 costs are
+estimates). Pictures are checked natively: `pio test -e native -f test_pictures` writes
+`.pio/pictures/*.png` and `_sheet.png`, look at them after a painter change.
+Execution: Claude implements inline, one Opus reviewer subagent.
 The device is on USB only when the owner says so: only ever write the Launcher's `modsyn` slot
 (0x650000, image <= 1 MB) via `tools/dev/flash_slot.sh`; full flash backup in `dist/`.
 Backlog not in the plan: `docs/todo.md`.
