@@ -6,7 +6,7 @@
 class SdStorage : public Storage {
    public:
     bool begin();  // mounts and creates /modsynth/patches
-    void selfTest();  // one serial line: writes, reads back and deletes /modsynth/probe.txt
+    void selfTest();  // one serial line from the mount; -DSD_SELFTEST adds a write/read/delete probe
     bool available() override;  // while unmounted, re-attempts begin() at most every 5 s
     bool read(const char* path, std::string& out) override;
     bool write(const char* path, const std::string& data) override;  // tmp + rename

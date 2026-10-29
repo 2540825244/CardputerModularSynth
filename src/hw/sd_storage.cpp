@@ -5,16 +5,17 @@
 bool SdStorage::mount() {
     if (!spiStarted_) {
         // G5 is the Cap LoRa-1262's SX1262 NSS on the EXT header, on the same SPI bus. It floats
-        // low after reset, so the radio answers on MISO and the card's CMD0 fails. A pull-up keeps
-        // the radio deselected (harmless with no cap fitted).
-        pinMode(5, INPUT_PULLUP);
+        // low after reset, so the radio answers on MISO and the card's CMD0 fails. We are the only
+        // driver of NSS: drive it high to keep the radio deselected (harmless with no cap fitted).
+        pinMode(5, OUTPUT);
+        digitalWrite(5, HIGH);
         SPI.begin(40, 39, 14, 12);
         spiStarted_ = true;
     } else {
         SD.end();
     }
     lastTryMs_ = millis();
-    ok_ = SD.begin(12, SPI, 25000000);
+    ok_ = SD.begin(12, SPI, 25000000, "/sd", 2);  // 2 open files: ~4 KB of heap each
     if (ok_) {
         SD.mkdir("/modsynth");
         SD.mkdir("/modsynth/patches");
@@ -29,13 +30,16 @@ void SdStorage::selfTest() {
         Serial.println("SD none");
         return;
     }
+#ifdef SD_SELFTEST
+    // Writes to the card, so only on request: the card also holds the Launcher's files.
     static const char* kProbe = "/modsynth/probe.txt";
     const std::string want = "modsynth sd probe";
     std::string got;
     const bool rw = write(kProbe, want) && read(kProbe, got) && got == want;
-    SD.remove(kProbe);
-    Serial.printf("SD %s type=%d %u MB\n", rw ? "ok" : "FAIL rw", (int)SD.cardType(),
-                  (unsigned)(SD.cardSize() >> 20));
+    if (SD.exists(kProbe)) SD.remove(kProbe);
+    if (!rw) Serial.println("SD FAIL rw");
+#endif
+    Serial.printf("SD ok type=%d %u MB\n", (int)SD.cardType(), (unsigned)(SD.cardSize() >> 20));
 }
 
 bool SdStorage::available() {
