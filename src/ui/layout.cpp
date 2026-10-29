@@ -94,6 +94,18 @@ bool placeCellOf(int typeIdx, int* page, uint8_t* row, uint8_t* col) {
     return true;
 }
 
+void stripSpan(float norm, float zero, int col, float* a, float* b) {
+    *a = 0.f;
+    *b = 0.f;
+    if (col < 0 || col >= 10) return;
+    const float lo = (norm < zero ? norm : zero) * 10.f - (float)col, hi = (norm < zero ? zero : norm) * 10.f - (float)col;
+    *a = lo < 0.f ? 0.f : (lo > 1.f ? 1.f : lo);
+    *b = hi < 0.f ? 0.f : (hi > 1.f ? 1.f : hi);
+    if (*a < 1e-3f) *a = 0.f;  // snap float noise, as stripFill does
+    if (*b > 1.f - 1e-3f) *b = 1.f;
+    if (*b - *a < 1e-3f) *b = *a;
+}
+
 float stripFill(float norm, int col) {
     if (col < 0 || col >= 10) return 0.f;
     float f = norm * 10.f - (float)col;

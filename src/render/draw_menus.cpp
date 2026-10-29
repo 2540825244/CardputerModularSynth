@@ -4,7 +4,9 @@
 #include "core/presets.h"
 #include "core/registry.h"
 #include "render_internal.h"
+#include "gfx_canvas.h"
 #include "ui/layout.h"
+#include "ui/pictures.h"
 
 namespace rd {
 
@@ -20,29 +22,47 @@ void joinLabels(char* out, size_t n, const char* const* labels, int count) {
     if (!count) snprintf(out, n, "-");
 }
 
-// Details of the selected type in the top-row band (rows 1-3 hold the tiles), in Font0.
+// Details of the selected type in the top-row band (rows 1-3 hold the tiles): v1.4 a preview of its
+// picture at the defaults on the left, then the name (Font0), the blurb, the pins and the cost.
 void drawDetails(const ModuleTypeInfo& t, const Refusal& r, uint32_t cpuUsed, uint32_t cost) {
     const int x = cellX(0), y = cellY(0), w = kGridW - 1;
     cv.fillRect(x, y, w, cellH(0), PEmpty);
+    int tx = x + 3;
+    if (hasPicture(t)) {
+        const int pw = 42, ph = cellH(0) - 4;
+        cv.fillRect(x + 2, y + 2, pw, ph, PBg);
+        const ModuleRec rec = defaultRecord(t);
+        int page = 0;
+        while (page < modulePageCount(t) && modulePageDrawing(t, page) != Drawing::Picture) page++;
+        cv.setClipRect(x + 2, y + 2, pw, ph);
+        drawPicture(PicCtx{canvasGfx(), rec, nullptr, page, -1, x + 3, y + 3, pw - 2, ph - 2, true});
+        cv.clearClipRect();
+        tx = x + pw + 6;
+    }
+    cv.setClipRect(x, y, w, cellH(0));  // a long blurb stops at the band's edge
     cv.setFont(&fonts::Font0);
     cv.setTextDatum(textdatum_t::top_left);
     cv.setTextColor(PText);
-    cv.drawString(t.name, x + 3, y + 2);
+    cv.drawString(t.name, tx, y + 2);
+    const int nameW = cv.textWidth(t.name);
+    cv.setFont(&fonts::TomThumb);
     cv.setTextColor(PDim);
-    cv.drawString(t.blurb, x + 25, y + 2);
+    cv.drawString(t.blurb, tx + nameW + 4, y + 4);
     char in[24], out[24], line[64];
     joinLabels(in, sizeof in, t.inLabels, t.numIns > 4 ? 4 : t.numIns);
     joinLabels(out, sizeof out, t.outLabels, t.numOuts > 4 ? 4 : t.numOuts);
     snprintf(line, sizeof line, "IN %s%s  OUT %s%s", in, t.numIns > 4 ? ".." : "", out, t.numOuts > 4 ? ".." : "");
     cv.setTextColor(PText);
-    cv.drawString(line, x + 3, y + 12);
+    cv.drawString(line, tx, y + 13);
     if (!r.ok) {
+        cv.setFont(&fonts::Font0);
         cv.setTextColor(PAccent);
-        cv.drawString(r.reason, x + 3, y + 22);
+        cv.drawString(r.reason, tx, y + 21);
+        cv.clearClipRect();
         return;
     }
     // CPU: what this type would take of the budget (measured once it has run), on top of what is used.
-    const int bw = 60, bx = x + 3, by = y + 24;
+    const int bw = 50, bx = tx, by = y + 23;
     cv.drawRect(bx, by, bw, 5, PDim);
     const int used = (int)(bw * (float)cpuUsed / (float)kCpuBudget);
     const int add = (int)(bw * (float)cost / (float)kCpuBudget) + 1;
@@ -51,7 +71,8 @@ void drawDetails(const ModuleTypeInfo& t, const Refusal& r, uint32_t cpuUsed, ui
     smallText("CPU", bx + bw + 9, by, PDim);
     cv.setTextDatum(textdatum_t::top_right);
     cv.setTextColor(PDim);
-    cv.drawString("ENTER=PLACE", x + w - 3, y + 22);
+    cv.drawString("ENTER=PLACE", x + w - 3, y + 23);
+    cv.clearClipRect();
 }
 
 }  // namespace

@@ -111,10 +111,13 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
     lastMs = gNow;
     const float norm = shown;
     const int cur = sel.spec ? (int)lroundf(sel.value - sel.spec->min) : -1;
+    // v1.4: a knob that goes both ways (TUNE, AMT, OFS ...) fills from its zero
+    const bool bipolar = sel.spec && sel.spec->curve == Curve::Lin && sel.spec->min < 0.f && sel.spec->max > 0.f;
+    const float zero = bipolar ? paramToNorm(*sel.spec, 0.f) : 0.f;
     for (int col = 0; col < kGridCols; col++) {
         const int x = cellX(col), y = cellY(0), w = cellW(col), h = cellH(0);
         bool on = false;
-        float fill = 0.f;  // knob segments: partial fill of the last one
+        float fill = 0.f, fa = 0.f, fb = 0.f;  // knob segments: the filled part [fa, fb] of this one
         char lab[8] = "";
         uint8_t labCol = PFaint;
         if (col < 10) {
@@ -126,7 +129,8 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
                     labCol = PDim;
                 }
             } else {
-                fill = sel.spec ? stripFill(norm, col) : 0.f;
+                if (sel.spec) stripSpan(norm, zero, col, &fa, &fb);
+                fill = fb > fa ? fb - fa : 0.f;
                 on = fill >= 0.5f;
                 snprintf(lab, sizeof lab, "%s", keyLabel(0, col));
             }
@@ -135,11 +139,17 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
         }
         if (fill > 0.f && fill < 1.f) {
             cv.fillRect(x, y, w, h, PEmpty);
-            cv.fillRect(x, y, (int)lroundf(w * fill), h, PAccent);
+            cv.fillRect(x + (int)lroundf(w * fa), y, (int)lroundf(w * fill), h, PAccent);
         } else {
             cv.fillRect(x, y, w, h, on ? PAccent : PEmpty);
         }
         smallText(lab, x + w / 2, y + h - 7, on ? PBg : labCol);
+    }
+    if (sel.spec && !steppedCells) {  // the zero of a bipolar knob, and a tick at the default
+        const int x0 = cellX(0), x10 = cellX(9) + cellW(9), yb = cellY(0) + cellH(0);
+        if (bipolar) cv.drawFastVLine(x0 + (int)lroundf(zero * (x10 - x0)), cellY(0) + 10, cellH(0) - 12, PText);
+        const int dx = x0 + (int)lroundf(paramToNorm(*sel.spec, sel.c.kind == CellKind::Param ? sel.spec->def : 1.f) * (x10 - x0));
+        cv.fillTriangle(dx - 2, yb - 1, dx + 2, yb - 1, dx, yb - 4, PText);
     }
     char name[16], val[16];
     if (sel.spec) {

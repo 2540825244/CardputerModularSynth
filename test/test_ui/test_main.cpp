@@ -1327,6 +1327,28 @@ static const ModuleTypeInfo& bigType(Drawing d) {
     return t;
 }
 
+// v1.4: a value that goes both ways fills from its zero, not from the left
+void test_strip_span_bipolar() {
+    float a = 0.f, b = 0.f;
+    stripSpan(0.75f, 0.5f, 5, &a, &b);  // +50 % of a -1..1 knob: segments 5 and 6 full, 7 half
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.f, a);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.f, b);
+    stripSpan(0.75f, 0.5f, 7, &a, &b);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.f, a);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.5f, b);
+    stripSpan(0.75f, 0.5f, 4, &a, &b);  // left of the zero: empty
+    TEST_ASSERT_TRUE(b <= a);
+    stripSpan(0.25f, 0.5f, 2, &a, &b);  // -50 %: segment 2 fills its right half
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.5f, a);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.f, b);
+    stripSpan(0.25f, 0.5f, 6, &a, &b);
+    TEST_ASSERT_TRUE(b <= a);
+    for (int c = 0; c < 10; c++) {  // zero 0: the same as stripFill
+        stripSpan(0.35f, 0.f, c, &a, &b);
+        TEST_ASSERT_FLOAT_WITHIN(1e-4f, stripFill(0.35f, c), b > a ? b - a : 0.f);
+    }
+}
+
 void test_auto_pages_overflow() {
     const ModuleTypeInfo& t = bigType(Drawing::None);
     TEST_ASSERT_EQUAL(2, modulePageCount(t));
@@ -2375,6 +2397,7 @@ int main() {
     RUN_TEST(test_strip_fill_partial_segment);
     RUN_TEST(test_strip_fill_ends);
     RUN_TEST(test_input_amount_edit);
+    RUN_TEST(test_strip_span_bipolar);
     RUN_TEST(test_auto_pages_overflow);
     RUN_TEST(test_drawing_page0_width5);
     RUN_TEST(test_drawing_page0_fits_seven_params);

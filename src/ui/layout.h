@@ -23,3 +23,6 @@ bool placeCellOf(int typeIdx, int* page, uint8_t* row, uint8_t* col);  // false 
 // Module-view value strip: how much of top-row segment col (0..9, each 10% of the knob) is filled
 // for a value at norm 0..1, in 0..1. The last segment fills partly, so 35% shows 3.5 segments.
 float stripFill(float norm, int col);
+// v1.4: the part [*a, *b] (0..1 across segment col) the strip fills between the knob's zero (as a
+// norm) and its value; zero = 0 is stripFill. *b <= *a: nothing.
+void stripSpan(float norm, float zero, int col, float* a, float* b);

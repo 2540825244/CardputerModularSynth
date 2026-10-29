@@ -5,6 +5,8 @@
 #include "ui/anim.h"
 #include "ui/layout.h"
 #include "render_internal.h"
+#include "gfx_canvas.h"
+#include "ui/pictures.h"
 
 namespace rd {
 
@@ -91,12 +93,13 @@ void outline(int col, int row, uint8_t color) {
     cv.drawRect(cellX(col), cellY(row), cellW(col), cellH(row), color);
 }
 
-void moduleTile(const ModuleTypeInfo& t, int col, int row, bool dim, int iconDy) {
+void moduleTile(const ModuleTypeInfo& t, int col, int row, bool dim, int iconDy, const ModuleRec* rec) {
     const int x = cellX(col), y = cellY(row), w = cellW(col);
     const uint8_t fg = dim ? PFaint : PText;
     if (gTheme) cv.fillRect(x, y, w, cellH(row), PEmpty);
     cv.fillRect(x + 2, y + 2, w - 4, 2, dim ? PFaint : categoryColor(t.category));  // category bar
-    drawIcon(t.icon, x + (w - 12) / 2, y + 8 + iconDy, fg);
+    if (!rec || !drawTileGlyph(canvasGfx(), *rec, x + (w - 13) / 2, y + 8, 13, 11, fg))
+        drawIcon(t.icon, x + (w - 12) / 2, y + 8 + iconDy, fg);
     smallText(t.name, x + w / 2, y + 22, fg);
 }
 

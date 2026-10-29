@@ -27,8 +27,9 @@ void drawIcon(Icon ic, int x, int y, uint8_t color);  // module icon
 void dotted(int x, int y, int w, int h, uint8_t color);
 void smallText(const char* s, int cx, int y, uint8_t color);  // TomThumb, centred
 void emptyCell(int col, int row, const char* label, bool selected);
-// Module tile: category bar, icon, name. dy shifts the icon (LFO animation).
-void moduleTile(const ModuleTypeInfo&, int col, int row, bool dim, int iconDy);
+// Module tile: category bar, icon, name. dy shifts the icon (LFO animation). With rec, a type
+// whose glyph follows its params (ui/pictures.h drawTileGlyph) draws that instead of the icon.
+void moduleTile(const ModuleTypeInfo&, int col, int row, bool dim, int iconDy, const ModuleRec* rec = nullptr);
 void outline(int col, int row, uint8_t color);
 
 // Key-cap labels per grid cell (row 0..3, col 0..11), nullptr-free.

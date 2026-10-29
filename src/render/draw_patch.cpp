@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 #include "render_internal.h"
 
 namespace rd {
@@ -25,6 +26,26 @@ void drawDots(int col, int row, const uint8_t* colors, int n) {
     for (int i = 0; i < n; i++, dx += 5) cv.fillRect(dx, y, 3, 3, PCable0 + colors[i] % kNumCableColors);
 }
 
+// v1.4: a sequencer's step now as a tick riding its category bar; a clock's bar lit on the beat.
+void stepTick(const ModuleRec& m, const Module& inst, int col, int row) {
+    const char* id = m.type->id;
+    const int x = cellX(col) + 2, y = cellY(row) + 1, w = cellW(col) - 4;
+    if (!strcmp(id, "clk")) {
+        if (inst.monitor(0) > 0.5f) cv.fillRect(x, y + 1, w, 2, PAccent);
+        return;
+    }
+    const char* lenKey = !strcmp(id, "euc") ? "steps" : "len";
+    if (strcmp(id, "seq") && strcmp(id, "trg") && strcmp(id, "euc") && strcmp(id, "kit")) return;
+    const int step = (int)inst.monitor(0);
+    if (step < 0) return;  // KIT between passes
+    int len = 12;
+    for (int i = 0; i < m.type->numParams; i++)
+        if (!strcmp(m.type->params[i].key, lenKey)) len = (int)lroundf(m.params[i]);
+    len = len < 1 ? 1 : len;
+    const int px = x + (step % len) * (w - 3) / (len > 1 ? len - 1 : 1);
+    cv.fillRect(px, y, 3, 4, PAccent);
+}
+
 }  // namespace
 
 void drawPatchView(const UiState& s, const Patch& p, Engine& e) {
@@ -42,7 +63,8 @@ void drawPatchView(const UiState& s, const Patch& p, Engine& e) {
             Module* inst = e.instance(m->id);
             if (inst && m->type->icon == Icon::Lfo) dy = (int)lroundf(sinf(inst->monitor(0) * 6.2831853f));
             // dim: waiting for RAM ("NO RAM"), silent; or bypassed (also slashed)
-            moduleTile(*m->type, col, row, !inst || m->bypass, dy);
+            moduleTile(*m->type, col, row, !inst || m->bypass, dy, m);
+            if (inst && !m->bypass) stepTick(*m, *inst, col, row);
             if (m->bypass)
                 cv.drawLine(cellX(col) + 3, cellY(row) + cellH(row) - 4, cellX(col) + cellW(col) - 4, cellY(row) + 4, PDim);
             if (inst && !m->bypass && m->type->numOuts > 0 && m->type->icon != Icon::Out) {  // activity: |out| peak
