@@ -5,6 +5,7 @@
 #include "delay_pool.h"
 #include "dsp_util.h"
 #include "modules/dly.h"
+#include "modules/keys.h"
 
 namespace {
 // A module created while bypassed: its out buffers (zero, or input 0 on output 0) and params,
@@ -15,6 +16,15 @@ class BypassStub final : public Module {
     void process(const float* const*, const bool*) override {}
 };
 }  // namespace
+
+// Bypassed and without an instance: a stub, except KEYS (tiny, and its PLAY page needs the real
+// one). Stubs need some heap too, so only above half the reserve.
+Module* Engine::makeStub(const ModuleTypeInfo& t) const {
+    if (heapFree_() <= kRamReserve / 2) return nullptr;
+    return new (std::nothrow) BypassStub(t);
+}
+
+bool Engine::stubbed(const ModuleRec& r) { return r.bypass && r.type != &kKeysType; }
 
 Engine::Engine(HeapFreeFn heapFree) : heapFree_(heapFree), scratch_{} {}
 
@@ -169,9 +179,9 @@ int Engine::instantiateAll(const Patch& p, uint32_t gen) {
         const ModuleRec& r = p.moduleAt(i);
         const int k = indexOf(r.id);
         Module* m = k >= 0 ? insts_[k].m : nullptr;
-        if (r.bypass) {  // an existing instance stays; a new one is only a stub (no heap)
+        if (stubbed(r)) {  // an existing instance stays; a new one is only a stub (no heap)
             if (!m) {
-                m = new (std::nothrow) BypassStub(*r.type);
+                m = makeStub(*r.type);
                 if (!m) {
                     missing++;
                     continue;
@@ -279,8 +289,8 @@ void Engine::collect() {
     for (int i = 0; i < patch_.moduleCount(); i++) {
         const ModuleRec& r = patch_.moduleAt(i);
         const int k = indexOf(r.id);
-        if (k >= 0 && (!insts_[k].stub || r.bypass)) continue;
-        Module* m = tryCreate(*r.type);
+        if (k >= 0 && (!insts_[k].stub || stubbed(r))) continue;
+        Module* m = stubbed(r) ? makeStub(*r.type) : tryCreate(*r.type);  // as instantiateAll
         if (!m) {
             missing++;
             continue;
@@ -289,7 +299,7 @@ void Engine::collect() {
             retire(insts_[k].m, nullptr, gen);
             insts_[k] = {r.id, m, false};
         } else {
-            insts_.push_back({r.id, m, false});
+            insts_.push_back({r.id, m, stubbed(r)});
         }
         pushValues(m, r);
         any = true;

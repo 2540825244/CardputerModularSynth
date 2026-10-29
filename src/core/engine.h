@@ -86,6 +86,8 @@ class Engine {
     // the real thing, pushes params; returns # missing.
     int instantiateAll(const Patch&, uint32_t gen);
     int indexOf(uint16_t id) const;  // into insts_, -1 = none
+    Module* makeStub(const ModuleTypeInfo& t) const;
+    static bool stubbed(const ModuleRec& r);  // bypassed and not KEYS: a new instance is a stub
     void publish(uint32_t gen);
 
     struct Learned {

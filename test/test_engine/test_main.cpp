@@ -648,6 +648,34 @@ void test_bypass_out_silent_and_free() {
     TEST_ASSERT_EQUAL(0, eng.estimatedCycles());
 }
 
+// KEYS bypassed still gets its real instance; stubs need heap above half the reserve; collect()
+// retries a bypassed record as a stub, never the real module.
+void test_bypass_stub_rules() {
+    Patch p;
+    const uint16_t k = add(p, kKeysType, 0);
+    uint16_t g = 0;
+    p.addModule(kGrdType, 0, 1, &g);
+    p.setBypass(k, true);
+    p.setBypass(g, true);
+    gHeap = 10 * 1024;  // below kRamReserve / 2: no stub yet
+    Engine eng(setHeap);
+    eng.apply(p);
+    TEST_ASSERT_EQUAL(2, eng.missing());  // the GRD's stub and the (real) KEYS both wait
+    gHeap = 1000000;
+    Engine big(bigHeap);
+    big.apply(p);
+    TEST_ASSERT_NOT_NULL(big.instance(k));  // KEYS: real even when bypassed
+    TEST_ASSERT_NULL(big.instance(g));
+    for (int i = 0; i < 70; i++) {  // heap back: collect() makes the GRD a stub, not a GRD
+        run(eng, 1);
+        eng.collect();
+    }
+    TEST_ASSERT_EQUAL(0, eng.missing());
+    TEST_ASSERT_NULL(eng.instance(g));
+    TEST_ASSERT_NOT_NULL(eng.instance(k));
+    gHeap = 0;
+}
+
 // Which types pass audio through when bypassed (the report lists them).
 void test_bypass_pass_types() {
     const char* const pass[] = {"vcf", "vca", "dly", "rev", "cho", "flg", "pha", "trm", "psh", "lad",
@@ -668,6 +696,7 @@ int main() {
     RUN_TEST(test_basic_voice);
     RUN_TEST(test_bypass_passes_effect);
     RUN_TEST(test_bypassed_module_not_created);
+    RUN_TEST(test_bypass_stub_rules);
     RUN_TEST(test_bypass_zeroes_others);
     RUN_TEST(test_bypass_out_silent_and_free);
     RUN_TEST(test_bypass_pass_types);
