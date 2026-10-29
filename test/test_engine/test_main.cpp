@@ -858,6 +858,48 @@ void test_kit_cpu_guard() {
     TEST_ASSERT_EQUAL_UINT32(kOutType.cpuCycles + kMixType.cpuCycles, eng.estimatedCycles());
 }
 
+// Task 9: a single source at unity amounts is read in place (no copy); a self-cable, a second
+// source or an amount still go through the input buffer.
+static const float* gSeenIn = nullptr;
+class Peek : public Module {
+   public:
+    Peek();
+    void process(const float* const* ins, const bool* c) override {
+        gSeenIn = c[0] ? ins[0] : nullptr;
+        for (int i = 0; i < kBlock; i++) out(0)[i] = c[0] ? ins[0][i] + 1.f : 0.f;
+    }
+};
+static Module* createPeek() { return new Peek(); }
+const ModuleTypeInfo kPeekType = {"tpeek", "TST", "test", Category::Processor, Icon::Osc, Drawing::None,
+                                  0, nullptr, 1, kTIn, kTIn, 1, kTOut, kTOut, 10, 100, 0, createPeek};
+Peek::Peek() : Module(kPeekType) {}
+
+void test_input_read_in_place() {
+    Patch p;
+    const uint16_t src = add(p, kDcType, 0), pk = add(p, kPeekType, 1);
+    wire(p, src, 0, pk, 0);
+    Engine eng(bigHeap);
+    eng.apply(p);
+    float buf[kBlock];
+    eng.processBlock(buf);
+    TEST_ASSERT_TRUE(gSeenIn == eng.instance(src)->out(0));
+    TEST_ASSERT_EQUAL_FLOAT(6.f, eng.instance(pk)->out(0)[5]);
+    p.find(src)->outAmount[0] = 0.5f;  // an amount: scaled in the buffer
+    eng.apply(p);
+    eng.processBlock(buf);
+    TEST_ASSERT_TRUE(gSeenIn != eng.instance(src)->out(0));
+    TEST_ASSERT_EQUAL_FLOAT(3.5f, eng.instance(pk)->out(0)[5]);
+    // a self-cable reads the previous block, never the buffer being written
+    Patch q;
+    const uint16_t s = add(q, kPeekType, 0);
+    wire(q, s, 0, s, 0);
+    Engine e2(bigHeap);
+    e2.apply(q);
+    for (int b = 0; b < 3; b++) e2.processBlock(buf);
+    TEST_ASSERT_TRUE(gSeenIn != e2.instance(s)->out(0));
+    TEST_ASSERT_EQUAL_FLOAT(3.f, e2.instance(s)->out(0)[0]);
+}
+
 // Review I1: a voice cut while ringing starts its next hit fresh, as the first one did.
 void test_kit_cut_voice_restarts_clean() {
     const ModuleTypeInfo* voices[] = {&kResType, &kStrType, &kMdlType, &kKckType};
@@ -992,6 +1034,7 @@ int main() {
     RUN_TEST(test_bypassed_module_not_created);
     RUN_TEST(test_bypass_stub_rules);
     RUN_TEST(test_kit_groups);
+    RUN_TEST(test_input_read_in_place);
     RUN_TEST(test_kit_demand_activation);
     RUN_TEST(test_kit_cpu_guard);
     RUN_TEST(test_kit_three_drum_kit);

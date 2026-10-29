@@ -384,6 +384,13 @@ MODSYNTH_IRAM void Engine::processBlock(float* mono) {
             conn[in] = in < numIns && node.nSrc[in] > 0;
             ins[in] = scratch_[in];
             if (!conn[in]) continue;
+            if (node.nSrc[in] == 1) {  // one source at unity: read its buffer in place (not its own)
+                const ProgramSource& src = prog->srcs[node.firstSrc[in]];
+                if (src.m != m && src.m->outAmount(src.out) == 1.f && m->inAmount(in) == 1.f) {
+                    ins[in] = src.m->out(src.out);
+                    continue;
+                }
+            }
             float* acc = scratch_[in];
             for (int k = 0; k < kBlock; k++) acc[k] = 0.f;
             for (int s = 0; s < node.nSrc[in]; s++) {
