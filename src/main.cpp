@@ -144,16 +144,18 @@ static void dumpInterrupts() {
 }
 #endif
 
-// Everything that installs an interrupt (I2C via M5.begin, the keyboard's GPIO ISR, USB serial,
+// Everything that installs an interrupt (I2C via M5.begin, USB serial,
 // I2S, the display's SPI) runs here, on core 0: an ESP-IDF interrupt lives on the core that
 // allocates it, and on core 1 it would run inside the audio task's time. Then this task is the UI.
 static void initTask(void*) {
     auto cfg = M5.config();
     cfg.internal_spk = false;  // we own the codec
     cfg.internal_mic = false;
-    M5Cardputer.begin(cfg, true);
+    M5Cardputer.begin(cfg, false);  // not M5Cardputer's keyboard reader: see hw/keyboard.cpp
+    const bool kbOk = keyboardBegin();
     Serial.begin(115200);
     Serial.setTxTimeoutMs(0);  // never stall the UI task when no host is reading
+    if (!kbOk) Serial.println("keyboardBegin FAILED (TCA8418)");
     printHeap("boot");
 
     M5Cardputer.Display.setRotation(1);
