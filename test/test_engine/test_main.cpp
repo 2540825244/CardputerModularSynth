@@ -1039,7 +1039,7 @@ void test_bypass_stub_rules() {
 // Which types pass audio through when bypassed (the report lists them).
 void test_bypass_pass_types() {
     const char* const pass[] = {"vcf", "vca", "dly", "rev", "cho", "flg", "pha", "trm", "psh", "lad",
-                                "fld", "ovd", "cru", "lpg", "dyn", "awh", "res"};
+                                "fld", "ovd", "cru", "lpg", "dyn", "awh", "res", "vow", "eq3"};
     int n = 0, count = 0;
     const ModuleTypeInfo* const* t = allTypes(&n);
     for (int i = 0; i < n; i++) {
@@ -1048,7 +1048,7 @@ void test_bypass_pass_types() {
         TEST_ASSERT_EQUAL_MESSAGE(want, bypassPasses(*t[i]), t[i]->id);
         count += want;
     }
-    TEST_ASSERT_EQUAL(17, count);
+    TEST_ASSERT_EQUAL(19, count);
 }
 
 int main() {

@@ -5,6 +5,7 @@
 #include "Effects/overdrive.h"
 #include "Effects/wavefolder.h"
 #include "core/modules/common.h"
+#include "core/modules/v14.h"
 #include "pictures_internal.h"
 
 namespace pic {
@@ -459,6 +460,61 @@ void rev(const PicCtx& c) {
     captions(c, l, isSel(c, 4) ? PAccent : PDim, r, isSel(c, 1) ? PAccent : PText);
 }
 
+// ---- VOW: the three formant peaks at this vowel (SHF moves them), the vowel's letter ----
+void vowPic(const PicCtx& c) {
+    float f[3];
+    vowFormants(par(c, 0), f);
+    const float shift = powf(2.f, par(c, 1) / 12.f), q = 1.f / (2.f * (0.25f - 0.21f * clampf(par(c, 2), 0.f, 1.f)));
+    static const float kG[3] = {0.f, -6.f, -12.f};
+    auto resp = [&](float u) {
+        const float hz = logF(u);
+        float best = -60.f;
+        for (int k = 0; k < 3; k++) {
+            const float d = bpDb(hz, f[k] * shift, q) + kG[k];
+            best = d > best ? d : best;
+        }
+        return dbUnit(best);
+    };
+    const Box b = body(c);
+    if (!c.small)
+        for (float hz : {100.f, 1000.f, 10000.f}) dashV(c.g, xUnit(b, uOfF(hz)), b.y, b.h, PBorder, 1, 2);
+    traceUnit(c.g, b, resp, c.sel < 0 || c.sel <= 2 ? PAccent : PText, c.sel == 0 || c.sel == 1);
+    if (c.small) return;
+    static const char* const kV[5] = {"A", "E", "I", "O", "U"};
+    const float v = clampf(par(c, 0), 0.f, 4.f);
+    const int a = (int)v < 4 ? (int)v : 3;
+    char l[16];
+    if (v - (float)a < 0.05f) snprintf(l, sizeof l, "%s", kV[a]);
+    else if (v - (float)a > 0.95f) snprintf(l, sizeof l, "%s", kV[a + 1]);
+    else snprintf(l, sizeof l, "%s > %s", kV[a], kV[a + 1]);
+    char r[16];
+    snprintf(r, sizeof r, "F1 %d", (int)lroundf(f[0] * shift));
+    captions(c, l, isSel(c, 0) ? PAccent : PText, r, isSel(c, 1) ? PAccent : PDim);
+}
+// ---- EQ3: the summed response of its three biquads (the module's own design) ----
+void eq3Pic(const PicCtx& c) {
+    Biquad bq[3];
+    eq3Design(par(c, 0), par(c, 1), par(c, 2), par(c, 3), bq);
+    const Box b = body(c);
+    auto resp = [&](float u) {  // +-18 dB across the box
+        const float hz = logF(u);
+        const float db = bq[0].magDb(hz, 48000.f) + bq[1].magDb(hz, 48000.f) + bq[2].magDb(hz, 48000.f);
+        return clampf(db / 18.f, -1.f, 1.f);
+    };
+    if (!c.small) {
+        for (float hz : {100.f, 1000.f, 10000.f}) dashV(c.g, xUnit(b, uOfF(hz)), b.y, b.h, PBorder, 1, 2);
+        dashH(c.g, b.x, b.y + b.h / 2, b.w, PBorder, 1, 2);
+        dashV(c.g, xUnit(b, uOfF(par(c, 2))), b.y, b.h, isSel(c, 2) ? PAccent : PDim);
+    }
+    trace(c.g, b, resp, PAccent, c.sel >= 0);
+    if (c.small) return;
+    char l[28];
+    snprintf(l, sizeof l, "%+.0f %+.0f %+.0f DB", (double)par(c, 0), (double)par(c, 1), (double)par(c, 3));
+    char r[12];
+    hzText(par(c, 2), r, sizeof r);
+    captions(c, l, c.sel >= 0 ? PAccent : PDim, r, isSel(c, 2) ? PAccent : PText);
+}
+
 }  // namespace
 
 const Entry kProcPics[] = {
@@ -466,7 +522,7 @@ const Entry kProcPics[] = {
     {"ovd", ovd, nullptr},  {"cru", cru, nullptr}, {"atn", atn, nullptr}, {"dyn", dyn, nullptr},
     {"ring", ring, nullptr}, {"xfd", xfd, nullptr}, {"lad", lad, ladGlyph}, {"awh", awh, nullptr},
     {"pha", pha, nullptr},  {"flg", flg, nullptr}, {"cho", cho, nullptr}, {"psh", psh, nullptr},
-    {"dly", dly, nullptr},  {"rev", rev, nullptr},
+    {"dly", dly, nullptr},  {"rev", rev, nullptr}, {"vow", vowPic, nullptr}, {"eq3", eq3Pic, nullptr},
 };
 const int kNumProcPics = sizeof kProcPics / sizeof kProcPics[0];
 

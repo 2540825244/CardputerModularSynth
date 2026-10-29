@@ -1,6 +1,7 @@
 // Pictures: envelopes and modulators.
 #include <cstdio>
 #include "core/modules/common.h"
+#include "core/modules/v14.h"
 #include "pictures_internal.h"
 
 namespace pic {
@@ -315,11 +316,51 @@ void snh(const PicCtx& c) {
     captions(c, "RAMP IN", PFaint, slewMs < 0.05f ? "NO SLEW" : t, isSel(c, 0) ? PAccent : PDim);
 }
 
+// ---- ARP: the pattern's notes as dots over its steps, the step now (live) ----
+void arpPic(const PicCtx& c) {
+    int notes[24];
+    const int n = arpPattern(ipar(c, 0), ipar(c, 1), ipar(c, 2), notes, 24);
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 3);
+    int top = 0;
+    for (int k = 0; k < n; k++) top = notes[k] > top ? notes[k] : top;
+    const int now = live(c) && mon(c, 1, 0.f) > 0.5f ? (int)mon(c, 0, -1.f) : -1;
+    const int reps = n <= 6 ? 2 : 1, shown = n * reps;  // a short pattern twice, so it reads as a loop
+    const int cw = b.w / (shown > 1 ? shown : 1), dot = c.small ? 1 : (cw > 8 ? 3 : 2);
+    if (!c.small)
+        for (int o = 12; o <= top; o += 12) dashH(c.g, b.x, b.y + b.h - 1 - (int)lroundf((float)o / (float)(top > 0 ? top : 1) * (b.h - 2 * dot - 2)) - dot, b.w, PBorder, 1, 2);
+    int px = -1, py = -1;
+    for (int j = 0; j < shown; j++) {
+        const int k = j % n;
+        const int x = b.x + j * cw + cw / 2;
+        const int y = b.y + b.h - 1 - dot - (int)lroundf((float)notes[k] / (float)(top > 0 ? top : 1) * (b.h - 2 * dot - 2));
+        if (px >= 0 && !c.small) c.g.line(px, py, x, y, PFaint);
+        px = x;
+        py = y;
+    }
+    for (int j = 0; j < shown; j++) {
+        const int k = j % n;
+        const int x = b.x + j * cw + cw / 2;
+        const int y = b.y + b.h - 1 - dot - (int)lroundf((float)notes[k] / (float)(top > 0 ? top : 1) * (b.h - 2 * dot - 2));
+        const bool isNow = k == now && j < n;
+        const uint8_t col = isNow ? PText : (j >= n ? PDim : (c.sel < 0 || c.sel <= 2 ? PAccent : PText));
+        if (isNow && !c.small) c.g.circle(x, y, dot + 2, PText);
+        c.g.fillCircle(x, y, dot, col);
+    }
+    if (c.small) return;
+    char r[20];
+    if (ipar(c, 1) == 3) snprintf(r, sizeof r, "RANDOM OF %d", n);
+    else snprintf(r, sizeof r, "%d STEPS", n);
+    char l[16];
+    snprintf(l, sizeof l, "%s X%d", enumName(c, 0), ipar(c, 2));
+    captions(c, l, c.sel == 0 || c.sel == 2 ? PAccent : PDim, r, isSel(c, 1) ? PAccent : PText);
+}
+
 }  // namespace
 
 const Entry kModPics[] = {
     {"env", env, envGlyph}, {"lfo", lfo, lfoGlyph}, {"rnd", rnd, nullptr}, {"chs", chs, nullptr},
     {"ad", ad, adGlyph},    {"enf", enf, nullptr},   {"slw", slw, nullptr}, {"snh", snh, nullptr},
+    {"arp", arpPic, nullptr},
 };
 const int kNumModPics = sizeof kModPics / sizeof kModPics[0];
 

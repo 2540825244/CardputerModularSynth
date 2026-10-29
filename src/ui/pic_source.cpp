@@ -7,6 +7,7 @@
 #include "Synthesis/vosim.h"
 #include "Synthesis/zoscillator.h"
 #include "core/modules/common.h"
+#include "core/modules/v14.h"
 #include "core/units.h"
 #include "pictures_internal.h"
 
@@ -471,13 +472,58 @@ void prt(const PicCtx& c) {
     captions(c, d, isSel(c, kPDen) ? PAccent : PDim, f, isSel(c, kPFrq) ? PAccent : PText);
 }
 
+// ---- CLP: three bursts SPR apart, the tail (DEC), the band TON ----
+void clpPic(const PicCtx& c) {
+    const float spr = par(c, 2) * 0.001f, tail = par(c, 1) * 0.001f, win = clampf(3.f * spr + 4.f * tail, 0.08f, 3.5f);
+    auto amp = [&](float t) {
+        float a = 0.f;
+        for (int k = 0; k < 3; k++)
+            if (t >= k * spr) a += expf(-(t - k * spr) / 0.003f);
+        if (t >= 3.f * spr) a += 0.7f * expf(-(t - 3.f * spr) / tail);
+        return clampf(a, 0.f, 1.f) * 0.95f;
+    };
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 2);
+    voice(c.g, b, win, amp, [&](float) { return par(c, 0); }, [](float) { return 0.7f; }, c.sel < 0 || c.sel <= 2 ? PAccent : PText);
+    if (c.small) return;
+    envelopeLines(c.g, b, win, amp, PDim);
+    char f[12], t[12];
+    fmt(c, 0, f, sizeof f, true);
+    secText(win, t, sizeof t);
+    captions(c, f, isSel(c, 0) ? PAccent : PText, t, PDim);
+}
+// ---- PRC: the mode's hit (the same shapes as prc in v14.cpp, drawn over its length) ----
+void prcPic(const PicCtx& c) {
+    const int mode = ipar(c, 0) < 0 ? 0 : (ipar(c, 0) > 4 ? 4 : ipar(c, 0));
+    float sweep, bodyMs, clickMs;
+    prcShape(mode, par(c, 2), &sweep, &bodyMs, &clickMs);
+    const float hz = kPrcBaseHz[mode] * powf(2.f, par(c, 1) / 12.f), tb = bodyMs * 0.001f, tc = clickMs * 0.001f;
+    const float win = clampf(4.f * tb, 0.02f, 2.5f);
+    const float shown = mode >= 2 ? hz / 6.f : hz;  // high modes drawn lower, so the shape reads
+    auto amp = [&](float t) {
+        const float a = expf(-t / tb);
+        return (mode == 2 ? 0.6f * expf(-t / (tc > 0.f ? tc : 0.001f)) + 0.4f * a : a) * 0.95f;
+    };
+    auto freq = [&](float t) { return shown * (1.f + sweep * expf(-t / (mode == 1 ? 0.008f : 0.015f))); };
+    auto noise = [&](float t) { return tc > 0.f && mode != 2 && t < 3.f * tc ? 0.35f : 0.f; };
+    const Box b = c.small ? body(c) : insetXY(body(c), 0, 2);
+    voice(c.g, b, win, amp, freq, noise, c.sel < 0 || c.sel <= 1 ? PAccent : PText);
+    if (c.small) return;
+    envelopeLines(c.g, b, win, amp, isSel(c, 2) ? PAccent : PDim);
+    char f[16], t[12];
+    hzText(hz, f, sizeof f);
+    secText(win, t, sizeof t);
+    char l[24];
+    snprintf(l, sizeof l, "%s %s", enumName(c, 0), f);
+    captions(c, l, c.sel == 0 || c.sel == 1 ? PAccent : PText, t, PDim);
+}
+
 }  // namespace
 
 const Entry kSourcePics[] = {
     {"osc", osc, oscGlyph}, {"vso", vso, vsoGlyph}, {"fmo", fmo, nullptr}, {"for", forPic, nullptr},
     {"vos", vosPic, nullptr}, {"zos", zosPic, nullptr}, {"ssw", ssw, nullptr}, {"hrm", hrm, nullptr},
     {"noi", noi, nullptr}, {"kck", kck, nullptr}, {"snr", snr, nullptr}, {"hat", hat, nullptr},
-    {"str", strPic, nullptr}, {"mdl", mdlPic, nullptr}, {"res", resPic, nullptr}, {"prt", prt, nullptr},
+    {"clp", clpPic, nullptr}, {"prc", prcPic, nullptr}, {"str", strPic, nullptr}, {"mdl", mdlPic, nullptr}, {"res", resPic, nullptr}, {"prt", prt, nullptr},
 };
 const int kNumSourcePics = sizeof kSourcePics / sizeof kSourcePics[0];
 

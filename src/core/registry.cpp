@@ -21,6 +21,7 @@
 #include "modules/osc.h"
 #include "modules/vca.h"
 #include "modules/vcf.h"
+#include "modules/v14.h"
 
 // One line per module type, in place-menu order.
 static const ModuleTypeInfo* const kTypes[] = {
@@ -89,6 +90,12 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kBrnType,
     &kKnbType,
     &kScoType,
+    // v1.4
+    &kArpType,
+    &kClpType,
+    &kPrcType,
+    &kVowType,
+    &kEq3Type,
 };
 
 const ModuleTypeInfo* const* allTypes(int* count) {

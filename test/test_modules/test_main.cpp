@@ -31,6 +31,7 @@
 #include "core/scales.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
+#include "core/modules/v14.h"
 
 void setUp() {}
 void tearDown() {}
@@ -1645,6 +1646,151 @@ void test_kit_worst_step() {
     TEST_ASSERT_EQUAL_UINT32(0, kitWorstStep(r, cost));
 }
 
+// ---- v1.4 modules ----
+void test_arp_patterns() {
+    int n[24];
+    TEST_ASSERT_EQUAL(3, arpPattern(0, 0, 1, n, 24));  // MAJ UP 1 oct
+    TEST_ASSERT_EQUAL(0, n[0]); TEST_ASSERT_EQUAL(4, n[1]); TEST_ASSERT_EQUAL(7, n[2]);
+    TEST_ASSERT_EQUAL(6, arpPattern(1, 0, 2, n, 24));  // MIN UP 2 oct: 0 3 7 12 15 19
+    TEST_ASSERT_EQUAL(19, n[5]);
+    TEST_ASSERT_EQUAL(3, arpPattern(0, 1, 1, n, 24));  // DN: 7 4 0
+    TEST_ASSERT_EQUAL(7, n[0]); TEST_ASSERT_EQUAL(0, n[2]);
+    TEST_ASSERT_EQUAL(4, arpPattern(0, 2, 1, n, 24));  // UPDN: 0 4 7 4, ends not doubled
+    TEST_ASSERT_EQUAL(4, n[3]);
+    TEST_ASSERT_EQUAL(1, arpPattern(6, 2, 1, n, 24));  // OCT chord, 1 oct: the root alone
+}
+
+void test_arp_clocked_steps() {
+    Module* m = kArpType.create();  // defaults: MAJ, UP, 1 octave; GATE unpatched: runs
+    std::vector<float> p = clocked(m, 6, 0);
+    const float want[] = {0.f, 4.f / 12.f, 7.f / 12.f, 0.f, 4.f / 12.f, 7.f / 12.f};
+    for (int k = 0; k < 6; k++) TEST_ASSERT_FLOAT_WITHIN(1e-4f, want[k], p[k]);
+    std::vector<float> g = clocked(m, 2, 1);  // the gate follows the clock
+    TEST_ASSERT_EQUAL_FLOAT(kGateHighVolts, g[0]);
+    delete m;
+}
+
+void test_arp_gate_holds_and_restarts() {
+    Module* m = kArpType.create();
+    static float ck[kBlock], z[kBlock], gt[kBlock];
+    const float* ins[kMaxIns] = {ck, z, gt, z, z, z, z, z};
+    bool c[kMaxIns] = {true, false, true};
+    auto step = [&](float gate) {  // one clock pulse with GATE at `gate`
+        constBlock(gt, gate);
+        constBlock(ck, 5.f);
+        for (int b = 0; b < 4; b++) m->process(ins, c);
+        const float pit = m->out(0)[kBlock - 1], g = m->out(1)[kBlock - 1];
+        constBlock(ck, 0.f);
+        for (int b = 0; b < 4; b++) m->process(ins, c);
+        return std::make_pair(pit, g);
+    };
+    TEST_ASSERT_EQUAL_FLOAT(0.f, step(0.f).second);  // no gate: no notes
+    step(5.f);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 4.f / 12.f, step(5.f).first);
+    step(0.f);
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.f, step(5.f).first);  // a new gate starts at the root
+    delete m;
+}
+
+static std::vector<float> trigRun(Module* m, int blocks, int trigIn = 0) {
+    static float tr[kBlock], z[kBlock];
+    const float* ins[kMaxIns] = {z, z, z, z, z, z, z, z};
+    ins[trigIn] = tr;
+    bool c[kMaxIns] = {};
+    c[trigIn] = true;
+    std::vector<float> r;
+    for (int b = 0; b < blocks; b++) {
+        constBlock(tr, b < 2 ? 5.f : 0.f);
+        m->process(ins, c);
+        r.insert(r.end(), m->out(0), m->out(0) + kBlock);
+    }
+    return r;
+}
+static float windowRms(const std::vector<float>& s, size_t from, size_t to) {
+    double e = 0.0;
+    for (size_t i = from; i < to && i < s.size(); i++) e += (double)s[i] * s[i];
+    return (float)sqrt(e / (double)(to - from));
+}
+
+void test_clp_bursts_then_tail() {
+    Module* m = kClpType.create();
+    m->setParam(2, 10.f);  // SPR 10 ms between bursts
+    m->setParam(1, 60.f);  // DEC 60 ms: gone well before 250 ms
+    const std::vector<float> s = trigRun(m, 30 * 48 / kBlock * 10);  // ~300 ms
+    // three bursts: each 10 ms window starts loud and dips before the next
+    const size_t ms = 48;
+    for (int k = 0; k < 3; k++) {
+        const float start = windowRms(s, k * 10 * ms, k * 10 * ms + 2 * ms), end = windowRms(s, k * 10 * ms + 7 * ms, k * 10 * ms + 10 * ms);
+        TEST_ASSERT_TRUE_MESSAGE(start > 2.f * end, "a burst dips before the next");
+    }
+    char msg[80];
+    snprintf(msg, sizeof msg, "tail %.3f late %.3f", (double)windowRms(s, 30 * ms, 60 * ms), (double)windowRms(s, 250 * ms, 290 * ms));
+    TEST_ASSERT_TRUE_MESSAGE(windowRms(s, 30 * ms, 60 * ms) > 0.2f, msg);    // the tail rings
+    TEST_ASSERT_TRUE(windowRms(s, 30 * ms, 60 * ms) > 4.f * windowRms(s, 250 * ms, 290 * ms));  // and dies
+    delete m;
+}
+
+void test_prc_modes() {
+    for (int mode = 0; mode < 5; mode++) {
+        Module* m = kPrcType.create();
+        m->setParam(0, (float)mode);
+        m->setParam(2, 0.f);  // the shortest DEC: every mode is gone by 300 ms
+        const std::vector<float> s = trigRun(m, 40 * 48 / kBlock * 10);
+        const float early = windowRms(s, 0, 30 * 48), late = windowRms(s, 300 * 48, 390 * 48);
+        TEST_ASSERT_TRUE_MESSAGE(early > 0.3f, "sounds");
+        char msg[64];
+        snprintf(msg, sizeof msg, "decays: mode %d early %.3f late %.3f", mode, (double)early, (double)late);
+        TEST_ASSERT_TRUE_MESSAGE(early > 5.f * late, msg);
+        for (float v : s) TEST_ASSERT_TRUE(fabsf(v) < 12.f);
+        delete m;
+    }
+    // TOM sits near its 110 Hz after the sweep; TUN +12 doubles it
+    for (int oct = 0; oct < 2; oct++) {
+        Module* m = kPrcType.create();
+        m->setParam(1, oct ? 12.f : 0.f);
+        m->setParam(2, 1.f);  // long decay
+        const std::vector<float> s = trigRun(m, 500);  // 333 ms
+        const std::vector<float> tail(s.begin() + 4800, s.begin() + 14400);
+        TEST_ASSERT_FLOAT_WITHIN(oct ? 24.f : 12.f, oct ? 220.f : 110.f, crossingHz(tail));
+        delete m;
+    }
+}
+
+void test_vow_formants_and_filter() {
+    float f[3];
+    vowFormants(0.f, f);  // A
+    TEST_ASSERT_FLOAT_WITHIN(1.f, 730.f, f[0]);
+    TEST_ASSERT_FLOAT_WITHIN(1.f, 1090.f, f[1]);
+    vowFormants(2.f, f);  // I
+    TEST_ASSERT_FLOAT_WITHIN(1.f, 270.f, f[0]);
+    vowFormants(0.5f, f);  // halfway A -> E
+    TEST_ASSERT_FLOAT_WITHIN(1.f, (730.f + 530.f) / 2.f, f[0]);
+    // A passes its F1 far more than a frequency between the formants
+    auto gainAt = [](float hz) {
+        Module* m = kVowType.create();
+        const float r = sineRms(*m, hz, 2.f, 200);
+        delete m;
+        return r;
+    };
+    TEST_ASSERT_TRUE(gainAt(730.f) > 3.f * gainAt(5000.f));
+}
+
+void test_eq3_shapes() {
+    auto gain = [](float lo, float mid, float hi, float hz) {
+        Module* m = kEq3Type.create();
+        m->setParam(0, lo);
+        m->setParam(1, mid);
+        m->setParam(3, hi);
+        const float r = sineRms(*m, hz, 2.f, 300) / (2.f / sqrtf(2.f));
+        delete m;
+        return 20.f * log10f(r);
+    };
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, 0.f, gain(0.f, 0.f, 0.f, 1000.f));  // flat at 0 dB
+    TEST_ASSERT_FLOAT_WITHIN(1.5f, 12.f, gain(12.f, 0.f, 0.f, 50.f));  // low shelf up
+    TEST_ASSERT_FLOAT_WITHIN(1.5f, -12.f, gain(0.f, 0.f, -12.f, 12000.f));  // high shelf down
+    TEST_ASSERT_FLOAT_WITHIN(1.f, 9.f, gain(0.f, 9.f, 0.f, 1000.f));   // the mid peak at FRQ
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -1734,5 +1880,12 @@ int main() {
     RUN_TEST(test_kit_stacks_loops_and_accents);
     RUN_TEST(test_kit_run_and_clock_inputs);
     RUN_TEST(test_kit_worst_step);
+    RUN_TEST(test_arp_patterns);
+    RUN_TEST(test_arp_clocked_steps);
+    RUN_TEST(test_arp_gate_holds_and_restarts);
+    RUN_TEST(test_clp_bursts_then_tail);
+    RUN_TEST(test_prc_modes);
+    RUN_TEST(test_vow_formants_and_filter);
+    RUN_TEST(test_eq3_shapes);
     return UNITY_END();
 }
