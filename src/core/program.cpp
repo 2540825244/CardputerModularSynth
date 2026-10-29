@@ -87,5 +87,8 @@ Program* compileProgram(const Patch& patch, Module* const* instances, uint32_t g
         done[pick] = true;
         remaining--;
     }
+    // A cycle through the KIT can place grouped nodes before it: they would miss the block their
+    // lane fires in, so they run always.
+    for (int k = 0; k < prog->kitNode; k++) prog->nodes[k].group = kNoGroup;
     return prog;
 }

@@ -13,6 +13,8 @@
 #include "core/modules/mix.h"
 #include "core/modules/src.h"
 #include "core/kit_groups.h"
+#include "core/modules/mod.h"
+#include "core/program.h"
 #include "core/modules/osc.h"
 #include "core/modules/out.h"
 #include "core/modules/vca.h"
@@ -674,7 +676,7 @@ class Burst : public Module {
     int left_ = 0;
 };
 static Module* createBurst() { return new Burst(); }
-const ModuleTypeInfo kBurstType = {"tburst", "TST", "test", Category::Source, Icon::Osc, Drawing::None,
+const ModuleTypeInfo kBurstType = {"tburst", "TST", "test", Category::Processor, Icon::Osc, Drawing::None,
                                    0, nullptr, 1, kTIn, kTIn, 1, kTOut, kTOut, 10, 100, 0, createBurst};
 Burst::Burst() : Module(kBurstType) {}
 extern const ModuleTypeInfo kHeavyType;
@@ -686,15 +688,15 @@ class Heavy : public Module {
     }
 };
 static Module* createHeavy() { return new Heavy(); }
-const ModuleTypeInfo kHeavyType = {"theavy", "TST", "test", Category::Source, Icon::Osc, Drawing::None,
+const ModuleTypeInfo kHeavyType = {"theavy", "TST", "test", Category::Processor, Icon::Osc, Drawing::None,
                                    0, nullptr, 1, kTIn, kTIn, 1, kTOut, kTOut, 1500, 100, 0, createHeavy};
 
 void test_kit_groups() {
     Patch p;
-    const uint16_t kit = add(p, kKitType, 0), a = add(p, kCountedType, 1), b = add(p, kCountedType, 2),
+    const uint16_t kit = add(p, kKitType, 0), a = add(p, kBurstType, 1), b = add(p, kBurstType, 2),
                    mix = add(p, kMixType, 3), out = add(p, kOutType, 4), lfo = add(p, kLfoType, 5),
-                   both = add(p, kCountedType, 6), accd = add(p, kKckType, 7), c1 = add(p, kCountedType, 8),
-                   c2 = add(p, kCountedType, 9), lone = add(p, kCountedType, 10), direct = add(p, kCountedType, 11);
+                   both = add(p, kBurstType, 6), accd = add(p, kKckType, 7), c1 = add(p, kBurstType, 8),
+                   c2 = add(p, kBurstType, 9), lone = add(p, kBurstType, 10), direct = add(p, kBurstType, 11);
     wire(p, kit, 0, a, 0);           // a: T1
     wire(p, a, 0, b, 0);             // b: fed only by a -> T1
     wire(p, kit, 1, mix, 0);         // mix: T2 and b -> shared
@@ -735,6 +737,34 @@ void test_kit_groups() {
     for (int i = 0; i < p.moduleCount(); i++) present[i] = p.moduleAt(i).id != lfo;
     kitGroups(p, g, present);
     TEST_ASSERT_EQUAL(2, grp(both));
+    // review I2: a delay's echo outlives the 50 ms quiet window, and a held CV drives an
+    // always-on module: neither runs on demand. An envelope inside a group still does.
+    Patch d;
+    const uint16_t dk = add(d, kKitType, 0), dkick = add(d, kKckType, 1), ddly = add(d, kDlyType, 2),
+                   dout = add(d, kOutType, 3), dseq = add(d, kSeqType, 4), dosc = add(d, kOscType, 5),
+                   denv = add(d, kEnvType, 6), dsnr = add(d, kSnrType, 7);
+    wire(d, dk, 0, dkick, 0);
+    wire(d, dkick, 0, ddly, 0);
+    wire(d, ddly, 0, dout, 0);
+    wire(d, dk, 1, dseq, 0);   // T2 clocks a SEQ that tunes an always-on OSC
+    wire(d, dseq, 0, dosc, 0);
+    wire(d, dosc, 0, dout, 0);
+    wire(d, dk, 2, denv, 0);   // T3 -> ENV -> SNR's accent, SNR triggered by T3: all T3's
+    wire(d, denv, 0, dsnr, 1);
+    wire(d, dk, 2, dsnr, 0);
+    wire(d, dsnr, 0, dout, 0);
+    kitGroups(d, g);
+    auto dg = [&](uint16_t id) {
+        for (int i = 0; i < d.moduleCount(); i++)
+            if (d.moduleAt(i).id == id) return (int)g[i];
+        return -2;
+    };
+    TEST_ASSERT_EQUAL(0, dg(dkick));
+    TEST_ASSERT_EQUAL(kNoGroup, dg(ddly));
+    TEST_ASSERT_EQUAL(kNoGroup, dg(dseq));
+    TEST_ASSERT_EQUAL(kNoGroup, dg(dosc));  // tuned by the lane, never struck: it never rests
+    TEST_ASSERT_EQUAL(2, dg(denv));
+    TEST_ASSERT_EQUAL(2, dg(dsnr));
     // no KIT: nothing is grouped
     Patch q;
     add(q, kCountedType, 0);
@@ -828,6 +858,56 @@ void test_kit_cpu_guard() {
     TEST_ASSERT_EQUAL_UINT32(kOutType.cpuCycles + kMixType.cpuCycles, eng.estimatedCycles());
 }
 
+// Review I1: a voice cut while ringing starts its next hit fresh, as the first one did.
+void test_kit_cut_voice_restarts_clean() {
+    const ModuleTypeInfo* voices[] = {&kResType, &kStrType, &kMdlType, &kKckType};
+    for (const ModuleTypeInfo* vt : voices) {
+        Patch p;
+        const uint16_t kit = add(p, kKitType, 0), v = add(p, *vt, 1), out = add(p, kOutType, 2);
+        wire(p, kit, 0, v, 0);
+        wire(p, v, 0, out, 0);
+        p.find(kit)->params[kit::kL1] = (float)0b101;  // T1 on steps 1 and 3; step 2 cuts it
+        p.find(kit)->params[kit::kLen] = 3.f;
+        p.find(kit)->params[kit::kGap] = 150.f;  // 225 blocks
+        Engine eng(bigHeap);
+        TEST_ASSERT_EQUAL(0, eng.apply(p));
+        static_cast<KitModule*>(eng.instance(kit))->start();
+        float buf[kBlock], first[20 * kBlock];
+        double diff = 0, e1 = 0, e2 = 0;
+        for (int b = 0; b < 470; b++) {
+            eng.processBlock(buf);
+            const float* o = eng.instance(v)->out(0);
+            for (int i = 0; i < kBlock; i++) {
+                if (b < 20) first[b * kBlock + i] = o[i];
+                if (b < 20) e1 += (double)o[i] * o[i];
+                if (b >= 450) {
+                    diff = fmax(diff, fabs((double)o[i] - first[(b - 450) * kBlock + i]));
+                    e2 += (double)o[i] * o[i];
+                }
+            }
+        }
+        if (vt == &kStrType)  // a noise-burst pluck: the same energy, not the same samples
+            TEST_ASSERT_TRUE_MESSAGE(e2 > 0.8 * e1 && e2 < 1.25 * e1, vt->id);
+        else
+            TEST_ASSERT_TRUE_MESSAGE(diff < 1e-3, vt->id);
+    }
+}
+
+// Review M6: a cycle through the KIT (T1 -> X -> KIT RUN) puts X first: it runs always.
+void test_kit_node_before_kit_is_always_on() {
+    Patch p;
+    const uint16_t env = add(p, kBurstType, 0), kit = add(p, kKitType, 1);
+    wire(p, kit, 0, env, 0);
+    wire(p, env, 0, kit, 0);
+    Module* inst[kMaxModules] = {kBurstType.create(), kKitType.create()};
+    Program* prog = compileProgram(p, inst, 1);
+    TEST_ASSERT_EQUAL(1, prog->kitNode);
+    TEST_ASSERT_EQUAL(kNoGroup, prog->nodes[0].group);
+    delete prog;
+    delete inst[0];
+    delete inst[1];
+}
+
 // A 3-drum kit of heavy voices: over budget summed, under it grouped; and it plays.
 void test_kit_three_drum_kit() {
     Patch p;
@@ -915,6 +995,8 @@ int main() {
     RUN_TEST(test_kit_demand_activation);
     RUN_TEST(test_kit_cpu_guard);
     RUN_TEST(test_kit_three_drum_kit);
+    RUN_TEST(test_kit_cut_voice_restarts_clean);
+    RUN_TEST(test_kit_node_before_kit_is_always_on);
     RUN_TEST(test_bypass_zeroes_others);
     RUN_TEST(test_bypass_out_silent_and_free);
     RUN_TEST(test_bypass_pass_types);

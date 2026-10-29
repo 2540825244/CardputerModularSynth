@@ -47,7 +47,8 @@ void patchView(SideIcons& r, const UiState& s, const Patch& p, bool fnHeld) {
     undo(r, fnHeld);
     if (s.selCell >= 0 && !moving) set(r, Side::Enter, sel ? Ic::Open : Ic::Plus, sel ? "OPEN" : "PLACE");
     for (int i = 0; i < p.moduleCount(); i++)
-        if (p.moduleAt(i).type == &kKeysType || p.moduleAt(i).type == &kKitType) set(r, Side::Space, Ic::Play, "PLAY");
+        if (p.moduleAt(i).type == &kKeysType || (p.moduleAt(i).type == &kKitType && !p.moduleAt(i).bypass))
+            set(r, Side::Space, Ic::Play, "PLAY");
 }
 
 void modulePage(SideIcons& r, const UiState& s, const ModuleRec& m, bool fnHeld) {
@@ -76,7 +77,7 @@ void modulePage(SideIcons& r, const UiState& s, const ModuleRec& m, bool fnHeld)
     }
     if (pin) set(r, Side::Enter, Ic::Cable, s.carry.active ? "DROP" : "CABLE");
     else if (c.kind == CellKind::Bit) set(r, Side::Enter, Ic::Toggle, "STEP");
-    else if (t.icon == Icon::Kit && c.kind != CellKind::Param) set(r, Side::Enter, Ic::Play, "RUN");
+    else if (t.icon == Icon::Kit && !m.bypass && c.kind != CellKind::Param) set(r, Side::Enter, Ic::Play, "RUN");
     else if (c.kind == CellKind::Param)
         set(r, Side::Enter, t.params[c.index].curve == Curve::Stepped ? Ic::Toggle : Ic::Tilt,
             t.params[c.index].curve == Curve::Stepped ? "NEXT" : "TILT");

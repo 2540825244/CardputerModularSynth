@@ -349,6 +349,7 @@ void Engine::laneOff(const Program* p, int lane) {
         float* o = node.m->out(0);
         for (int k = 0; k < node.m->type().numOuts * kBlock; k++) o[k] = 0.f;
         node.m->setPeak(0.f);
+        node.m->silence();
     }
 }
 

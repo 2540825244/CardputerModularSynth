@@ -364,7 +364,11 @@ just map keys to virtual midi/oct/gate/etc out".
   cell of the KIT view, or PLAY in the patch view when there is no KEYS (KEYS keeps PLAY).
   - A module whose every connected input traces back to one lane (the KIT's T-out, or modules
     already in that lane) is in that lane's group; ACC, self-cables and sources without an instance
-    don't count. KIT and OUT never join; cycles stay always-on.
+    don't count. A source must be struck by the lane (its trig/gate input). A module whose output
+    leaves the group must be audio (source, processor, effect: a held CV would drop). KIT, OUT and
+    DLY/REV (echoes outlive the quiet window) never join; cycles stay always-on.
+  - A group switched off forgets its ringing (drum and physical voices re-init), so every hit of
+    a take starts the same. An edit that pushes the worst step past the budget toasts CPU FULL.
   - A group runs from its trigger until its outputs leaving the group stay under 5 mV (-60 dB of
     5 V) for 50 ms, or the next step starts (then it fades out over 2.7 ms). Idle groups output 0
     and cost 0.

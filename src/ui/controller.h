@@ -65,7 +65,8 @@ class UiController {
     bool loadJson(const std::string& text, bool keepUndo, char* msg, size_t msgSize);
     void newPatch();  // clears the patch (undoable)
     void loadSettings();
-    Screen screen(uint32_t nowMs) const;  // from the last key and the SYSTEM sleep time
+    Screen screen(uint32_t nowMs) const;
+    void warnKitCpu();  // after an edit: "CPU FULL" when a KIT's worst step no longer fits  // from the last key and the SYSTEM sleep time
     void saveSettings();  // bumps settingsGen, writes /modsynth/settings.json
     uint32_t holdMs() const;
     void validate();  // end a carry / close a view whose module is gone (after undo, load, delete)

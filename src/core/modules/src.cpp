@@ -319,6 +319,7 @@ template <typename Voice, const ModuleTypeInfo& T>
 class Phys : public Module {
    public:
     explicit Phys(float gain) : Module(T), gain_(gain) { v_.Init(kSampleRate); }
+    void silence() override { v_.Init(kSampleRate); }
     void process(const float* const* ins, const bool* c) override {
         const float* tr = inOrNull(ins, c, 0);
         const float* pit = inOrNull(ins, c, 1);
@@ -377,6 +378,7 @@ const char* const kInLabels[] = {"IN", "PIT"};
 class Res : public Module {
    public:
     Res() : Module(kResType) { r_.Init(0.015f, 16, kSampleRate); }
+    void silence() override { r_.Init(0.015f, 16, kSampleRate); }
     void process(const float* const* ins, const bool* c) override {
         const float* in = inOrNull(ins, c, 0);
         const float* pit = inOrNull(ins, c, 1);
@@ -418,6 +420,7 @@ const ParamSpec kParams[] = {
 class Kck : public Module {
    public:
     Kck() : Module(kKckType) { d_.Init(kSampleRate); }
+    void silence() override { d_.Init(kSampleRate); }
     void process(const float* const* ins, const bool* c) override {
         const float* tr = inOrNull(ins, c, 0);
         const float* acc = inOrNull(ins, c, 1);
@@ -461,6 +464,7 @@ const ParamSpec kParams[] = {
 class Snr : public Module {
    public:
     Snr() : Module(kSnrType) { d_.Init(kSampleRate); }
+    void silence() override { d_.Init(kSampleRate); }
     void process(const float* const* ins, const bool* c) override {
         const float* tr = inOrNull(ins, c, 0);
         const float* acc = inOrNull(ins, c, 1);
@@ -503,6 +507,7 @@ const ParamSpec kParams[] = {
 class Hat : public Module {
    public:
     Hat() : Module(kHatType) { d_.Init(kSampleRate); }
+    void silence() override { d_.Init(kSampleRate); }
     void process(const float* const* ins, const bool* c) override {
         const float* tr = inOrNull(ins, c, 0);
         const float* acc = inOrNull(ins, c, 1);

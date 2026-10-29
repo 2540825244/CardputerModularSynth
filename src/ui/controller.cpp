@@ -132,8 +132,8 @@ KeysModule* UiController::keysInstance() {
 
 KitModule* UiController::kitInstance() {
     for (int i = 0; i < patch_.moduleCount(); i++)
-        if (patch_.moduleAt(i).type == &kKitType)
-            return static_cast<KitModule*>(engine_.instance(patch_.moduleAt(i).id));
+        if (patch_.moduleAt(i).type == &kKitType)  // bypassed: no pass (it would start once enabled)
+            return patch_.moduleAt(i).bypass ? nullptr : static_cast<KitModule*>(engine_.instance(patch_.moduleAt(i).id));
     return nullptr;
 }
 
@@ -394,7 +394,14 @@ bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceK
     s_.dirty = true;
     s_.lastEditMs = now_;
     if (coalesceKey) coalescedEdit_ = true;
+    warnKitCpu();
     return true;
+}
+
+// With a KIT, a cable or a step can raise the worst step past the budget; one overloaded step is
+// too short for the measured-load warning, so say it at the edit.
+void UiController::warnKitCpu() {
+    if (patch_.countOfType(kKitType) && engine_.patchCycles(patch_) > kCpuBudget) toast("CPU FULL", now_);
 }
 
 bool UiController::editValue(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {
@@ -403,6 +410,7 @@ bool UiController::editValue(void (*fn)(Patch&, void*), void* ctx, uint32_t coal
     s_.dirty = true;
     s_.lastEditMs = now_;
     coalescedEdit_ = true;
+    warnKitCpu();
     return true;
 }
 

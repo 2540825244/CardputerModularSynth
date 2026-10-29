@@ -94,6 +94,9 @@ class Module {
     // Fills out(o) for kBlock samples. ins[i] is only valid when connected[i].
     virtual void process(const float* const* ins, const bool* connected) = 0;
     virtual const float* masterOut() const { return nullptr; }  // OUT only: +-1 full-scale block
+    // Audio thread: its KIT group was switched off mid-sound; forget the ringing so the next hit
+    // starts as the first did (drum and physical voices). No allocation.
+    virtual void silence() {}
     // SCO: a ring of recent input samples for the module view (UI reads it unlocked; a torn frame
     // only shows for one redraw). *n = length, *head = the oldest sample's index.
     virtual const float* displayBuffer(int* n, int* head) const { (void)n; (void)head; return nullptr; }

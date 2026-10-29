@@ -2034,6 +2034,47 @@ void test_kit_play_key_keys_first() {
     f.sideUp(Side::Space);
 }
 
+// Review M5: a bypassed KIT takes no start (it would run by surprise once enabled).
+void test_kit_bypassed_ignores_play() {
+    Fx f;
+    f.place(registryIndex(kKitType), 0, 0);
+    const uint16_t id = gPatch.findAt(0, 0)->id;
+    f.tap(0, 0);
+    f.sideDown(Side::Fn);
+    f.side(Side::Del);  // bypass
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(1, gPatch.find(id)->bypass);
+    TEST_ASSERT_FALSE(icons(f).shown[(int)Side::Space]);
+    f.side(Side::Space);
+    float buf[kBlock];
+    f.eng.processBlock(buf);
+    f.sideDown(Side::Fn);
+    f.side(Side::Del);  // enable
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_FALSE(kitRuns(f, id));
+}
+
+// Review I3: a step stacked onto a busy one can overload the worst step: say so.
+void test_kit_step_overload_warns() {
+    Fx f;
+    uint16_t kit = 0, a = 0, b = 0, out = 0;
+    gPatch.addModule(kKitType, 0, 0, &kit);
+    gPatch.addModule(*findType("grd"), 0, 1, &a);
+    gPatch.addModule(*findType("mdl"), 0, 2, &b);
+    gPatch.addModule(kOutType, 0, 3, &out);
+    gPatch.addCable(kit, 0, a, 1);  // T1 -> GRD trig
+    gPatch.addCable(kit, 1, b, 0);  // T2 -> MDL trig
+    gPatch.addCable(a, 0, out, 0);
+    gPatch.addCable(b, 0, out, 0);
+    f.eng.apply(gPatch);
+    TEST_ASSERT_TRUE(f.eng.patchCycles(gPatch) <= kCpuBudget);
+    f.tap(0, 0);
+    f.side(Side::Enter);  // open the KIT, page T1-3
+    f.tap(0, 2);          // T2 on step 1 too: GRD + MDL at once
+    TEST_ASSERT_TRUE(f.eng.patchCycles(gPatch) > kCpuBudget);
+    TEST_ASSERT_EQUAL_STRING("CPU FULL", f.ui.state().toast);
+}
+
 void test_kit_enter_starts_pass() {
     Fx f;
     const ModuleRec* m = placeAndOpen(f, registryIndex(kKitType));
@@ -2165,6 +2206,8 @@ int main() {
     RUN_TEST(test_kit_play_key_starts_pass);
     RUN_TEST(test_kit_play_key_keys_first);
     RUN_TEST(test_kit_enter_starts_pass);
+    RUN_TEST(test_kit_bypassed_ignores_play);
+    RUN_TEST(test_kit_step_overload_warns);
     RUN_TEST(test_toast_expiry);
     RUN_TEST(test_edit_coalescing_breaks);
     RUN_TEST(test_layout_vcf);
