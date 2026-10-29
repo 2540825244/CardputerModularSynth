@@ -118,7 +118,7 @@ Module* create() {
 }  // namespace rev
 
 const ModuleTypeInfo kRevType = {
-    "rev", "REV", "Plate reverb", Category::Effect, Icon::Rev, Drawing::None,
+    "rev", "REV", "Plate reverb", Category::Effect, Icon::Rev, Drawing::Picture,
     5, rev::kParams, 1, kInOnly, kInLbl, 2, rev::kOutKeys, rev::kOutLabels,
     1920, sizeof(rev::Rev) + 2 * kBlock * sizeof(float), kDelaySlots, rev::create, nullptr, 0, 1};
 
@@ -169,7 +169,7 @@ Module* create() { return new Cho(); }
 }  // namespace cho
 
 const ModuleTypeInfo kChoType = {
-    "cho", "CHO", "Chorus, two swept taps", Category::Effect, Icon::Fx, Drawing::None,
+    "cho", "CHO", "Chorus, two swept taps", Category::Effect, Icon::Fx, Drawing::Picture,
     4, cho::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
     290, sizeof(cho::Cho) + kBlock * sizeof(float), 0, cho::create};
 
@@ -209,7 +209,7 @@ Module* create() { return new Flg(); }
 }  // namespace flg
 
 const ModuleTypeInfo kFlgType = {
-    "flg", "FLG", "Flanger with feedback", Category::Effect, Icon::Fx, Drawing::None,
+    "flg", "FLG", "Flanger with feedback", Category::Effect, Icon::Fx, Drawing::Picture,
     4, flg::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
     210, sizeof(flg::Flg) + kBlock * sizeof(float), 0, flg::create};
 
@@ -263,7 +263,7 @@ Module* create() { return new Pha(); }
 }  // namespace pha
 
 const ModuleTypeInfo kPhaType = {
-    "pha", "PHA", "6-stage phaser", Category::Effect, Icon::Fx, Drawing::None,
+    "pha", "PHA", "6-stage phaser", Category::Effect, Icon::Fx, Drawing::Picture,
     5, pha::kParams, 2, pha::kInKeys, pha::kInLabels, 1, kOutOnly, kOutLbl,
     560, sizeof(pha::Pha) + kBlock * sizeof(float), 0, pha::create};
 
@@ -355,6 +355,6 @@ Module* create() { return new Psh(); }
 }  // namespace psh
 
 const ModuleTypeInfo kPshType = {
-    "psh", "PSH", "Pitch shifter, +-2 oct", Category::Effect, Icon::Psh, Drawing::None,
+    "psh", "PSH", "Pitch shifter, +-2 oct", Category::Effect, Icon::Psh, Drawing::Picture,
     4, psh::kParams, 2, psh::kInKeys, psh::kInLabels, 1, kOutOnly, kOutLbl,
     540, sizeof(psh::Psh) + kBlock * sizeof(float), 0, psh::create};

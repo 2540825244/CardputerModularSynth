@@ -1,6 +1,7 @@
 #pragma once
 // Shared helpers for the painters (ui/pic_*.cpp). Not for the rest of the UI.
 #include <cmath>
+#include <cstdio>
 #include "core/param.h"
 #include "pictures.h"
 #include "render/palette.h"
@@ -70,6 +71,15 @@ inline void dashH(Gfx& g, int x, int y, int w, uint8_t col, int on = 2, int off 
 inline void dashV(Gfx& g, int x, int y, int h, uint8_t col, int on = 2, int off = 2) {
     for (int i = 0; i < h; i += on + off) g.vline(x, y + i, i + on <= h ? on : h - i, col);
 }
+// Stipple under a unit curve: every third pixel, so a fill reads without a colour of its own.
+template <class F>
+void stipple(Gfx& g, Box b, F f) {
+    for (int px = 1; px < b.w - 1; px += 3) {
+        const int top = yUnit(b, f((float)px / (float)(b.w - 1)));
+        for (int yy = b.y + b.h - 2; yy > top + 1; yy -= 3) g.pixel(b.x + px, yy, PBorder);
+    }
+}
+
 // Faint grid: nx x ny cells (big pictures only).
 inline void grid(const PicCtx& c, Box b, int nx, int ny) {
     if (c.small) return;
@@ -91,6 +101,12 @@ inline Box body(const PicCtx& c) { return c.small ? inset(box(c), 1) : Box{c.x +
 
 inline void fmt(const PicCtx& c, int i, char* out, int len, bool longForm = false) {
     paramFormat(c.m.type->params[i], c.m.params[i], out, len, longForm);
+}
+// Hz for captions: rates below 10 Hz keep two decimals (the param formatter rounds them).
+inline void hzText(float hz, char* out, int len) {
+    if (hz >= 1000.f) snprintf(out, (size_t)len, "%.2fKHZ", (double)(hz / 1000.f));
+    else if (hz >= 10.f) snprintf(out, (size_t)len, "%dHZ", (int)lroundf(hz));
+    else snprintf(out, (size_t)len, "%.2fHZ", (double)hz);
 }
 inline const char* enumName(const PicCtx& c, int i) {
     const ParamSpec& s = c.m.type->params[i];

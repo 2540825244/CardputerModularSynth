@@ -6,15 +6,6 @@
 namespace pic {
 namespace {
 
-// Stipple under a unit curve: every third pixel, so the fill reads without a colour of its own.
-template <class F>
-void stipple(Gfx& g, Box b, F f) {
-    for (int px = 1; px < b.w - 1; px += 3) {
-        const int top = yUnit(b, f((float)px / (float)(b.w - 1)));
-        for (int yy = b.y + b.h - 2; yy > top + 1; yy -= 3) g.pixel(b.x + px, yy, PBorder);
-    }
-}
-
 // ---- ENV: ADSR. Segment widths grow with sqrt(time) so a 2 ms attack still shows; the
 // sustain plateau is a fixed fifth. ----
 struct Adsr {
@@ -158,7 +149,7 @@ void rnd(const PicCtx& c) {
     }
     if (c.small) return;
     char r[20];
-    fmt(c, 0, r, sizeof r, true);
+    hzText(par(c, 0), r, sizeof r);
     char w[16];
     snprintf(w, sizeof w, "%d S", (int)secs);
     captions(c, w, PDim, r, isSel(c, 0) ? PAccent : PText);

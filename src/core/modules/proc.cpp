@@ -67,7 +67,7 @@ Module* create() { return new Lad(); }
 }  // namespace lad
 
 const ModuleTypeInfo kLadType = {
-    "lad", "LAD", "Ladder filter 24/12 dB, 6 modes", Category::Processor, Icon::Vcf, Drawing::None,
+    "lad", "LAD", "Ladder filter 24/12 dB, 6 modes", Category::Processor, Icon::Vcf, Drawing::Picture,
     4, lad::kParams, 3, lad::kInKeys, lad::kInLabels, 1, kOutOnly, kOutLbl,
     790, sizeof(lad::Lad) + kBlock * sizeof(float), 0, lad::create};
 
@@ -101,7 +101,7 @@ Module* create() { return new Fld(); }
 }  // namespace fld
 
 const ModuleTypeInfo kFldType = {
-    "fld", "FLD", "Wavefolder, gain CV", Category::Processor, Icon::Fold, Drawing::None,
+    "fld", "FLD", "Wavefolder, gain CV", Category::Processor, Icon::Fold, Drawing::Picture,
     2, fld::kParams, 2, fld::kInKeys, fld::kInLabels, 1, kOutOnly, kOutLbl,
     400, sizeof(fld::Fld) + kBlock * sizeof(float), 0, fld::create};
 
@@ -139,7 +139,7 @@ Module* create() { return new Ovd(); }
 }  // namespace ovd
 
 const ModuleTypeInfo kOvdType = {
-    "ovd", "OVD", "Overdrive with tone", Category::Processor, Icon::Drive, Drawing::None,
+    "ovd", "OVD", "Overdrive with tone", Category::Processor, Icon::Drive, Drawing::Picture,
     3, ovd::kParams, 2, ovd::kInKeys, ovd::kInLabels, 1, kOutOnly, kOutLbl,
     250, sizeof(ovd::Ovd) + kBlock * sizeof(float), 0, ovd::create};
 
@@ -181,7 +181,7 @@ Module* create() { return new Cru(); }
 }  // namespace cru
 
 const ModuleTypeInfo kCruType = {
-    "cru", "CRU", "Bit crusher + rate reducer", Category::Processor, Icon::Crush, Drawing::None,
+    "cru", "CRU", "Bit crusher + rate reducer", Category::Processor, Icon::Crush, Drawing::Picture,
     3, cru::kParams, 2, cru::kInKeys, cru::kInLabels, 1, kOutOnly, kOutLbl,
     460, sizeof(cru::Cru) + kBlock * sizeof(float), 0, cru::create};
 
@@ -265,7 +265,7 @@ Module* create() { return new Ring(); }
 }  // namespace ring
 
 const ModuleTypeInfo kRingType = {
-    "ring", "RNG", "Ring mod, sum, max, min", Category::Processor, Icon::Ring, Drawing::None,
+    "ring", "RNG", "Ring mod, sum, max, min", Category::Processor, Icon::Ring, Drawing::Picture,
     0, nullptr, 2, ring::kInKeys, ring::kInLabels, 4, ring::kOutKeys, ring::kOutLabels,
     260, sizeof(ring::Ring) + 4 * kBlock * sizeof(float), 0, ring::create};
 
@@ -298,7 +298,7 @@ Module* create() { return new Xfd(); }
 }  // namespace xfd
 
 const ModuleTypeInfo kXfdType = {
-    "xfd", "XFD", "Crossfade A to B, CV", Category::Utility, Icon::Mix, Drawing::None,
+    "xfd", "XFD", "Crossfade A to B, CV", Category::Utility, Icon::Mix, Drawing::Picture,
     1, xfd::kParams, 3, xfd::kInKeys, xfd::kInLabels, 1, kOutOnly, kOutLbl,
     220, sizeof(xfd::Xfd) + kBlock * sizeof(float), 0, xfd::create};
 
@@ -342,6 +342,7 @@ class Dyn : public Module {
             o[i] = x * gain_ * makeup;
             gr[i] = -gainDb_ * (kAudioVolts / 24.f);  // 0..5 V for 0..24 dB of reduction
         }
+        setMonitor(0, -gainDb_);  // the picture's gain-reduction meter (ui/pic_proc.cpp)
     }
 
    private:
@@ -351,7 +352,7 @@ Module* create() { return new Dyn(); }
 }  // namespace dyn
 
 const ModuleTypeInfo kDynType = {
-    "dyn", "DYN", "Compressor, sidechain in", Category::Processor, Icon::Drive, Drawing::None,
+    "dyn", "DYN", "Compressor, sidechain in", Category::Processor, Icon::Drive, Drawing::Picture,
     5, dyn::kParams, 2, dyn::kInKeys, dyn::kInLabels, 2, dyn::kOutKeys, dyn::kOutLabels,
     580, sizeof(dyn::Dyn) + 2 * kBlock * sizeof(float), 0, dyn::create};
 
@@ -382,7 +383,7 @@ Module* create() { return new Awh(); }
 }  // namespace awh
 
 const ModuleTypeInfo kAwhType = {
-    "awh", "AWH", "Auto-wah", Category::Effect, Icon::Fx, Drawing::None,
+    "awh", "AWH", "Auto-wah", Category::Effect, Icon::Fx, Drawing::Picture,
     3, awh::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
     870, sizeof(awh::Awh) + kBlock * sizeof(float), 0, awh::create};
 

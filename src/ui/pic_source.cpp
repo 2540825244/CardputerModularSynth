@@ -302,14 +302,6 @@ void noi(const PicCtx& c) {
     captions(c, enumName(c, 0), isSel(c, 0) ? PAccent : PDim, kind >= 3 ? r : "10 MS", isSel(c, 1) ? PAccent : PDim);
 }
 
-template <class F>
-void stipple(Gfx& g, Box b, F f) {
-    for (int px = 1; px < b.w - 1; px += 3) {
-        const int top = yUnit(b, f((float)px / (float)(b.w - 1)));
-        for (int yy = b.y + b.h - 2; yy > top + 1; yy -= 3) g.pixel(b.x + px, yy, PBorder);
-    }
-}
-
 // ---- drums and struck voices: sketches of what the knobs do (the real voices cost up to 10k
 // cycles a sample: too heavy to run for a picture) ----
 void secText(float s, char* out, int len) {
