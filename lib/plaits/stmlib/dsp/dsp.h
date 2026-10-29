@@ -98,8 +98,21 @@ inline float Crossfade(float a, float b, float fade) {
   return a + (b - a) * fade;
 }
 
+// modsynth: 1/x for x > 0 (no 0, Inf or NaN). The ESP32-S3 has no FPU divide (a ROM call,
+// ~66 cycles); recip0.s plus two Newton steps is ~1 ulp in ~20.
+inline float FastRecip(float x) {
+#if defined(__XTENSA__)
+  float r;
+  asm("recip0.s %0, %1" : "=f"(r) : "f"(x));
+  r = r * (2.0f - x * r);
+  return r * (2.0f - x * r);
+#else
+  return 1.0f / x;
+#endif
+}
+
 inline float SoftLimit(float x) {
-  return x * (27.0f + x * x) / (27.0f + 9.0f * x * x);
+  return x * (27.0f + x * x) * FastRecip(27.0f + 9.0f * x * x);  // modsynth: no divide
 }
 
 inline float SoftClip(float x) {

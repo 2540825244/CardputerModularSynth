@@ -1,3 +1,4 @@
+#include "modsynth_iram.h" // modsynth
 #include "adsr.h"
 #include <math.h>
 
@@ -92,7 +93,7 @@ void Adsr::SetTimeConstant(float timeInS, float& time, float& coeff)
 }
 
 
-float Adsr::Process(bool gate)
+MODSYNTH_IRAM float Adsr::Process(bool gate) // modsynth: IRAM
 {
     float out = 0.0f;
 

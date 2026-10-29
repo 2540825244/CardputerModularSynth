@@ -26,6 +26,7 @@
 //
 // Main synthesis voice.
 
+#include "plaits/modsynth_iram.h"  // modsynth
 #include "plaits/dsp/voice.h"
 #include "plaits/user_data.h"
 
@@ -87,7 +88,7 @@ void Voice::Init(BufferAllocator* allocator) {
   trigger_delay_.Init(trigger_delay_line_);
 }
 
-void Voice::Render(
+MODSYNTH_IRAM void Voice::Render(  // modsynth: IRAM
     const Patch& patch,
     const Modulations& modulations,
     Frame* frames,

@@ -26,6 +26,7 @@
 //
 // 2 variable shape oscillators with sync, FM and crossfading.
 
+#include "plaits/modsynth_iram.h"  // modsynth
 #include "plaits/dsp/engine/virtual_analog_engine.h"
 
 #include <algorithm>
@@ -75,7 +76,7 @@ float VirtualAnalogEngine::ComputeDetuning(float detune) const {
   return (a + (b - a) * Squash(Squash(detune_fractional))) * sign;
 }
 
-void VirtualAnalogEngine::Render(
+MODSYNTH_IRAM void VirtualAnalogEngine::Render(  // modsynth: IRAM
     const EngineParameters& parameters,
     float* out,
     float* aux,

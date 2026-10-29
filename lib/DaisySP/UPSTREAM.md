@@ -20,3 +20,6 @@
   - `Synthesis/vosim`, `zoscillator`, `formantosc`: sinf -> FastSin2Pi, `freq / sr` -> `freq * (1/sr)`.
   - Snare, hi-hat, string voice and string: `rand()` -> `FastRand()` (an LCG on the device, still
     `rand()` natively).
+  - v1.3 Task 4: `Utility/modsynth_iram.h` (new, `MODSYNTH_IRAM` = `IRAM_ATTR` on the device);
+    `Control/adsr` `Process()` in IRAM (GRD's envelope); `Synthesis/harmonic_osc.h`: sinf ->
+    FastSin2Pi, the harmonic loop unrolled.

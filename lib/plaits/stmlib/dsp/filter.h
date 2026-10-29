@@ -31,6 +31,7 @@
 #define STMLIB_DSP_FILTER_H_
 
 #include "stmlib/stmlib.h"
+#include "stmlib/dsp/dsp.h"  // modsynth: FastRecip
 
 #include <cmath>
 #include <algorithm>
@@ -222,8 +223,8 @@ class Svf {
   template<FrequencyApproximation approximation>
   inline void set_f_q(float f, float resonance) {
     g_ = OnePole::tan<approximation>(f);
-    r_ = 1.0f / resonance;
-    h_ = 1.0f / (1.0f + r_ * g_ + g_ * g_);
+    r_ = FastRecip(resonance);  // modsynth: no divide (resonance > 0)
+    h_ = FastRecip(1.0f + r_ * g_ + g_ * g_);
   }
   
   template<FilterMode mode>

@@ -90,6 +90,7 @@ class HarmonicOscillator {
       }
       
       float sum = 0.0f;
+#pragma GCC unroll 16  // modsynth: unrolled, same arithmetic
       for (int i = 0; i < num_harmonics; ++i) {
         sum += am[i].Next() * current;
         float temp = current;

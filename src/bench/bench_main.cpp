@@ -77,7 +77,9 @@ const char* kModes[] = {"idle", "ui30", "uiMax"};
 
 // Short runs: only these types (one line per round, UI at 30 fps) and no split/micro/GRD sweep.
 // {nullptr} alone = the full bench. Edit for the task at hand.
-const char* const kFocus[] = {"snr", "mdl", "hat", "res", "kck", "str", "awh", "vos", "zos", "ssw", "for", "grd", nullptr};
+const char* const kFocus[] = {"grd", "rev", "mdl", "hrm", "lad", "ssw", "vos", "kck", "qnt", "awh", "res", nullptr};
+// Short runs also sweep GRD's 24 engines in the owner's patch shape (UI at 30 fps).
+constexpr bool kGrdSweep = true;
 const bool kShort = kFocus[0] != nullptr;
 
 // Patches are 5.3 KB: statics, never on the task stack.
@@ -283,6 +285,35 @@ void grdLikeOwner() {
     runBlocks(4);
 }
 
+// GRD's own measured cycles per engine, KEYS pitch+gate -> GRD -> OUT, UI at 30 fps.
+void grdSweep(float flt, int ui = 1) {
+    Patch& p = gBuild;
+    p = gEmpty;
+    const uint16_t k = add(p, kKeysType, 0), g = add(p, kGrdType, 1), o = add(p, kOutType, 2);
+    p.addCable(k, 0, g, 0);
+    p.addCable(k, 1, g, 1);
+    p.addCable(g, 0, o, 0);
+    gPatch = p;
+    gEngine.apply(gPatch);
+    gUiMode = ui;
+    Serial.printf("  grd %s %s:", kModes[ui], flt == 0.f ? "ladder" : "nofilt");
+    uint32_t worst = 0;
+    for (int e = 0; e < 24; e++) {
+        Module* m = gEngine.instance(g);
+        m->setParam(0, (float)e);
+        m->setParam(12, flt);
+        runBlocks(150);
+        runBlocks(450);
+        const uint32_t c = m->measuredCycles();
+        worst = c > worst ? c : worst;
+        Serial.printf(" %u", (unsigned)c);
+    }
+    Serial.printf(" | worst %u\n", (unsigned)worst);
+    gUiMode = 0;
+    gEngine.apply(gEmpty);
+    runBlocks(4);
+}
+
 // ---- round 2: where a trivial module's ~180 cycles/sample go ----
 __attribute__((noinline)) float recipNewton(float x) {
     float r;
@@ -425,6 +456,12 @@ void benchTask(void*) {
         allTypes();
         if (kShort) dspParts();
         if (kShort) grdLikeOwner();
+        if (kShort && kGrdSweep) {
+            grdSweep(0.f);  // ladder LP
+            grdSweep(2.f);  // filter OFF
+            grdSweep(0.f, 0);
+            grdSweep(2.f, 0);
+        }
         if (kShort) {
             vTaskDelay(pdMS_TO_TICKS(500));
             continue;

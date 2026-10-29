@@ -1,4 +1,5 @@
 #define TEST  // stmlib's portable code paths (lib/plaits/library.json builds with the same flag)
+#include "../modsynth_iram.h"
 #include "grd.h"
 #include <new>
 #include "common.h"
@@ -90,7 +91,7 @@ class Grd : public Module {
     }
     ~Grd() override { delete[] shared_; }
 
-    void process(const float* const* ins, const bool* c) override {
+    MODSYNTH_IRAM void process(const float* const* ins, const bool* c) override {
         const int vca = (int)param(kVca), flt = (int)param(kFlt);
         plaits::Patch p = {};
         p.note = 60.f + param(kOct) * 12.f + param(kTune);
@@ -124,6 +125,11 @@ class Grd : public Module {
         float* eo = out(2);
         float* lo = out(3);
         float hz = 0.f;
+        // Pass 1 per sample: LFO, triggers, renders, envelope, cutoff (every 8), raw voice, gain.
+        // Pass 2: the ladder over 8-sample runs. Pass 3: the VCA. Same arithmetic as one pass.
+        float v[kBlock], g[kBlock], cut[kBlock / 8];
+        const float* cutIn = inOrNull(ins, c, kInCut);
+        const float* lvl = vca != kVcaLpg && c[kInLevel] ? ins[kInLevel] : nullptr;
         for (int i = 0; i < kBlock; i++) {
             lfoPh_ += lfoInc;
             if (lfoPh_ >= 1.f) lfoPh_ -= 1.f;
@@ -139,20 +145,24 @@ class Grd : public Module {
             }
             const float e = env_.Process(gate_.process(gated ? ins[kInTrig][i] : 0.f));
             if ((i & 7) == 0) {
-                const float oct = cutSlew_.process(base) + feg * e + lCut * lfo + at(inOrNull(ins, c, kInCut), i);
+                const float oct = cutSlew_.process(base) + feg * e + lCut * lfo + at(cutIn, i);
                 hz = hzClamp(voltsToHz(oct), 20.f, 18000.f);
-                lad_.SetFreq(hz);
+                cut[i >> 3] = hz;
             }
             const plaits::Voice::Frame& f = fifo_[pos_++];
-            float v = (float)f.out * (1.f / 32768.f);
-            if (flt != kFltOff) v = lad_.Process(v);
-            float g = vca == kVcaEnv && gated ? e : 1.f;
-            if (vca != kVcaLpg && c[kInLevel]) g *= clampf(ins[kInLevel][i] * 0.2f, 0.f, 1.f);
-            o[i] = v * g * kAudioVolts;
+            v[i] = (float)f.out * (1.f / 32768.f);
+            float gi = vca == kVcaEnv && gated ? e : 1.f;
+            if (lvl) gi *= clampf(lvl[i] * 0.2f, 0.f, 1.f);
+            g[i] = gi;
             x[i] = (float)f.aux * (kAudioVolts / 32768.f);
             eo[i] = e * kAudioVolts;
             lo[i] = lfo * kAudioVolts;
         }
+        for (int r = 0; r < kBlock / 8; r++) {
+            lad_.SetFreq(cut[r]);  // even with the filter off, as before (keeps the coefficients warm)
+            if (flt != kFltOff) lad_.ProcessBlock(v + r * 8, 8);
+        }
+        for (int i = 0; i < kBlock; i++) o[i] = v[i] * g[i] * kAudioVolts;
         setMonitor(0, (float)voice_.active_engine());
         setMonitor(1, hz);
     }
@@ -217,7 +227,7 @@ int grdEngineIndex(int v) {
 const ModuleTypeInfo kGrdType = {
     "grd", "GRD", "Grind voice: Plaits+ladder+ADS", Category::Source, Icon::Grind, Drawing::None,
     22, kParams, 9, kInKeys, kInLabels, 4, kOutKeys, kOutLabels,
-    // cpuCycles: measured on the device (bench, UI at 30 fps), ENG 0 = the default and the
-    // heaviest engine with the ladder on; the engine can change live, so a lower measurement
-    // never lowers it.
-    3270, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kLargest, true};
+    // cpuCycles: the worst engine with the ladder on, measured on the device (v1.3 Task 4: bench
+    // at UI 30 fps 2234, real firmware 2240, both ENG 11 STR); the engine can change live, so
+    // it is the worst engine's, whatever ENG is.
+    2240, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kLargest, true};

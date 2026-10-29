@@ -153,9 +153,9 @@ class GrainletOscillator {
     } else if (shape_integral == 1) {
       float breakpoint = 0.001f + 0.499f * t * t * t;
       if (phase < breakpoint) {
-        phase *= (0.5f / breakpoint);
+        phase *= 0.5f * stmlib::FastRecip(breakpoint);  // modsynth: no divide
       } else {
-        phase = 0.5f + (phase - breakpoint) * 0.5f / (1.0f - breakpoint);
+        phase = 0.5f + (phase - breakpoint) * 0.5f * stmlib::FastRecip(1.0f - breakpoint);  // modsynth
       }
       phase += 0.75f;
     } else {
@@ -173,7 +173,7 @@ class GrainletOscillator {
       float bleed) {
     float carrier = Carrier(carrier_phase, shape);
     float formant = Sine(formant_phase);
-    return carrier * (formant + bleed) / (1.0f + bleed);
+    return carrier * (formant + bleed) * stmlib::FastRecip(1.0f + bleed);  // modsynth: bleed >= 0
   }
 
   // Oscillator state.

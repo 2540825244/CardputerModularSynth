@@ -67,8 +67,8 @@ class ResonatorSvf {
     float gains[batch_size];
     for (int i = 0; i < batch_size; ++i) {
       g[i] = stmlib::OnePole::tan<stmlib::FREQUENCY_FAST>(f[i]);
-      r[i] = 1.0f / q[i];
-      h[i] = 1.0f / (1.0f + r[i] * g[i] + g[i] * g[i]);
+      r[i] = stmlib::FastRecip(q[i]);  // modsynth: no divides (q >= 1)
+      h[i] = stmlib::FastRecip(1.0f + r[i] * g[i] + g[i] * g[i]);
       r_plus_g[i] = r[i] + g[i];
       state_1[i] = state_1_[i];
       state_2[i] = state_2_[i];
@@ -78,6 +78,7 @@ class ResonatorSvf {
     while (size--) {
       float s_in = *in++;
       float s_out = 0.0f;
+#pragma GCC unroll 4  // modsynth: the four modes' chains interleave (same arithmetic)
       for (int i = 0; i < batch_size; ++i) {
         const float hp = (s_in - r_plus_g[i] * state_1[i] - state_2[i]) * h[i];
         const float bp = g[i] * hp + state_1[i];
