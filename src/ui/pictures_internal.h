@@ -44,14 +44,25 @@ inline int ySigned(Box b, float v) { return b.y + (int)lroundf((1.f - (clampf(v,
 inline int yUnit(Box b, float v) { return b.y + (int)lroundf((1.f - clampf(v, 0.f, 1.f)) * (b.h - 1)); }
 inline int xUnit(Box b, float u) { return b.x + (int)lroundf(clampf(u, 0.f, 1.f) * (b.w - 1)); }
 
+// Values a painter computed that were not finite (NaN / inf): drawing clamps them to an edge, so
+// the tests read this to catch them (test_pictures).
+extern int gNonFinite;
+inline float finite(float v) {
+    if (!std::isfinite(v)) {
+        gNonFinite++;
+        return 0.f;
+    }
+    return v;
+}
+
 // A polyline of f(u), u = 0..1 across the box, f -1..1. bold doubles it one pixel down (inside
 // the box); dash > 0 draws dash pixels on, dash off.
 template <class F>
 void trace(Gfx& g, Box b, F f, uint8_t col, bool bold = false, int dash = 0) {
     if (b.w < 2 || b.h < 2) return;
-    int prev = ySigned(b, f(0.f));
+    int prev = ySigned(b, finite(f(0.f)));
     for (int px = 1; px < b.w; px++) {
-        const int yy = ySigned(b, f((float)px / (float)(b.w - 1)));
+        const int yy = ySigned(b, finite(f((float)px / (float)(b.w - 1))));
         if (!dash || (px / dash) % 2 == 0) {
             g.line(b.x + px - 1, prev, b.x + px, yy, col);
             if (bold) g.line(b.x + px - 1, prev < b.y + b.h - 1 ? prev + 1 : prev, b.x + px, yy < b.y + b.h - 1 ? yy + 1 : yy, col);

@@ -18,6 +18,7 @@ struct PicCtx {
 };
 
 bool hasPicture(const ModuleTypeInfo& t);
+bool hasPainter(const ModuleTypeInfo& t);  // a painter for t's id exists
 void drawPicture(const PicCtx& c);
 // Patch tile glyph (about 13 x 11) that follows the params; false: the type keeps its icon.
 bool drawTileGlyph(Gfx& g, const ModuleRec& m, int x, int y, int w, int h, uint8_t color);
@@ -30,6 +31,7 @@ ModuleRec defaultRecord(const ModuleTypeInfo& t);
 
 // ---- picture maths, shared with the tests ----
 namespace pic {
+extern int gNonFinite;  // non-finite values painters computed (see pictures_internal.h)
 // "C3 +12" from a pitch in semitones relative to C4 (MIDI 60); cents rounded, -50..+49.
 void noteName(float semisFromC4, char* out, int len);
 // One cycle of a basic wave at phase t (any real), -1..1. kind: 0 sin, 1 tri, 2 saw, 3 square.

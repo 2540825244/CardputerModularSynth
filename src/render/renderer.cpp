@@ -98,7 +98,7 @@ void moduleTile(const ModuleTypeInfo& t, int col, int row, bool dim, int iconDy,
     const uint8_t fg = dim ? PFaint : PText;
     if (gTheme) cv.fillRect(x, y, w, cellH(row), PEmpty);
     cv.fillRect(x + 2, y + 2, w - 4, 2, dim ? PFaint : categoryColor(t.category));  // category bar
-    if (!rec || !drawTileGlyph(canvasGfx(), *rec, x + (w - 13) / 2, y + 8, 13, 11, fg))
+    if (!rec || !drawTileGlyph(canvasGfx(), *rec, x + (w - 13) / 2, y + 8 + iconDy, 13, 11, fg))
         drawIcon(t.icon, x + (w - 12) / 2, y + 8 + iconDy, fg);
     smallText(t.name, x + w / 2, y + 22, fg);
 }

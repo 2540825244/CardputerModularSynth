@@ -324,7 +324,7 @@ void out(const PicCtx& c) {
     const Box m = c.small ? band(b, 0.3f, 0.7f) : Box{b.x, b.y + 22, b.w, 16};
     c.g.rect(m.x, m.y, m.w, m.h, PBorder);
     const int fx = xOf(m, db);
-    if (db > -30.f) c.g.fillRect(m.x + 1, m.y + 1, fx - m.x - 1, m.h - 2, db > -1.f ? PAccent : PText);
+    if (fx - m.x - 1 > 0) c.g.fillRect(m.x + 1, m.y + 1, fx - m.x - 1, m.h - 2, db > -1.f ? PAccent : PText);
     const int tx = xOf(m, -3.f);
     if (c.small) {
         c.g.vline(tx, m.y - 2, m.h + 4, PAccent);

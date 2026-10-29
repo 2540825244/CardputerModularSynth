@@ -30,9 +30,9 @@ template <class Step>
 void scope(Gfx& g, Box b, float f0, float cycles, Step step, uint8_t col, bool bold, float gain = 1.f / 1.25f) {
     f0 = clampf(f0, 32.f, 2000.f);
     const int n = (int)(kFs * cycles / f0);
-    int px = b.x, py = ySigned(b, step() * gain);
+    int px = b.x, py = ySigned(b, finite(step()) * gain);
     for (int i = 1; i < n; i++) {
-        const int x = b.x + i * (b.w - 1) / (n - 1), y = ySigned(b, step() * gain);
+        const int x = b.x + i * (b.w - 1) / (n - 1), y = ySigned(b, finite(step()) * gain);
         g.line(px, py, x, y, col);
         if (bold) g.line(px, py < b.y + b.h - 1 ? py + 1 : py, x, y < b.y + b.h - 1 ? y + 1 : y, col);
         px = x;
@@ -120,8 +120,16 @@ void vso(const PicCtx& c) {
     baseNote(c, kVOct, 0.f, note, sizeof note);
     captions(c, l, c.sel >= kVShape ? PAccent : PDim, note, c.sel == kVOct || c.sel == kVTune ? PAccent : PText);
 }
+// The tile glyph: the shape's formula (saw/tri at PW blended to a pulse by SHP), one point a
+// pixel; the real oscillator per tile per frame costs ~1 ms (review).
 bool vsoGlyph(Gfx& g, const ModuleRec& m, Box b, uint8_t col) {
-    vsoTrace(m, g, b, 200.f, col, false);
+    const float shp = clampf(m.params[kVShape], 0.f, 1.f), pw = clampf(m.params[kVPw], 0.05f, 0.95f);
+    trace(g, b, [&](float u) {
+        const float p = u * 1.5f - floorf(u * 1.5f);
+        const float saw = p < pw ? -1.f + 2.f * p / pw : 1.f - 2.f * (p - pw) / (1.f - pw);
+        const float sq = p < pw ? 1.f : -1.f;
+        return ((1.f - shp) * saw + shp * sq) * 0.9f;
+    }, col);
     return true;
 }
 
@@ -274,7 +282,7 @@ void noi(const PicCtx& c) {
                 b2 = 0.57000f * b2 + w * 1.0526913f;
                 y = (b0 + b1 + b2 + w * 0.1848f) * 0.25f;
                 break;
-            case 2: y = (brown = clampf(brown * 0.998f + w * 0.05f, -1.f, 1.f)) * 3.f; break;
+            case 2: y = (brown = clampf(brown * 0.998f + w * 0.05f, -1.f, 1.f)) * 3.f; break;  // x3: brown is quiet, drawn to read
             case 3:
                 ph += rate;
                 if (ph >= 1.f) {
@@ -322,9 +330,9 @@ void voice(Gfx& g, Box b, float winS, Amp amp, Freq freq, Noise noise, uint8_t c
         ph += freq(t) * winS / (float)n;
         ph -= floorf(ph);
         const float nz = noise(t);
-        const float y = (sinf(6.2831853f * ph) * (1.f - nz) + rng.bi() * nz) * amp(t);
+        const float y = finite((sinf(6.2831853f * ph) * (1.f - nz) + rng.bi() * nz) * amp(t));
         const int x = i * (b.w - 1) / n;
-        if (x != colX || i == n) {
+        if (x != colX) {
             g.line(b.x + colX, ySigned(b, hi), b.x + colX, ySigned(b, lo), col);
             colX = x;
             lo = hi = y;
@@ -332,6 +340,7 @@ void voice(Gfx& g, Box b, float winS, Amp amp, Freq freq, Noise noise, uint8_t c
             lo = y < lo ? y : lo;
             hi = y > hi ? y : hi;
         }
+        if (i == n) g.line(b.x + colX, ySigned(b, hi), b.x + colX, ySigned(b, lo), col);  // the last column
     }
 }
 template <class Amp>
@@ -399,14 +408,16 @@ void hat(const PicCtx& c) {
         for (float r : kRatios) m += sinf(6.2831853f * f0 * r * t) > 0.f ? 1.f : -1.f;
         const float y = (m / 6.f * (1.f - noi) + rng.bi() * noi) * expf(-t / tau) * 0.95f;
         const int x = i * (b.w - 1) / n;
-        if (x != colX || i == n) {
-            c.g.line(b.x + colX, ySigned(b, hi), b.x + colX, ySigned(b, lo), c.sel < 0 || c.sel == kHNoi || c.sel == kHFrq ? PAccent : PText);
+        const uint8_t col = c.sel < 0 || c.sel == kHNoi || c.sel == kHFrq ? PAccent : PText;
+        if (x != colX) {
+            c.g.line(b.x + colX, ySigned(b, hi), b.x + colX, ySigned(b, lo), col);
             colX = x;
             lo = hi = y;
         } else {
             lo = y < lo ? y : lo;
             hi = y > hi ? y : hi;
         }
+        if (i == n) c.g.line(b.x + colX, ySigned(b, hi), b.x + colX, ySigned(b, lo), col);
     }
     if (c.small) return;
     envelopeLines(c.g, b, win, [&](float t) { return expf(-t / tau) * 0.95f; }, isSel(c, kHDec) ? PAccent : PDim);

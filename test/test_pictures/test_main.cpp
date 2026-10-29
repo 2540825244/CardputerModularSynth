@@ -69,8 +69,13 @@ struct FbGfx : Gfx {
     }
     void hline(int x, int y, int w, uint8_t c) override { for (int i = 0; i < w; i++) pixel(x + i, y, c); }
     void vline(int x, int y, int h, uint8_t c) override { for (int i = 0; i < h; i++) pixel(x, y + i, c); }
-    void fillRect(int x, int y, int w, int h, uint8_t c) override { for (int j = 0; j < h; j++) hline(x, y + j, w, c); }
+    // the device draws a negative width or height (LovyanGFX flips it): a fault here
+    void fillRect(int x, int y, int w, int h, uint8_t c) override {
+        if (w < 0 || h < 0) nan++;
+        for (int j = 0; j < h; j++) hline(x, y + j, w, c);
+    }
     void rect(int x, int y, int w, int h, uint8_t c) override {
+        if (w < 0 || h < 0) nan++;
         if (w <= 0 || h <= 0) return;
         hline(x, y, w, c); hline(x, y + h - 1, w, c); vline(x, y, h, c); vline(x + w - 1, y, h, c);
     }
@@ -181,7 +186,9 @@ std::vector<int> picturePages(const ModuleTypeInfo& t) {
 
 void paint(FbGfx& f, const ModuleRec& m, int page, int sel, int x, int y, int w, int h, bool small) {
     f.box(x, y, w, h);
+    pic::gNonFinite = 0;
     drawPicture(PicCtx{f, m, nullptr, page, sel, x, y, w, h, small});
+    f.nan += pic::gNonFinite;  // a NaN a painter computed counts as a fault
 }
 
 }  // namespace
@@ -202,7 +209,7 @@ void test_picture_pages_match_painters() {
     const ModuleTypeInfo* const* all = allTypes(&n);
     for (int i = 0; i < n; i++) {
         const bool pages = !picturePages(*all[i]).empty();
-        TEST_ASSERT_EQUAL_MESSAGE(pages, hasPicture(*all[i]), all[i]->id);
+        TEST_ASSERT_EQUAL_MESSAGE(pages, hasPainter(*all[i]), all[i]->id);  // a picture page has a painter, and back
     }
 }
 
@@ -225,7 +232,7 @@ void test_pictures_stay_in_their_box() {
                     TEST_ASSERT_TRUE_MESSAGE(f.drawn > 40, msg);
                 }
                 f.clear(PEmpty);
-                paint(f, m, page, -1, 10, 10, 40, 26, true);  // a thumbnail
+                paint(f, m, page, -1, 10, 10, 40, 27, true);  // a thumbnail, the place menu's size
                 TEST_ASSERT_EQUAL_MESSAGE(0, f.outside, t->id);
                 TEST_ASSERT_EQUAL_MESSAGE(0, f.nan, t->id);
             }
@@ -341,7 +348,7 @@ void test_grd_knob_labels_follow_the_engine() {
     for (int e = 0; e < 24; e++)
         for (int k = 0; k < 3; k++) {
             TEST_ASSERT_TRUE(strlen(pic::grdKnobLabel(e, k)) <= 3);
-            TEST_ASSERT_TRUE(strlen(pic::grdKnobName(e, k)) <= 16);
+            TEST_ASSERT_TRUE(strlen(pic::grdKnobName(e, k)) <= 15);  // the strip's name[16]
         }
 }
 

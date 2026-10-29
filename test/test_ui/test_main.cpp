@@ -1349,6 +1349,29 @@ void test_strip_span_bipolar() {
     }
 }
 
+// v1.4 review: every param of every type has a cell on a page tab can reach
+void test_every_param_reachable() {
+    int n = 0;
+    const ModuleTypeInfo* const* t = allTypes(&n);
+    for (int i = 0; i < n; i++) {
+        if (t[i]->pages)
+            for (int pg = 0; pg < t[i]->numPages; pg++)  // numPages counts every PageDef
+                TEST_ASSERT_TRUE_MESSAGE(t[i]->pages[pg].name != nullptr, t[i]->id);
+        for (int p = 0; p < t[i]->numParams; p++) {
+            bool found = false;
+            for (int pg = 0; pg < modulePageCount(*t[i]) && !found; pg++)
+                for (int r = 1; r <= 3 && !found; r++)
+                    for (int c = 0; c < kGridCols && !found; c++) {
+                        const CellRef ref = moduleCell(*t[i], pg, (uint8_t)r, (uint8_t)c);
+                        found = (ref.kind == CellKind::Param || ref.kind == CellKind::Bit) && ref.index == p;
+                    }
+            char msg[48];
+            snprintf(msg, sizeof msg, "%s param %d", t[i]->id, p);
+            TEST_ASSERT_TRUE_MESSAGE(found, msg);
+        }
+    }
+}
+
 void test_auto_pages_overflow() {
     const ModuleTypeInfo& t = bigType(Drawing::None);
     TEST_ASSERT_EQUAL(2, modulePageCount(t));
@@ -2421,6 +2444,7 @@ int main() {
     RUN_TEST(test_strip_fill_ends);
     RUN_TEST(test_input_amount_edit);
     RUN_TEST(test_strip_span_bipolar);
+    RUN_TEST(test_every_param_reachable);
     RUN_TEST(test_auto_pages_overflow);
     RUN_TEST(test_drawing_page0_width5);
     RUN_TEST(test_drawing_page0_fits_seven_params);

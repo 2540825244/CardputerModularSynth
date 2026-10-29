@@ -5,6 +5,7 @@
 #include "pictures_internal.h"
 
 namespace pic {
+int gNonFinite = 0;
 namespace {
 
 const Entry* find(const char* id) {
@@ -27,7 +28,8 @@ void noteName(float semis, char* out, int len) {
     const int note = (int)lroundf(midi);
     int cents = (int)lroundf((midi - (float)note) * 100.f);
     if (cents > 49) cents = 49;
-    snprintf(out, (size_t)len, "%s%d %+d", kN[((note % 12) + 12) % 12], note / 12 - 1, cents);
+    const int octave = (note >= 0 ? note / 12 : (note - 11) / 12) - 1;  // floor: MIDI -1 is B-2
+    snprintf(out, (size_t)len, "%s%d %+d", kN[((note % 12) + 12) % 12], octave, cents);
 }
 
 float basicWave(int kind, float t) {
@@ -83,6 +85,11 @@ const char* grdKnobName(int engine, int knob) { return grd(engine).full[knob < 0
 const char* grdEngineName(int engine) { return grd(engine).name; }
 
 }  // namespace pic
+
+bool hasPainter(const ModuleTypeInfo& t) {
+    const pic::Entry* e = pic::find(t.id);
+    return e && e->paint;
+}
 
 bool hasPicture(const ModuleTypeInfo& t) {
     for (int p = 0; p < modulePageCount(t); p++)

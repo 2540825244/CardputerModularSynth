@@ -69,10 +69,10 @@ void trm(const PicCtx& c) {
     auto lfoU = [&](float t) {  // 0..1
         const float p = t - floorf(t);
         if (w == 1) return p < 0.5f ? 2.f * p : 2.f - 2.f * p;
-        if (w == 2) return p < 0.5f ? 1.f : 0.f;
-        return 0.5f + 0.5f * sinf(6.2831853f * p);
+        if (w == 2) return p < 0.5f ? 0.f : 1.f;
+        return 0.5f - 0.5f * sinf(6.2831853f * p);
     };
-    auto gain = [&](float u) { return 1.f - dep * lfoU(u * 2.f); };
+    auto gain = [&](float u) { return 1.f - dep * lfoU(u * 2.f); };  // DaisySP: SIN rises, SQR starts at 1
     const Box b = c.small ? body(c) : insetXY(body(c), 0, 3);
     if (!c.small) {
         trace(c.g, b, [&](float u) { return gain(u) * 0.95f; }, isSel(c, 1) ? PAccent : PDim);

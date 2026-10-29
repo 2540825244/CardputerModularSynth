@@ -248,4 +248,4 @@ const ModuleTypeInfo kGrdType = {
     // cpuCycles: the worst engine with the ladder on, measured on the device (v1.3 Task 4: bench
     // at UI 30 fps 2234, real firmware 2240, both ENG 11 STR); the engine can change live, so
     // it is the worst engine's, whatever ENG is.
-    2240, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, 3, 0, kLargest, true};
+    2240, sizeof(Grd) + kShared + 4 * kBlock * sizeof(float), 1, create, kGrdPages, sizeof kGrdPages / sizeof kGrdPages[0], 0, kLargest, true};

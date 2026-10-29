@@ -46,6 +46,11 @@ void env(const PicCtx& c) {
         const Box sb = {xUnit(b, ends[seg]), b.y, xUnit(b, ends[seg + 1]) - xUnit(b, ends[seg]) + 1, b.h};
         if (sb.w < 1) continue;
         const uint8_t col = c.sel < 0 ? PAccent : ink(c, seg);
+        if (sb.w < 2) {  // a 0.5 ms attack beside long D / R: one column, a vertical line
+            const int y0 = yUnit(b, adsrAt(e, ends[seg])), y1 = yUnit(b, adsrAt(e, ends[seg + 1] - 1e-4f));
+            c.g.vline(sb.x, y0 < y1 ? y0 : y1, (y0 < y1 ? y1 - y0 : y0 - y1) + 1, col);
+            continue;
+        }
         const float u0 = ends[seg], du = ends[seg + 1] - ends[seg];
         traceUnit(c.g, sb, [&](float u) { return adsrAt(e, u0 + u * du); }, col, isSel(c, seg));
     }

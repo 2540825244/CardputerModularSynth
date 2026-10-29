@@ -272,7 +272,8 @@ void drawScope(Module* inst, int x, int y, int w, int h) {
         const int note = (int)lroundf(midi);
         const int cents = (int)lroundf((midi - (float)note) * 100.f);
         char lab[24];
-        snprintf(lab, sizeof lab, "%s%d %+dC  %.1fHZ", kN[((note % 12) + 12) % 12], note / 12 - 1, cents, (double)hz);
+        snprintf(lab, sizeof lab, "%s%d %+dC  %.1fHZ", kN[((note % 12) + 12) % 12], (note >= 0 ? note / 12 : (note - 11) / 12) - 1,
+                 cents, (double)hz);
         smallText(lab, x + w / 2, y + 2, PText);
     }
 }
@@ -332,6 +333,7 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
                         const int xx = x + k + j;
                         if (xx >= x && xx < x + w && (j & 1) == 0) cv.drawPixel(xx, y + h - 1 - j, PBorder);
                     }
+                if (s.modCell == row * kGridCols + col) outline(col, row, PAccent);  // over the hatch
             }
     }
     if (drawing == Drawing::Playhead) {  // the playing step's column: a bar over its cells
