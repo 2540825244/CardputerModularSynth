@@ -11,16 +11,14 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 
-## Next step (as of 2026-10-28, session 5)
-v1.2 "feature complete" (plan `docs/superpowers/plans/2026-10-28-v1.2-feature-complete.md`, spec §14 + §14.1) is
-on branch `feat/v1-firmware`. Review rounds 1-5b are fixed; the RAM rework freed ~120 KB (static 153.9 KB).
-Ledger with every ruling: `.superpowers/sdd/2026-10-28-v1.2-feature-complete/progress.md`.
-**Agreed-but-unbuilt changes live in `docs/todo.md`**: add to it when the owner OKs something for later.
-1. Owner flashes `dist/modsynth-v1.2-test3.bin` and runs `dist/test-5-script.md` with the serial monitor on.
-   The `cost id=measured/estimate` lines give the real cpuCycles for the type tables.
-2. Fix what the report finds, build the `docs/todo.md` items, then Task 14: final whole-branch review.
-3. Execution mode: native, plus one persistent Opus reviewer agent (rev-v12). No other subagents.
-   Automatic speaker/line switching stays manual (owner, 2026-10-28). USB MIDI host is deferred.
+## Next step (as of 2026-10-29, session 6)
+v1.3 plan `docs/superpowers/plans/2026-10-29-v1.3-perf-and-sampling.md` (perf, SD fix, flash budget,
+bypass, KIT demand-driven drum sampler, PO-33 presets, screen sleep). Ledger:
+`.superpowers/sdd/2026-10-29-v1.3-perf-and-sampling/progress.md` (trust it and git log after compaction).
+Execution: one persistent Opus implementer subagent (impl-v13) does all code; Claude coordinates and
+feeds ideas; reviewer rev-v12. The device is on USB: only ever write the Launcher's `modsyn` slot
+(0x650000, image <= 1 MB) via `tools/dev/flash_slot.sh`; full flash backup in `dist/`.
+Backlog not in the plan: `docs/todo.md`.
 
 ## Constraints to remember
 - PlatformIO + Arduino core. `pio` isn't on PATH: use `~/.platformio/penv/bin/pio`.
