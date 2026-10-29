@@ -10,7 +10,7 @@ enum { kRange, kSmooth };
 
 const ParamSpec kParams[] = {
     {"range", "RNG", 10.f, 90.f, 45.f, Curve::Lin, Unit::Deg, nullptr},
-    {"smooth", "SMO", 5.f, 500.f, 20.f, Curve::Sqr, Unit::Ms, nullptr},  // >= 5 ms: input updates at ~100 Hz
+    {"smooth", "SMO", 20.f, 500.f, 20.f, Curve::Sqr, Unit::Ms, nullptr},  // >= 20 ms: the IMU is read at 50 Hz
 };
 const char* const kOutKeys[] = {"roll", "pitch"};
 const char* const kOutLabels[] = {"ROL", "PIT"};

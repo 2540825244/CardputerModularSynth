@@ -55,7 +55,8 @@ class Ladder {
     }
 
     // Process() over n samples in place, the state in registers across them; bit-identical.
-    void ProcessBlock(float* io, int n) {
+    // Always inline: in GRD it must land inside Grd::process, which runs from IRAM.
+    __attribute__((always_inline)) inline void ProcessBlock(float* io, int n) {
         switch (mode_) {
             case LP24: runBlock<LP24>(io, n); break;
             case LP12: runBlock<LP12>(io, n); break;
@@ -101,7 +102,7 @@ class Ladder {
     }
 
     template <int M>
-    void runBlock(float* io, int n) {
+    __attribute__((always_inline)) inline void runBlock(float* io, int n) {
         float a0 = z0_[0], a1 = z0_[1], a2 = z0_[2], a3 = z0_[3];
         float b0 = z1_[0], b1 = z1_[1], b2 = z1_[2], b3 = z1_[3];
         float old = old_;

@@ -29,6 +29,7 @@
 #ifndef STMLIB_UTILS_DSP_DSP_H_
 #define STMLIB_UTILS_DSP_DSP_H_
 
+#include <cassert>
 #include "stmlib/stmlib.h"
 
 #include <cmath>
@@ -107,6 +108,7 @@ inline float FastRecip(float x) {
   r = r * (2.0f - x * r);
   return r * (2.0f - x * r);
 #else
+  assert(x > 0.0f && x < 3.4e38f);  // modsynth: the device path needs a positive normal x
   return 1.0f / x;
 #endif
 }

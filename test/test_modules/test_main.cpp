@@ -745,24 +745,25 @@ void test_dmx_routes() {
 
 void test_tilt_module_scales() {
     Module* m = kTiltType.create();
-    m->setParam(1, 5.f);  // SMO minimum
+    m->setParam(1, 20.f);  // SMO minimum
     tiltPublish(22.5f, -45.f);
     const float* ins[1] = {nullptr};
     const bool conn[1] = {false};
-    for (int b = 0; b < 120; b++) m->process(ins, conn);
-    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 2.5f, m->out(0)[kBlock - 1]);
-    TEST_ASSERT_FLOAT_WITHIN(1e-4f, -5.f, m->out(1)[kBlock - 1]);
+    for (int b = 0; b < 600; b++) m->process(ins, conn);
+    // a 20 ms one-pole stalls ~1e-4 short: its step falls below a float ulp of the target
+    TEST_ASSERT_FLOAT_WITHIN(5e-4f, 2.5f, m->out(0)[kBlock - 1]);
+    TEST_ASSERT_FLOAT_WITHIN(5e-4f, -5.f, m->out(1)[kBlock - 1]);
     delete m;
 }
 
 void test_tilt_module_clamps() {
     Module* m = kTiltType.create();
-    m->setParam(1, 5.f);
+    m->setParam(1, 20.f);
     tiltPublish(90.f, 0.f);
     const float* ins[1] = {nullptr};
     const bool conn[1] = {false};
-    for (int b = 0; b < 120; b++) m->process(ins, conn);
-    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 5.f, m->out(0)[kBlock - 1]);
+    for (int b = 0; b < 600; b++) m->process(ins, conn);
+    TEST_ASSERT_FLOAT_WITHIN(5e-4f, 5.f, m->out(0)[kBlock - 1]);
     delete m;
 }
 
@@ -817,7 +818,7 @@ void test_selector_cv_hysteresis() {
 }
 
 void test_tilt_smooth_minimum() {
-    TEST_ASSERT_TRUE(kTiltType.params[1].min >= 5.f);
+    TEST_ASSERT_TRUE(kTiltType.params[1].min >= 20.f);  // the IMU is read at 50 Hz
 }
 
 

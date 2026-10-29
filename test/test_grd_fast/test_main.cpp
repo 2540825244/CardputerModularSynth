@@ -107,10 +107,67 @@ void test_grd_matches_old_filter_off_lpg_drone() {
     check(13, 2, 2, true, false);
 }
 
+// Every engine at the corners of HARM/TIMB/MORPH, triggered, in each VCA mode: with the native
+// FastRecip asserting x > 0, this drives every Plaits reciprocal site with real data.
+void test_all_engines_corners() {
+    const In in = makeInputs(120, true, true);
+    for (int eng = 0; eng < 24; eng++)
+        for (int corner = 0; corner < 8; corner++) {
+            float params[kMaxParams];
+            for (int i = 0; i < kGrdType.numParams; i++) params[i] = kGrdType.params[i].def;
+            params[oldgrd::kEng] = (float)eng;
+            params[oldgrd::kHarm] = (corner & 1) ? 1.f : 0.f;
+            params[oldgrd::kTimb] = (corner & 2) ? 1.f : 0.f;
+            params[oldgrd::kMorph] = (corner & 4) ? 1.f : 0.f;
+            params[oldgrd::kVca] = (float)(corner % 3);
+            params[oldgrd::kDecay] = (corner & 1) ? 0.f : 1.f;
+            params[oldgrd::kColor] = (corner & 2) ? 0.f : 1.f;
+            Module* m = kGrdType.create();
+            const Run r = run(m, in, 120, params);
+            delete m;
+            for (float v : r.out[0]) TEST_ASSERT_TRUE(v == v && fabsf(v) < 1e3f);
+        }
+}
+
+// FLT OFF -> LP mid-run (the ladder's state starts where it was left): still the old output.
+void test_grd_matches_old_filter_switch() {
+    float params[kMaxParams];
+    for (int i = 0; i < kGrdType.numParams; i++) params[i] = kGrdType.params[i].def;
+    params[oldgrd::kFlt] = 2.f;
+    const int blocks = 600;
+    const In in = makeInputs(blocks, true, false);
+    Module* now = kGrdType.create();
+    Module* old = new oldgrd::OldGrd(new char[oldgrd::kShared]);
+    Run a, b;
+    for (int pass = 0; pass < 2; pass++) {
+        Module* m = pass ? old : now;
+        Run& r = pass ? b : a;
+        stmlib::Random::Seed(1);
+        for (int i = 0; i < kGrdType.numParams; i++) m->setParam(i, params[i]);
+        for (int blk = 0; blk < blocks; blk++) {
+            if (blk == 300) m->setParam(oldgrd::kFlt, 0.f);
+            const float* ins[kMaxIns] = {};
+            bool conn[kMaxIns] = {};
+            for (int k = 0; k < kIns; k++) {
+                conn[k] = in.conn[k];
+                ins[k] = in.conn[k] ? in.ch[k].data() + blk * kBlock : nullptr;
+            }
+            m->process(ins, conn);
+            r.out[0].insert(r.out[0].end(), m->out(0), m->out(0) + kBlock);
+        }
+    }
+    delete now;
+    delete old;
+    for (size_t i = 0; i < a.out[0].size(); i++)
+        if (a.out[0][i] != b.out[0][i]) TEST_FAIL_MESSAGE("FLT OFF -> LP differs from the old GRD");
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_grd_matches_old_ladder_lp);
     RUN_TEST(test_grd_matches_old_ladder_hp_cut_level);
     RUN_TEST(test_grd_matches_old_filter_off_lpg_drone);
+    RUN_TEST(test_all_engines_corners);
+    RUN_TEST(test_grd_matches_old_filter_switch);
     return UNITY_END();
 }

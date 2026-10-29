@@ -50,7 +50,8 @@ static void uiTask(void*) {
         // The IMU read is an I2C transfer: only while something uses the tilt (a TILT module or a
         // hold-and-tilt sweep) at <= 50 Hz, else 4 Hz to keep the angles warm.
         const bool tiltWanted = gUi.tiltActive() || gPatch.countOfType(kTiltType) > 0;
-        if (now - lastTiltPoll >= (tiltWanted ? 20u : 250u)) {
+        const bool tiltStarts = gUi.tiltActive() && gUi.tiltGeneration() != lastTiltGen;  // fresh start angle
+        if (tiltStarts || now - lastTiltPoll >= (tiltWanted ? 20u : 250u)) {
             lastTiltPoll = now;
             tiltPoll(now);
         }
@@ -101,6 +102,34 @@ static void uiTask(void*) {
     }
 }
 
+#ifdef MODSYNTH_INTR_DUMP
+// Debug (build with -DMODSYNTH_INTR_DUMP): which peripheral interrupts are routed to which core.
+// The interrupt matrix maps each source to a CPU interrupt per core (core 0 at 0x600C2000, core 1
+// at +0x800, 4 bytes per source); a source counts if that CPU interrupt is enabled on the core.
+static volatile uint32_t g_intEnable[2];
+static void readIntEnable(void* done) {
+    uint32_t v;
+    asm volatile("rsr %0, intenable" : "=r"(v));
+    g_intEnable[xPortGetCoreID()] = v;
+    xTaskNotifyGive((TaskHandle_t)done);
+    vTaskDelete(nullptr);
+}
+static void dumpInterrupts() {
+    for (int core = 0; core < 2; core++) {
+        xTaskCreatePinnedToCore(readIntEnable, "intr", 2048, xTaskGetCurrentTaskHandle(), 5, nullptr, core);
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    }
+    for (int core = 0; core < 2; core++) {
+        Serial.printf("[intr] core %d intenable=%08x sources:", core, (unsigned)g_intEnable[core]);
+        for (int src = 0; src < ETS_MAX_INTR_SOURCE; src++) {
+            const uint32_t inum = *(volatile uint32_t*)(0x600C2000u + core * 0x800u + src * 4u) & 31u;
+            if (inum != 6 && (g_intEnable[core] >> inum) & 1u) Serial.printf(" %d->%u", src, (unsigned)inum);
+        }
+        Serial.println();
+    }
+}
+#endif
+
 // Everything that installs an interrupt (I2C via M5.begin, the keyboard's GPIO ISR, USB serial,
 // I2S, the display's SPI) runs here, on core 0: an ESP-IDF interrupt lives on the core that
 // allocates it, and on core 1 it would run inside the audio task's time. Then this task is the UI.
@@ -127,6 +156,10 @@ static void initTask(void*) {
     printHeap("init");
     Serial.printf("[grd] needs %u B: one block of %u + the rest\n", (unsigned)kGrdType.ramBytes,
                   (unsigned)kGrdType.largestAlloc);
+#ifdef MODSYNTH_INTR_DUMP
+    delay(200);  // the audio task is running
+    dumpInterrupts();
+#endif
     uiTask(nullptr);
 }
 

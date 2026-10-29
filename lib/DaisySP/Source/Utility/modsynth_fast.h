@@ -5,6 +5,7 @@
 #ifndef DSY_MODSYNTH_FAST_H
 #define DSY_MODSYNTH_FAST_H
 
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
@@ -36,6 +37,7 @@ inline float FastRecip(float x)
     r = r * (2.f - x * r);
     return r * (2.f - x * r);
 #else
+    assert(x > 0.f && x < 3.4e38f); // the device path needs a positive normal x
     return 1.f / x;
 #endif
 }
