@@ -25,6 +25,7 @@
 #include "ref/stringvoice.h"
 #include "ref/vosim.h"
 #include "ref/zoscillator.h"
+#include "ref/harmonic_osc.h"
 #include "ref/svf.h"
 #include "Filters/svf.h"
 
@@ -543,6 +544,44 @@ void test_awh_matches_old() {
     compare("awh", kAwhType, {}, in, n, {600, 0, 0.9f}, 1e-3f, make);
 }
 
+// HRM: sinf -> FastSin2Pi per sample (a few ulps); the wrapper below is the old one verbatim.
+void test_hrm_matches_old() {
+    const int n = 600;
+    Inputs in;
+    in.ch[0] = ramp(n, -1.f, 1.f);
+    in.ch[1] = ramp(n, 0.f, 2.f);
+    struct Old {
+        daisysp_ref::HarmonicOscillator<16> o;
+        float lastC = -1.f, lastR = -1.f, lastO = -1.f;
+        Old() { o.Init(kSampleRate); }
+    };
+    auto make = [] {
+        auto s = std::make_shared<Old>();
+        return [s](const Params& p, const float* const* ins, float* o) {
+            enum { kOct, kTune, kCenter, kRolloff, kOdd };
+            const float *pit = ins[0], *cc = ins[1];
+            const float center = clampf(p(kCenter) + at(cc, 0) * 3.f, 1.f, 16.f);
+            const float roll = p(kRolloff), odd = p(kOdd);
+            if (center != s->lastC || roll != s->lastR || odd != s->lastO) {
+                s->lastC = center;
+                s->lastR = roll;
+                s->lastO = odd;
+                float amp[16], sum = 0.f;
+                for (int h = 0; h < 16; h++) {
+                    const float d = fabsf((float)(h + 1) - center);
+                    amp[h] = powf(roll, d) * (((h + 1) % 2 == 0) ? 1.f - odd : 1.f);
+                    sum += amp[h];
+                }
+                for (float& a : amp) a /= sum > 0.f ? sum : 1.f;
+                s->o.SetAmplitudes(amp);
+            }
+            s->o.SetFreq(hzClamp(voltsToHz(oldBaseVolts(p, kOct) + at(pit, 0)), 10.f, 1200.f));
+            for (int i = 0; i < kBlock; i++) o[i] = clampf(s->o.Process(), -1.5f, 1.5f) * kAudioVolts;
+        };
+    };
+    compare("hrm", kHrmType, {}, in, n, {300, 3, 0.9f}, 1e-3f, make);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_svf_cache_is_exact);
@@ -558,5 +597,6 @@ int main() {
     RUN_TEST(test_for_matches_old);
     RUN_TEST(test_ssw_matches_old);
     RUN_TEST(test_awh_matches_old);
+    RUN_TEST(test_hrm_matches_old);
     return UNITY_END();
 }

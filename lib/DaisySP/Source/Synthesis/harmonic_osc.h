@@ -10,6 +10,7 @@ https://opensource.org/licenses/MIT.
 #ifndef DSY_HARMONIC_H
 #define DSY_HARMONIC_H
 
+#include "modsynth_fast.h" // modsynth
 #include <stdint.h>
 #include "Utility/dsp.h"
 #ifdef __cplusplus
@@ -81,7 +82,7 @@ class HarmonicOscillator
         {
             phase_ -= 1.0f;
         }
-        const float two_x = 2.0f * sinf(phase_ * TWOPI_F);
+        const float two_x = 2.0f * FastSin2Pi(phase_); // modsynth: sinf ~260 cycles
         float       previous, current;
         if(first_harmonic_index_ == 1)
         {
@@ -91,11 +92,12 @@ class HarmonicOscillator
         else
         {
             const float k = first_harmonic_index_;
-            previous      = sinf((phase_ * (k - 1.0f) + 0.25f) * TWOPI_F);
-            current       = sinf((phase_ * k) * TWOPI_F);
+            previous      = FastSin2Pi(phase_ * (k - 1.0f) + 0.25f); // modsynth
+            current       = FastSin2Pi(phase_ * k);
         }
 
         float sum = 0.0f;
+#pragma GCC unroll 16 // modsynth: unrolled, same arithmetic
         for(int i = 0; i < num_harmonics; ++i)
         {
             sum += amplitude_[i] * current;

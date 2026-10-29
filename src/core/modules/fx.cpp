@@ -120,7 +120,7 @@ Module* create() {
 const ModuleTypeInfo kRevType = {
     "rev", "REV", "Plate reverb", Category::Effect, Icon::Rev, Drawing::None,
     5, rev::kParams, 1, kInOnly, kInLbl, 2, rev::kOutKeys, rev::kOutLabels,
-    1790, sizeof(rev::Rev) + 2 * kBlock * sizeof(float), kDelaySlots, rev::create, nullptr, 0, 1};
+    1920, sizeof(rev::Rev) + 2 * kBlock * sizeof(float), kDelaySlots, rev::create, nullptr, 0, 1};
 
 // ---------------------------------------------------------------- CHO
 // Mono chorus: two taps of a 25 ms line swept in opposite phase.

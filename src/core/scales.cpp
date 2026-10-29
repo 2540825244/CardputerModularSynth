@@ -43,11 +43,12 @@ int scaleDegree(int s, int k) {
 float quantize(float volts, int scale, int root) {
     const unsigned m = scaleMask(scale);
     const float semi = volts * 12.f - (float)root;
-    const int base = (int)floorf(semi);
+    int base = (int)semi;  // floorf without the libm call (|semi| is small: volts are clamped)
+    if ((float)base > semi) base--;
     int best = base;
     float bestD = 1e9f;
-    for (int c = base - 6; c <= base + 7; c++) {
-        const int pc = ((c % 12) + 12) % 12;
+    int pc = ((base - 6) % 12 + 12) % 12;  // pitch class of c, stepped along instead of two %
+    for (int c = base - 6; c <= base + 7; c++, pc = pc == 11 ? 0 : pc + 1) {
         if (!((m >> pc) & 1)) continue;
         const float d = fabsf((float)c - semi);
         if (d < bestD - 1e-6f || (fabsf(d - bestD) < 1e-6f && c > best)) {

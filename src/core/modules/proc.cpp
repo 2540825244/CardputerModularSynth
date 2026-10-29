@@ -51,7 +51,9 @@ class Lad : public Module {
             hz = hzClamp(voltsToHz(slew_.process(base) + at(cut, i)), 20.f, 18000.f);
             f_.SetFreq(hz);
             f_.SetRes(clampf(param(kRes) + at(rcv, i) * 0.2f, 0.f, 1.f) * 1.8f);
-            for (int j = i; j < i + 8; j++) o[j] = f_.Process(in ? in[j] * 0.2f : 0.f) * kAudioVolts;
+            for (int j = i; j < i + 8; j++) o[j] = in ? in[j] * 0.2f : 0.f;
+            f_.ProcessBlock(o + i, 8);  // the state stays in registers over the 8 samples
+            for (int j = i; j < i + 8; j++) o[j] *= kAudioVolts;
         }
         setMonitor(0, hz);
     }
@@ -67,7 +69,7 @@ Module* create() { return new Lad(); }
 const ModuleTypeInfo kLadType = {
     "lad", "LAD", "Ladder filter 24/12 dB, 6 modes", Category::Processor, Icon::Vcf, Drawing::None,
     4, lad::kParams, 3, lad::kInKeys, lad::kInLabels, 1, kOutOnly, kOutLbl,
-    810, sizeof(lad::Lad) + kBlock * sizeof(float), 0, lad::create};
+    790, sizeof(lad::Lad) + kBlock * sizeof(float), 0, lad::create};
 
 // ---------------------------------------------------------------- FLD
 namespace fld {

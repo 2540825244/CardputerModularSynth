@@ -362,7 +362,7 @@ Module* create() { return new Qnt(); }
 const ModuleTypeInfo kQntType = {
     "qnt", "QNT", "Quantizer to a scale", Category::Utility, Icon::Quant, Drawing::None,
     3, qnt::kParams, 1, kInOnly, kInLbl, 2, qnt::kOutKeys, qnt::kOutLabels,
-    750, sizeof(qnt::Qnt) + 2 * kBlock * sizeof(float), 0, qnt::create};
+    630, sizeof(qnt::Qnt) + 2 * kBlock * sizeof(float), 0, qnt::create};
 
 // ---------------------------------------------------------------- TUR
 // Turing machine: a LEN-bit loop; on each clock the last bit comes back to the front, flipped with

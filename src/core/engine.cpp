@@ -1,3 +1,4 @@
+#include "modsynth_iram.h"
 #include "engine.h"
 #include <cmath>
 #include "delay_pool.h"
@@ -244,7 +245,7 @@ void Engine::collect() {
     if (any) publish(++gen_);
 }
 
-void Engine::processBlock(float* mono) {
+MODSYNTH_IRAM void Engine::processBlock(float* mono) {
     for (int i = 0; i < kBlock; i++) mono[i] = 0.f;
     if (Program* p = pending_.exchange(nullptr, std::memory_order_acq_rel)) {
         cur_ = p;
@@ -277,19 +278,15 @@ void Engine::processBlock(float* mono) {
         }
         m->process(ins, conn);
         const int numOuts = m->type().numOuts;
-        if (numOuts > 0) {
+        if (numOuts > 0) {  // the peak is out 0's
             float* o = m->out(0);
-            float pk = 0.f;
-            for (int k = 0; k < numOuts * kBlock; k++) o[k] = sanitize(o[k]);
-            for (int k = 0; k < kBlock; k++) pk = fabsf(o[k]) > pk ? fabsf(o[k]) : pk;
-            m->setPeak(pk);
+            m->setPeak(sanitizeBlock(o, kBlock));
+            if (numOuts > 1) sanitizeBlock(o + kBlock, (numOuts - 1) * kBlock);
         }
         if (const float* mo = m->masterOut())
             for (int k = 0; k < kBlock; k++) mono[k] += mo[k];
         if (cycles_) m->addCycles(cycles_() - t0);
     }
-    for (int k = 0; k < kBlock; k++) {
-        const float v = sanitize(mono[k]);
-        mono[k] = v > 1.f ? 1.f : (v < -1.f ? -1.f : v);
-    }
+    sanitizeBlock(mono, kBlock);
+    for (int k = 0; k < kBlock; k++) mono[k] = mono[k] > 1.f ? 1.f : (mono[k] < -1.f ? -1.f : mono[k]);
 }

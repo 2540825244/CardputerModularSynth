@@ -54,6 +54,18 @@ class Ladder {
         }
     }
 
+    // Process() over n samples in place, the state in registers across them; bit-identical.
+    void ProcessBlock(float* io, int n) {
+        switch (mode_) {
+            case LP24: runBlock<LP24>(io, n); break;
+            case LP12: runBlock<LP12>(io, n); break;
+            case BP24: runBlock<BP24>(io, n); break;
+            case BP12: runBlock<BP12>(io, n); break;
+            case HP24: runBlock<HP24>(io, n); break;
+            default: runBlock<HP12>(io, n); break;
+        }
+    }
+
    private:
     static constexpr int kOs = 4;
 
@@ -78,13 +90,36 @@ class Ladder {
 
     template <int M>
     float run(float in) {
-        const float input = in * driveScaled_;
-        const float kq = k_ * qAdjust_, a = alpha_, pbg = pbg_;
         float a0 = z0_[0], a1 = z0_[1], a2 = z0_[2], a3 = z0_[3];
         float b0 = z1_[0], b1 = z1_[1], b2 = z1_[2], b3 = z1_[3];
+        float old = old_;
+        const float total = step<M>(in, old, a0, a1, a2, a3, b0, b1, b2, b3);
+        z0_[0] = a0, z0_[1] = a1, z0_[2] = a2, z0_[3] = a3;
+        z1_[0] = b0, z1_[1] = b1, z1_[2] = b2, z1_[3] = b3;
+        old_ = old;
+        return total;
+    }
+
+    template <int M>
+    void runBlock(float* io, int n) {
+        float a0 = z0_[0], a1 = z0_[1], a2 = z0_[2], a3 = z0_[3];
+        float b0 = z1_[0], b1 = z1_[1], b2 = z1_[2], b3 = z1_[3];
+        float old = old_;
+        for (int i = 0; i < n; i++) io[i] = step<M>(io[i], old, a0, a1, a2, a3, b0, b1, b2, b3);
+        z0_[0] = a0, z0_[1] = a1, z0_[2] = a2, z0_[3] = a3;
+        z1_[0] = b0, z1_[1] = b1, z1_[2] = b2, z1_[3] = b3;
+        old_ = old;
+    }
+
+    // One sample: 4x oversampled stages; the state passes by reference so it can stay in registers.
+    template <int M>
+    __attribute__((always_inline)) inline float step(float in, float& old, float& a0, float& a1, float& a2,
+                                                     float& a3, float& b0, float& b1, float& b2, float& b3) {
+        const float input = in * driveScaled_;
+        const float kq = k_ * qAdjust_, a = alpha_, pbg = pbg_;
         float total = 0.f, interp = 0.f;
         for (int os = 0; os < kOs; os++) {
-            const float x = interp * old_ + (1.f - interp) * input;
+            const float x = interp * old + (1.f - interp) * input;
             const float u = tanhApprox(x - (b3 - pbg * x) * kq);
             // stage: ft = s * (1 / 1.3) + (0.3 / 1.3) * z0 - z1; ft = ft * alpha + z1
             float f = (u * 0.76923077f + 0.23076923f * a0 - b0) * a + b0;
@@ -105,9 +140,7 @@ class Ladder {
             total += mix<M>(u, s1, s2, s3, f) * (1.f / kOs);
             interp += 1.f / kOs;
         }
-        z0_[0] = a0, z0_[1] = a1, z0_[2] = a2, z0_[3] = a3;
-        z1_[0] = b0, z1_[1] = b1, z1_[2] = b2, z1_[3] = b3;
-        old_ = input;
+        old = input;
         return total;
     }
 

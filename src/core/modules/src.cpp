@@ -610,7 +610,7 @@ Module* create() { return new Vos(); }
 const ModuleTypeInfo kVosType = {
     "vos", "VOS", "VOSIM: two formants", Category::Source, Icon::Osc, Drawing::None,
     5, vos::kParams, 2, vos::kInKeys, vos::kInLabels, 1, kOutOnly, kOutLbl,
-    850, sizeof(vos::Vos) + kBlock * sizeof(float), 0, vos::create};
+    1030, sizeof(vos::Vos) + kBlock * sizeof(float), 0, vos::create};
 
 // ---------------------------------------------------------------- ZOS
 namespace zos {
@@ -700,4 +700,4 @@ Module* create() { return new Hrm(); }
 const ModuleTypeInfo kHrmType = {
     "hrm", "HRM", "Additive, 16 harmonics", Category::Source, Icon::Osc, Drawing::None,
     5, hrm::kParams, 2, hrm::kInKeys, hrm::kInLabels, 1, kOutOnly, kOutLbl,
-    790, sizeof(hrm::Hrm) + kBlock * sizeof(float), 0, hrm::create};
+    660, sizeof(hrm::Hrm) + kBlock * sizeof(float), 0, hrm::create};
