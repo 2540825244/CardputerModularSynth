@@ -4,6 +4,7 @@
 #include "modules/fx.h"
 #include "modules/proc.h"
 #include "modules/src.h"
+#include "modules/kit.h"
 #include "modules/mod.h"
 #include "modules/grd.h"
 #include "modules/dmx.h"
@@ -79,6 +80,7 @@ static const ModuleTypeInfo* const kTypes[] = {
     &kRndType,
     &kSeqType,
     &kTrgType,
+    &kKitType,
     &kEucType,
     &kTurType,
     &kChsType,

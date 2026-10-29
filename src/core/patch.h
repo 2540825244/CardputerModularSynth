@@ -61,6 +61,6 @@ class Patch {
 };
 
 static_assert(std::is_trivially_copyable<Patch>::value, "undo snapshots Patch with =");
-// ~5.4 KB on the device (4-byte pointers; 22 params, 9 inputs for the GRD voice; the bypass byte
-// pads each record by 4); 64-bit hosts pad each record to 160 B.
-static_assert(sizeof(Patch) <= (sizeof(void*) == 4 ? 5376 + 128 : 5760), "Patch snapshot size budget");
+// ~6 KB on the device (4-byte pointers; 22 params, 9 inputs for the GRD voice, 9 outputs for the
+// KIT; the bypass byte pads each record by 4); 64-bit hosts pad each record to 176 B.
+static_assert(sizeof(Patch) <= (sizeof(void*) == 4 ? 6016 + 128 : 6272), "Patch snapshot size budget");

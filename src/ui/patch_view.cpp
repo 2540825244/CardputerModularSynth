@@ -122,12 +122,16 @@ void sideKey(UiController& ui, const KeyEvent& e) {
     UiState& s = ui.mut();
     const bool down = e.type == KeyEvent::Down;
     if (e.side == Side::Space) {
-        // The release is handled by UiController::handle, whatever view is active by then.
-        if (down && s.latchedBit < 0)  // a latched drone keeps playing: no audition over it
-            if (KeysModule* k = ui.keysInstance()) {
-                k->noteOn(ui.lastNote);
-                ui.auditioning = true;
-            }
+        // The release is handled by UiController::handle, whatever view is active by then. KEYS
+        // auditions; without one, a KIT runs a pass.
+        if (!down) return;
+        KeysModule* k = ui.keysInstance();
+        if (k && s.latchedBit < 0) {  // a latched drone keeps playing: no audition over it
+            k->noteOn(ui.lastNote);
+            ui.auditioning = true;
+        } else if (!k) {
+            if (KitModule* kit = ui.kitInstance()) kit->start();
+        }
         return;
     }
     if (!down) return;

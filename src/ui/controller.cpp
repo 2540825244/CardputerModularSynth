@@ -112,6 +112,13 @@ KeysModule* UiController::keysInstance() {
     return nullptr;
 }
 
+KitModule* UiController::kitInstance() {
+    for (int i = 0; i < patch_.moduleCount(); i++)
+        if (patch_.moduleAt(i).type == &kKitType)
+            return static_cast<KitModule*>(engine_.instance(patch_.moduleAt(i).id));
+    return nullptr;
+}
+
 void UiController::releaseAudition() {
     auditioning = false;
     if (KeysModule* k = keysInstance()) k->gateOff();

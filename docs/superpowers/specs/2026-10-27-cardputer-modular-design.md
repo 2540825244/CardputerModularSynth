@@ -356,6 +356,20 @@ just map keys to virtual midi/oct/gate/etc out".
   - **adding a module that won't fit is refused** with a clear message
 - **No allocation on the audio thread.** Delay buffers come from a pool (one static slot, one heap
   slot taken on the UI thread when a second DLY/REV is placed).
+- **KIT, demand-driven activation** (v1.3 **[owner: "demand driven module activation"]**, details
+  **[Claude's call]**): the KIT module (MOD page, max 1) plays a drum kit into the PO-33 in one take:
+  8 trigger lanes (T1..T8) plus an ACC lane over up to 12 steps (one per key column; stacked hits =
+  several lanes on a step), a step every GAP (150-1500 ms) or each CLK rise, one pass or a loop.
+  ACC out = ACC x 5 V during accented steps. A pass starts on a RUN rise, enter on a non-editable
+  cell of the KIT view, or PLAY in the patch view when there is no KEYS (KEYS keeps PLAY).
+  - A module whose every connected input traces back to one lane (the KIT's T-out, or modules
+    already in that lane) is in that lane's group; ACC, self-cables and sources without an instance
+    don't count. KIT and OUT never join; cycles stay always-on.
+  - A group runs from its trigger until its outputs leaving the group stay under 5 mV (-60 dB of
+    5 V) for 50 ms, or the next step starts (then it fades out over 2.7 ms). Idle groups output 0
+    and cost 0.
+  - CPU guard: always-on modules + the costliest set of groups one step fires; the live check adds
+    that worst step to the measured load.
 
 ## 11. Patch storage **[owner: SD; format details proposed]**
 

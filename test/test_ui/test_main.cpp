@@ -3,6 +3,7 @@
 #include <map>
 #include "core/modules/env.h"
 #include "core/modules/keys.h"
+#include "core/modules/kit.h"
 #include "core/modules/lfo.h"
 #include "core/modules/osc.h"
 #include "core/modules/out.h"
@@ -2003,6 +2004,54 @@ void test_copy_at_module_limit_no_undo_step() {
     TEST_ASSERT_EQUAL_STRING("TOO MANY", f.ui.state().toast);
 }
 
+// ---- v1.3: KIT passes start from the UI ----
+static bool kitRuns(Fx& f, uint16_t id) {
+    float buf[kBlock];
+    f.eng.processBlock(buf);  // the request is taken at the next block
+    return static_cast<KitModule*>(f.eng.instance(id))->running();
+}
+
+void test_kit_play_key_starts_pass() {
+    Fx f;
+    f.place(registryIndex(kKitType), 0, 0);
+    const uint16_t id = gPatch.findAt(0, 0)->id;
+    TEST_ASSERT_FALSE(kitRuns(f, id));
+    TEST_ASSERT_TRUE(icons(f).shown[(int)Side::Space]);
+    TEST_ASSERT_EQUAL_STRING("PLAY", icons(f).name[(int)Side::Space]);
+    f.side(Side::Space);
+    TEST_ASSERT_TRUE(kitRuns(f, id));
+}
+
+void test_kit_play_key_keys_first() {
+    Fx f;
+    f.place(registryIndex(kKitType), 0, 0);
+    f.place(TKeys, 1, 0);
+    const uint16_t id = gPatch.findAt(0, 0)->id;
+    f.sideDown(Side::Space);  // KEYS auditions; the KIT stays put
+    TEST_ASSERT_FALSE(kitRuns(f, id));
+    TEST_ASSERT_EQUAL_FLOAT(1.f, f.eng.instance(gPatch.findAt(0, 1)->id)->monitor(1));
+    f.sideUp(Side::Space);
+}
+
+void test_kit_enter_starts_pass() {
+    Fx f;
+    const ModuleRec* m = placeAndOpen(f, registryIndex(kKitType));
+    const uint16_t id = m->id;
+    TEST_ASSERT_EQUAL_STRING("T1-3", modulePageName(kKitType, 0));
+    // a step cell: enter toggles the step, no pass
+    f.tap(0, 1);
+    f.side(Side::Enter);
+    TEST_ASSERT_FALSE(kitRuns(f, id));
+    TEST_ASSERT_EQUAL_FLOAT(0.f, gPatch.find(id)->params[kit::kL1]);  // step 1 of T1 was on
+    // SET page, an empty cell: enter runs a pass
+    for (int i = 0; i < 3; i++) f.side(Side::Tab);
+    TEST_ASSERT_EQUAL_STRING("SET", modulePageName(kKitType, f.ui.state().modPage));
+    f.tap(8, 1);
+    TEST_ASSERT_EQUAL_STRING("RUN", icons(f).name[(int)Side::Enter]);
+    f.side(Side::Enter);
+    TEST_ASSERT_TRUE(kitRuns(f, id));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -2019,6 +2068,9 @@ int main() {
     RUN_TEST(test_move_cancel_by_esc);
     RUN_TEST(test_paging);
     RUN_TEST(test_audition);
+    RUN_TEST(test_kit_play_key_starts_pass);
+    RUN_TEST(test_kit_play_key_keys_first);
+    RUN_TEST(test_kit_enter_starts_pass);
     RUN_TEST(test_toast_expiry);
     RUN_TEST(test_edit_coalescing_breaks);
     RUN_TEST(test_layout_vcf);

@@ -8,6 +8,11 @@
 #include "core/modules/env.h"
 #include "core/modules/grd.h"
 #include "core/modules/keys.h"
+#include "core/modules/kit.h"
+#include "core/modules/lfo.h"
+#include "core/modules/mix.h"
+#include "core/modules/src.h"
+#include "core/kit_groups.h"
 #include "core/modules/osc.h"
 #include "core/modules/out.h"
 #include "core/modules/vca.h"
@@ -648,6 +653,215 @@ void test_bypass_out_silent_and_free() {
     TEST_ASSERT_EQUAL(0, eng.estimatedCycles());
 }
 
+
+// ---- KIT: demand-driven activation ----
+// Burst: on a rising input 0, outputs 1 V for gBurstLen samples (forever when < 0); counts its
+// process() calls. Heavy: a 1-input passthrough with a big estimated cost.
+static int gBurstLen = 480;
+static int gBurstCalls = 0;
+class Burst : public Module {
+   public:
+    Burst();
+    void process(const float* const* ins, const bool* c) override {
+        gBurstCalls++;
+        for (int i = 0; i < kBlock; i++) {
+            if (gd_.process(c[0] ? ins[0][i] : 0.f) && gd_.rose) left_ = gBurstLen < 0 ? INT32_MAX : gBurstLen;
+            out(0)[i] = left_ > 0 ? 1.f : 0.f;
+            if (left_ > 0 && left_ != INT32_MAX) left_--;
+        }
+    }
+    GateDetector gd_;
+    int left_ = 0;
+};
+static Module* createBurst() { return new Burst(); }
+const ModuleTypeInfo kBurstType = {"tburst", "TST", "test", Category::Source, Icon::Osc, Drawing::None,
+                                   0, nullptr, 1, kTIn, kTIn, 1, kTOut, kTOut, 10, 100, 0, createBurst};
+Burst::Burst() : Module(kBurstType) {}
+extern const ModuleTypeInfo kHeavyType;
+class Heavy : public Module {
+   public:
+    Heavy() : Module(kHeavyType) {}
+    void process(const float* const* ins, const bool* c) override {
+        for (int i = 0; i < kBlock; i++) out(0)[i] = c[0] ? ins[0][i] : 0.f;
+    }
+};
+static Module* createHeavy() { return new Heavy(); }
+const ModuleTypeInfo kHeavyType = {"theavy", "TST", "test", Category::Source, Icon::Osc, Drawing::None,
+                                   0, nullptr, 1, kTIn, kTIn, 1, kTOut, kTOut, 1500, 100, 0, createHeavy};
+
+void test_kit_groups() {
+    Patch p;
+    const uint16_t kit = add(p, kKitType, 0), a = add(p, kCountedType, 1), b = add(p, kCountedType, 2),
+                   mix = add(p, kMixType, 3), out = add(p, kOutType, 4), lfo = add(p, kLfoType, 5),
+                   both = add(p, kCountedType, 6), accd = add(p, kKckType, 7), c1 = add(p, kCountedType, 8),
+                   c2 = add(p, kCountedType, 9), lone = add(p, kCountedType, 10), direct = add(p, kCountedType, 11);
+    wire(p, kit, 0, a, 0);           // a: T1
+    wire(p, a, 0, b, 0);             // b: fed only by a -> T1
+    wire(p, kit, 1, mix, 0);         // mix: T2 and b -> shared
+    wire(p, b, 0, mix, 1);
+    wire(p, mix, 0, out, 0);
+    wire(p, kit, 2, both, 0);        // both: T3 and the LFO -> shared
+    wire(p, lfo, 0, both, 0);
+    wire(p, kit, 3, accd, 0);        // accd: T4 and the KIT's ACC (neutral) -> T4
+    wire(p, kit, kit::kAccOut, accd, 1);
+    wire(p, kit, 4, c1, 0);          // c1 <-> c2, both from T5: a cycle stays always-on
+    wire(p, c2, 0, c1, 0);
+    wire(p, c1, 0, c2, 0);
+    wire(p, kit, 5, direct, 0);      // direct: T6 and a self-cable -> T6
+    wire(p, direct, 0, direct, 0);
+    wire(p, a, 0, out, 0);           // OUT: never grouped
+    (void)lone;                      // lone: no inputs -> always-on
+    uint8_t g[kMaxModules];
+    TEST_ASSERT_EQUAL(0, kitGroups(p, g));
+    auto grp = [&](uint16_t id) {
+        for (int i = 0; i < p.moduleCount(); i++)
+            if (p.moduleAt(i).id == id) return (int)g[i];
+        return -2;
+    };
+    TEST_ASSERT_EQUAL(kNoGroup, grp(kit));
+    TEST_ASSERT_EQUAL(0, grp(a));
+    TEST_ASSERT_EQUAL(0, grp(b));
+    TEST_ASSERT_EQUAL(kNoGroup, grp(mix));
+    TEST_ASSERT_EQUAL(kNoGroup, grp(out));
+    TEST_ASSERT_EQUAL(kNoGroup, grp(lfo));
+    TEST_ASSERT_EQUAL(kNoGroup, grp(both));
+    TEST_ASSERT_EQUAL(3, grp(accd));
+    TEST_ASSERT_EQUAL(kNoGroup, grp(c1));
+    TEST_ASSERT_EQUAL(kNoGroup, grp(c2));
+    TEST_ASSERT_EQUAL(kNoGroup, grp(lone));
+    TEST_ASSERT_EQUAL(5, grp(direct));
+    // a source without an instance is ignored: with the LFO missing, `both` is T3's
+    bool present[kMaxModules];
+    for (int i = 0; i < p.moduleCount(); i++) present[i] = p.moduleAt(i).id != lfo;
+    kitGroups(p, g, present);
+    TEST_ASSERT_EQUAL(2, grp(both));
+    // no KIT: nothing is grouped
+    Patch q;
+    add(q, kCountedType, 0);
+    TEST_ASSERT_EQUAL(-1, kitGroups(q, g));
+    TEST_ASSERT_EQUAL(kNoGroup, g[0]);
+}
+
+// KIT T1 -> burst A -> OUT, T2 -> burst B -> OUT. A group runs only from its trigger until 50 ms
+// of quiet or the next step.
+void test_kit_demand_activation() {
+    Patch p;
+    const uint16_t kit = add(p, kKitType, 0), a = add(p, kBurstType, 1), out = add(p, kOutType, 2);
+    wire(p, kit, 0, a, 0);
+    wire(p, a, 0, out, 0);
+    p.find(kit)->params[kit::kLen] = 2.f;
+    p.find(kit)->params[kit::kGap] = 500.f;  // 24000 samples, 750 blocks
+    Engine eng(bigHeap);
+    TEST_ASSERT_EQUAL(0, eng.apply(p));
+    gBurstLen = 480;  // 10 ms
+    gBurstCalls = 0;
+    run(eng, 100);
+    TEST_ASSERT_EQUAL(0, gBurstCalls);  // KIT idle: the group costs nothing
+    static_cast<KitModule*>(eng.instance(kit))->start();
+    run(eng, 1);
+    TEST_ASSERT_EQUAL(1, gBurstCalls);  // the trigger's block runs it
+    TEST_ASSERT_EQUAL_FLOAT(1.f, eng.instance(a)->out(0)[0]);
+    // 10 ms of sound, then 50 ms of quiet: off at about 60 ms (2880 samples = 90 blocks)
+    run(eng, 200);
+    TEST_ASSERT_TRUE(gBurstCalls >= 89 && gBurstCalls <= 92);
+    for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(0.f, eng.instance(a)->out(0)[i]);
+    // a sound that never stops is cut at the next step (block 750), and its outputs read 0
+    gBurstLen = -1;
+    gBurstCalls = 0;
+    static_cast<KitModule*>(eng.instance(kit))->start();
+    run(eng, 750);  // the next step starts in block 750
+    TEST_ASSERT_EQUAL_FLOAT(1.f, eng.instance(a)->out(0)[kBlock - 1]);
+    // the cut fades out over 4 blocks (no click), then the group stops; the 4th block ramps to 0
+    // too, but its buffer is zeroed once it has been read
+    float last = 1.f;
+    for (int b = 0; b < 3; b++) {
+        run(eng, 1);
+        const float* o = eng.instance(a)->out(0);
+        for (int i = 0; i < kBlock; i++) {
+            TEST_ASSERT_TRUE(o[i] <= last + 1e-6f);
+            TEST_ASSERT_TRUE(last - o[i] < 0.02f);  // a ramp, not a step
+            last = o[i];
+        }
+    }
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.25f, last);
+    run(eng, 8);
+    TEST_ASSERT_EQUAL(754, gBurstCalls);
+    for (int i = 0; i < kBlock; i++) TEST_ASSERT_EQUAL_FLOAT(0.f, eng.instance(a)->out(0)[i]);
+    // the pass is over: nothing restarts it
+    const int calls = gBurstCalls;
+    run(eng, 800);
+    TEST_ASSERT_EQUAL(calls, gBurstCalls);
+    gBurstLen = 480;
+}
+
+// The guard: always-on modules + the worst single step's groups, not every group.
+void test_kit_cpu_guard() {
+    Patch p;
+    const uint16_t kit = add(p, kKitType, 0), out = add(p, kOutType, 1), mix = add(p, kMixType, 2);
+    uint16_t h[3];
+    for (int i = 0; i < 3; i++) {
+        h[i] = add(p, kHeavyType, 3 + i);
+        wire(p, kit, i, h[i], 0);  // default lanes: T1 plays step 1, T2 step 2, T3 step 3
+        wire(p, h[i], 0, mix, i);
+    }
+    wire(p, mix, 0, out, 0);
+    Engine eng(bigHeap);
+    eng.apply(p);
+    const uint32_t base = kKitType.cpuCycles + kOutType.cpuCycles + kMixType.cpuCycles;
+    TEST_ASSERT_EQUAL_UINT32(base + 1500, eng.estimatedCycles());
+    TEST_ASSERT_TRUE(eng.canAdd(p, kHeavyType).ok);  // an unpatched one runs always: base + 3000
+    // stacked: step 1 fires T1, T2 and T3 at once
+    p.find(kit)->params[kit::kL1 + 1] = (float)0b011;
+    p.find(kit)->params[kit::kL1 + 2] = (float)0b101;
+    eng.apply(p);
+    TEST_ASSERT_EQUAL_UINT32(base + 4500, eng.estimatedCycles());
+    TEST_ASSERT_FALSE(eng.canAdd(p, kHeavyType).ok);
+    // the live check adds the worst step to the measured load (an idle KIT measures nothing)
+    eng.setCpuLoad(0.1f);  // 500 cycles
+    TEST_ASSERT_FALSE(eng.canAddLive(p, kCountedType).ok);
+    p.find(kit)->params[kit::kL1 + 1] = (float)0b010;
+    p.find(kit)->params[kit::kL1 + 2] = (float)0b100;
+    TEST_ASSERT_TRUE(eng.canAddLive(p, kCountedType).ok);
+    // a bypassed KIT fires nothing: its groups cost nothing
+    p.setBypass(kit, true);
+    eng.apply(p);
+    TEST_ASSERT_EQUAL_UINT32(kOutType.cpuCycles + kMixType.cpuCycles, eng.estimatedCycles());
+}
+
+// A 3-drum kit of heavy voices: over budget summed, under it grouped; and it plays.
+void test_kit_three_drum_kit() {
+    Patch p;
+    const uint16_t kit = add(p, kKitType, 0), mix = add(p, kMixType, 1), out = add(p, kOutType, 2);
+    const ModuleTypeInfo* voices[] = {&kMdlType, &kResType, &kStrType, &kKckType, &kSnrType, &kHatType};
+    uint32_t sum = 0, worst = 0;
+    for (int i = 0; i < 6; i++) {
+        const uint16_t v = add(p, *voices[i], 3 + i);
+        wire(p, kit, i, v, 0);
+        wire(p, v, 0, mix, i % 4);
+        sum += voices[i]->cpuCycles;
+        worst = voices[i]->cpuCycles > worst ? voices[i]->cpuCycles : worst;
+    }
+    wire(p, mix, 0, out, 0);
+    p.find(kit)->params[kit::kLen] = 6.f;
+    p.find(kit)->params[kit::kGap] = 150.f;
+    Engine eng(bigHeap);
+    TEST_ASSERT_EQUAL(0, eng.apply(p));
+    const uint32_t base = kKitType.cpuCycles + kMixType.cpuCycles + kOutType.cpuCycles;
+    TEST_ASSERT_EQUAL_UINT32(base + worst, eng.estimatedCycles());
+    TEST_ASSERT_TRUE(base + worst <= kCpuBudget);
+    TEST_ASSERT_TRUE(base + sum > kCpuBudget);  // summed, the guard would refuse it
+    static_cast<KitModule*>(eng.instance(kit))->start();
+    const int stepBlocks = 7200 / kBlock;
+    for (int s = 0; s < 6; s++) TEST_ASSERT_TRUE_MESSAGE(run(eng, stepBlocks) > 0.001, voices[s]->id);
+    // pass over: every voice idle at 0; OUT only has its DC blocker settling (SNR's DC offset)
+    run(eng, 4);
+    for (int i = 0; i < 6; i++) {
+        const Module* v = eng.instance(p.moduleAt(3 + i).id);
+        for (int k = 0; k < kBlock; k++) TEST_ASSERT_EQUAL_FLOAT_MESSAGE(0.f, const_cast<Module*>(v)->out(0)[k], voices[i]->id);
+    }
+    TEST_ASSERT_TRUE(run(eng, 100) < 0.003);  // -50 dBFS
+}
+
 // KEYS bypassed still gets its real instance; stubs need heap above half the reserve; collect()
 // retries a bypassed record as a stub, never the real module.
 void test_bypass_stub_rules() {
@@ -697,6 +911,10 @@ int main() {
     RUN_TEST(test_bypass_passes_effect);
     RUN_TEST(test_bypassed_module_not_created);
     RUN_TEST(test_bypass_stub_rules);
+    RUN_TEST(test_kit_groups);
+    RUN_TEST(test_kit_demand_activation);
+    RUN_TEST(test_kit_cpu_guard);
+    RUN_TEST(test_kit_three_drum_kit);
     RUN_TEST(test_bypass_zeroes_others);
     RUN_TEST(test_bypass_out_silent_and_free);
     RUN_TEST(test_bypass_pass_types);

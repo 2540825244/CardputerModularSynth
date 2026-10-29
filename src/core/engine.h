@@ -62,6 +62,10 @@ class Engine {
     void setCpuLoad(float l) { cpuLoad_.store(l, std::memory_order_relaxed); }
     float cpuLoad() const { return cpuLoad_.load(std::memory_order_relaxed); }
     uint32_t estimatedCycles() const;  // the running patch, from costOf()
+    // CPU of p from costOf(): its always-on modules, plus the groups the KIT's worst step fires at
+    // once (kit_groups.h). kitWorst is that second part alone.
+    uint32_t patchCycles(const Patch& p) const;
+    uint32_t kitWorst(const Patch& p) const;
 
    private:
     struct Inst {
@@ -114,6 +118,16 @@ class Engine {
     std::atomic<uint32_t> seen_{0};
     std::atomic<float> cpuLoad_{0.f};
     // audio-thread state
+    struct Lane {  // a KIT lane's group: running, and how long its boundary outputs were quiet
+        bool on;
+        uint8_t fade;    // blocks left of the fade-out after its step ended (0: none)
+        uint32_t quiet;  // samples
+        float peak;      // this block
+    };
+    void startProgram(const Program*);
+    void laneOff(const Program*, int lane);
+    void kitEvents(uint32_t events);
+    Lane lanes_[8] = {};
     Program* cur_ = nullptr;
     float scratch_[kMaxIns][kBlock];
 };

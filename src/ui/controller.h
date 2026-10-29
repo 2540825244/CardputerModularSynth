@@ -3,6 +3,7 @@
 #include <cstdint>
 #include "core/engine.h"
 #include "core/modules/keys.h"
+#include "core/modules/kit.h"
 #include "core/note_stack.h"
 #include "core/patch.h"
 #include "core/storage.h"
@@ -50,6 +51,7 @@ class UiController {
     bool ctrlHeld() const { return dec_ ? dec_->sideHeld(Side::Ctrl) : ctrl_; }
     uint32_t now() const { return now_; }
     KeysModule* keysInstance();  // the KEYS instance, or nullptr
+    KitModule* kitInstance();    // the KIT instance, or nullptr
     void releaseAudition();
     // Load a patch file into the live patch. keepUndo pushes undo first and marks dirty; the boot
     // load does neither. Returns the toast text ("LOADED", "SKIPPED n", or the error) via msg.

@@ -5,7 +5,7 @@
 #include "units.h"
 
 enum class Category : uint8_t { Source, Modulator, Processor, Effect, Utility };  // place-menu page, bar colour
-enum class Icon : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, Mix, Atn, Snh, Clk, Mux, Dmx, Tilt, Rev, Fx, Psh, Fold, Drive, Crush, Ring, Noise, Drum, Hat, String, Bell, Seq, Steps, Euclid, Quant, Logic, Dice, Chaos, Knob, Scope, Grind, Slew, Lpg, Fm, Saw };
+enum class Icon : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, Mix, Atn, Snh, Clk, Mux, Dmx, Tilt, Rev, Fx, Psh, Fold, Drive, Crush, Ring, Noise, Drum, Hat, String, Bell, Seq, Steps, Euclid, Quant, Logic, Dice, Chaos, Knob, Scope, Grind, Slew, Lpg, Fm, Saw, Kit };
 // Module-view drawings. FilterCurve/Envelope/Scope cover the Drawing cells; Playhead marks the
 // column of the playing step (monitor(0)) on a sequencer page.
 enum class Drawing : uint8_t { None, FilterCurve, Envelope, Scope, Playhead };

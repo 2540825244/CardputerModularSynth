@@ -3,7 +3,7 @@
 
 // 12x12 1-bit icons, one uint16_t per row, bit 11 = leftmost pixel. Hand-drawn from the SVGs in
 // docs/design/mockups.html.
-enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Tilt, Mix, Atn, Snh, Clk, Mux, Dmx, Cancel, Copy, Redo, Open, Latch, Layout, Help, MRev, MFx, MPsh, MFold, MDrive, MCrush, MRing, MNoise, MDrum, MHat, MString, MBell, MSeq, MSteps, MEuclid, MQuant, MLogic, MDice, MChaos, MKnob, MScope, MGrind, MSlew, MLpg, MFm, MSaw, Shift, Bypass, Count };
+enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Tilt, Mix, Atn, Snh, Clk, Mux, Dmx, Cancel, Copy, Redo, Open, Latch, Layout, Help, MRev, MFx, MPsh, MFold, MDrive, MCrush, MRing, MNoise, MDrum, MHat, MString, MBell, MSeq, MSteps, MEuclid, MQuant, MLogic, MDice, MChaos, MKnob, MScope, MGrind, MSlew, MLpg, MFm, MSaw, MKit, Shift, Bypass, Count };
 
 constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Keys
@@ -186,6 +186,9 @@ constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Saw
      0b000000000000, 0b000000000000, 0b000010000100, 0b000110001100, 0b001010010100, 0b010010100100,
      0b100011000100, 0b000010000100, 0b000000000000, 0b000000000000, 0b000000000000, 0b000000000000},
+    {// Kit (two pads over a kick drum)
+     0b000000000000, 0b111000000111, 0b010000000010, 0b000001100000, 0b000110011000, 0b001000000100,
+     0b001000000100, 0b001000000100, 0b001000000100, 0b000110011000, 0b000001100000, 0b000000000000},
     {// Shift (hollow up arrow: fn reverses tab / enter)
      0b000001100000, 0b000010010000, 0b000100001000, 0b001000000100, 0b010000000010, 0b111000000111,
      0b001000000100, 0b001000000100, 0b001000000100, 0b001000000100, 0b001111111100, 0b000000000000},

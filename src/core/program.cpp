@@ -1,4 +1,5 @@
 #include "program.h"
+#include "kit_groups.h"
 
 Program* compileProgram(const Patch& patch, Module* const* instances, uint32_t generation) {
     Program* prog = new Program();
@@ -12,6 +13,10 @@ Program* compileProgram(const Patch& patch, Module* const* instances, uint32_t g
         else
             done[i] = true;  // no instance: skipped, its cables are dropped
     }
+    bool present[kMaxModules];
+    for (int i = 0; i < n; i++) present[i] = instances[i] != nullptr;
+    uint8_t group[kMaxModules];
+    const int kit = kitGroups(patch, group, present);
     auto indexOf = [&](uint16_t id) {
         for (int i = 0; i < n; i++)
             if (patch.moduleAt(i).id == id) return i;
@@ -54,6 +59,14 @@ Program* compileProgram(const Patch& patch, Module* const* instances, uint32_t g
         node.m = instances[pick];
         const ModuleRec& rec = patch.moduleAt(pick);
         node.bypass = !rec.bypass ? Bypass::None : (bypassPasses(*rec.type) ? Bypass::Pass : Bypass::Zero);
+        node.group = group[pick];
+        node.boundary = false;
+        for (int c = 0; c < patch.cableCount() && node.group != kNoGroup; c++) {
+            const CableRec& cb = patch.cableAt(c);
+            const int t = cb.fromId == rec.id ? indexOf(cb.toId) : -1;
+            if (t >= 0 && instances[t] && group[t] != node.group) node.boundary = true;
+        }
+        if (pick == kit) prog->kitNode = prog->numNodes - 1;
         const int numIns = node.bypass == Bypass::None ? rec.type->numIns
                                                        : (node.bypass == Bypass::Pass ? 1 : 0);
         for (int in = 0; in < kMaxIns; in++) {

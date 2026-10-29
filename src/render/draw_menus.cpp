@@ -32,8 +32,8 @@ void drawDetails(const ModuleTypeInfo& t, const Refusal& r, uint32_t cpuUsed, ui
     cv.drawString(t.blurb, x + 25, y + 2);
     char in[24], out[24], line[64];
     joinLabels(in, sizeof in, t.inLabels, t.numIns > 4 ? 4 : t.numIns);
-    joinLabels(out, sizeof out, t.outLabels, t.numOuts);
-    snprintf(line, sizeof line, "IN %s%s  OUT %s", in, t.numIns > 4 ? ".." : "", out);
+    joinLabels(out, sizeof out, t.outLabels, t.numOuts > 4 ? 4 : t.numOuts);
+    snprintf(line, sizeof line, "IN %s%s  OUT %s%s", in, t.numIns > 4 ? ".." : "", out, t.numOuts > 4 ? ".." : "");
     cv.setTextColor(PText);
     cv.drawString(line, x + 3, y + 12);
     if (!r.ok) {

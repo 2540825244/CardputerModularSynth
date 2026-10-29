@@ -105,10 +105,16 @@ const ParamSpec& specOf(const ModuleRec& m, CellRef c) {
 
 namespace {
 
-// Do-it on a cell: a pin carries a cable, a stepped param steps to its next option.
+// Do-it on a cell: a pin carries a cable, a stepped param steps to its next option; on a KIT, any
+// other cell (or none) runs a pass.
 void activate(UiController& ui, const ModuleRec& m, int cell) {
-    if (cell < kGridCols) return;  // the value strip has no do-it
+    if (cell >= 0 && cell < kGridCols) return;  // the value strip has no do-it
     const CellRef c = cellAt(ui.state(), *m.type, cell);
+    if (m.type == &kKitType && (c.kind == CellKind::Empty || c.kind == CellKind::Drawing)) {
+        if (KitModule* k = ui.kitInstance()) k->start();
+        return;
+    }
+    if (cell < 0) return;
     if (c.kind == CellKind::In || c.kind == CellKind::Out) {
         pinAction(ui, m, c.kind == CellKind::Out, c.index);
     } else if (c.kind == CellKind::Param) {

@@ -3,9 +3,11 @@
 #include <cmath>
 #include <new>
 #include "delay_pool.h"
+#include "kit_groups.h"
 #include "dsp_util.h"
 #include "modules/dly.h"
 #include "modules/keys.h"
+#include "modules/kit.h"
 
 namespace {
 // A module created while bypassed: its out buffers (zero, or input 0 on output 0) and params,
@@ -25,6 +27,8 @@ Module* Engine::makeStub(const ModuleTypeInfo& t) const {
 }
 
 bool Engine::stubbed(const ModuleRec& r) { return r.bypass && r.type != &kKeysType; }
+
+static_assert(kit::kLanes == 8, "Engine::lanes_");
 
 Engine::Engine(HeapFreeFn heapFree) : heapFree_(heapFree), scratch_{} {}
 
@@ -54,10 +58,7 @@ Refusal Engine::fits(const Patch& p, const ModuleTypeInfo& t, bool cpu) const {
     if (t.poolSlots && poolUsed(p) + t.poolSlots > kDelaySlots) return {false, "NO BUFFER"};
     if (t.maxInstances && p.countOfType(t) >= t.maxInstances) return {false, "MAX 1"};
     if (!cpu) return {true, nullptr};
-    uint32_t cycles = costOf(t);
-    for (int i = 0; i < p.moduleCount(); i++)
-        if (!p.moduleAt(i).bypass) cycles += costOf(*p.moduleAt(i).type);  // bypassed: not run
-    if (cycles > kCpuBudget) return {false, "NO CPU"};
+    if (costOf(t) + patchCycles(p) > kCpuBudget) return {false, "NO CPU"};
     return {true, nullptr};
 }
 
@@ -95,7 +96,8 @@ Refusal Engine::canAddLive(const Patch& p, const ModuleTypeInfo& t, const Live& 
     // The per-type sum canAdd uses is each type's worst moment and over-counts a live patch.
     const Refusal r = fits(p, t, false);
     if (!r.ok) return r;
-    if (l.cycles + costOf(t) > kCpuBudget) return {false, "NO CPU"};
+    // An idle KIT measures nothing: its worst step comes on top (over-counts while a step sounds).
+    if (l.cycles + costOf(t) + kitWorst(p) > kCpuBudget) return {false, "NO CPU"};
     if (heapFree_() < ramFor(p, t) + kRamReserve) return {false, "NO RAM"};
     // Free heap can be plenty while no single block fits (GRD's 16 KB buffer, a 96 KB heap
     // delay slot).
@@ -118,11 +120,35 @@ uint32_t Engine::costOf(const ModuleTypeInfo& t) const {
     return t.costVaries && t.cpuCycles > padded ? t.cpuCycles : padded;
 }
 
-uint32_t Engine::estimatedCycles() const {
-    uint32_t c = 0;
-    for (int i = 0; i < patch_.moduleCount(); i++)
-        if (!patch_.moduleAt(i).bypass) c += costOf(*patch_.moduleAt(i).type);
-    return c;
+uint32_t Engine::estimatedCycles() const { return patchCycles(patch_); }
+
+namespace {
+// Per-lane cost of p's grouped modules and the always-on rest; bypassed ones are not run.
+int splitCosts(const Engine& e, const Patch& p, uint32_t* always, uint32_t* lane) {
+    uint8_t g[kMaxModules];
+    const int kit = kitGroups(p, g);
+    *always = 0;
+    for (int l = 0; l < kit::kLanes; l++) lane[l] = 0;
+    for (int i = 0; i < p.moduleCount(); i++) {
+        if (p.moduleAt(i).bypass) continue;
+        const uint32_t c = e.costOf(*p.moduleAt(i).type);
+        if (g[i] == kNoGroup) *always += c;
+        else lane[g[i]] += c;
+    }
+    return kit;
+}
+}  // namespace
+
+uint32_t Engine::kitWorst(const Patch& p) const {
+    uint32_t always, lane[kit::kLanes];
+    const int kit = splitCosts(*this, p, &always, lane);
+    return kit < 0 ? 0 : kitWorstStep(p.moduleAt(kit), lane);
+}
+
+uint32_t Engine::patchCycles(const Patch& p) const {
+    uint32_t always, lane[kit::kLanes];
+    const int kit = splitCosts(*this, p, &always, lane);
+    return always + (kit < 0 ? 0 : kitWorstStep(p.moduleAt(kit), lane));
 }
 
 void Engine::learnCosts() {
@@ -308,11 +334,40 @@ void Engine::collect() {
     if (any) publish(++gen_);
 }
 
+// Audio thread. A new program starts with every group idle: their outputs read 0.
+void Engine::startProgram(const Program* p) {
+    for (int l = 0; l < kit::kLanes; l++) laneOff(p, l);
+}
+
+constexpr uint8_t kFadeBlocks = 4;  // 2.7 ms: a step's end ramps its group out, no click
+
+void Engine::laneOff(const Program* p, int lane) {
+    lanes_[lane] = {false, 0, 0, 0.f};
+    for (int n = 0; n < p->numNodes; n++) {
+        const ProgramNode& node = p->nodes[n];
+        if (node.group != lane) continue;
+        float* o = node.m->out(0);
+        for (int k = 0; k < node.m->type().numOuts * kBlock; k++) o[k] = 0.f;
+        node.m->setPeak(0.f);
+    }
+}
+
+// After the KIT's process(): a step edge fades out the groups the new step does not fire (one
+// step's groups at a time, as the CPU guard counts them, give or take the fade); the fired ones
+// start.
+void Engine::kitEvents(uint32_t ev) {
+    for (int l = 0; l < kit::kLanes; l++) {
+        if ((ev >> l) & 1u) lanes_[l] = {true, 0, 0, 0.f};
+        else if ((ev & kit::kStepEdge) && lanes_[l].on && !lanes_[l].fade) lanes_[l].fade = kFadeBlocks;
+    }
+}
+
 MODSYNTH_IRAM void Engine::processBlock(float* mono) {
     for (int i = 0; i < kBlock; i++) mono[i] = 0.f;
     if (Program* p = pending_.exchange(nullptr, std::memory_order_acq_rel)) {
         cur_ = p;
         seen_.store(p->generation, std::memory_order_release);
+        startProgram(p);
     }
     const Program* prog = cur_;
     if (!prog) return;
@@ -321,6 +376,7 @@ MODSYNTH_IRAM void Engine::processBlock(float* mono) {
     for (int n = 0; n < prog->numNodes; n++) {
         const ProgramNode& node = prog->nodes[n];
         Module* m = node.m;
+        if (node.group != kNoGroup && !lanes_[node.group].on) continue;  // idle: outputs stay 0
         const uint32_t t0 = cycles_ ? cycles_() : 0;
         const int numIns = m->type().numIns;
         for (int in = 0; in < kMaxIns; in++) {
@@ -350,13 +406,35 @@ MODSYNTH_IRAM void Engine::processBlock(float* mono) {
         }
         if (numOuts > 0) {  // the peak is out 0's
             float* o = m->out(0);
-            m->setPeak(sanitizeBlock(o, kBlock));
-            if (numOuts > 1) sanitizeBlock(o + kBlock, (numOuts - 1) * kBlock);
+            float pk = sanitizeBlock(o, kBlock);
+            m->setPeak(pk);
+            if (numOuts > 1) {
+                const float rest = sanitizeBlock(o + kBlock, (numOuts - 1) * kBlock);
+                pk = rest > pk ? rest : pk;
+            }
+            if (node.boundary) {
+                Lane& ln = lanes_[node.group];
+                if (pk > ln.peak) ln.peak = pk;
+                if (ln.fade) {  // what leaves the group ramps from fade/4 to (fade-1)/4
+                    const float g0 = (float)ln.fade / kFadeBlocks, dg = -1.f / (kFadeBlocks * kBlock);
+                    for (int ch = 0; ch < numOuts; ch++)
+                        for (int k = 0; k < kBlock; k++) o[ch * kBlock + k] *= g0 + dg * (float)(k + 1);
+                }
+            }
         }
         if (node.bypass != Bypass::None) continue;  // no master out, and its measured cost stays
+        if (n == prog->kitNode) kitEvents(static_cast<KitModule*>(m)->events());
         if (const float* mo = m->masterOut())
             for (int k = 0; k < kBlock; k++) mono[k] += mo[k];
         if (cycles_) m->addCycles(cycles_() - t0);
+    }
+    // A group whose outputs leaving it stayed under -60 dB (of 5 V) for 50 ms is done.
+    for (int l = 0; l < kit::kLanes; l++) {
+        Lane& ln = lanes_[l];
+        if (!ln.on) continue;
+        ln.quiet = ln.peak < 0.005f ? ln.quiet + kBlock : 0;
+        ln.peak = 0.f;
+        if ((ln.fade && --ln.fade == 0) || ln.quiet >= (uint32_t)(0.05f * kSampleRate)) laneOff(prog, l);
     }
     sanitizeBlock(mono, kBlock);
     for (int k = 0; k < kBlock; k++) mono[k] = mono[k] > 1.f ? 1.f : (mono[k] < -1.f ? -1.f : mono[k]);

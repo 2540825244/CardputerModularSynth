@@ -27,6 +27,7 @@
 #include "core/modules/src.h"
 #include "core/modules/mod.h"
 #include "core/modules/grd.h"
+#include "core/modules/kit.h"
 #include "core/scales.h"
 #include "core/delay_pool.h"
 #include "core/dsp_util.h"
@@ -1504,6 +1505,136 @@ void test_grd_short_triggers_at_block_edges() {  // review r3: pulses between ch
     }
 }
 
+// ---- KIT ----
+// Runs a KIT for nBlocks; returns, per lane (and ACC as lane 8), the sample indices where the
+// output rose, and the events() of every block.
+struct KitRun {
+    std::vector<int> rises[kit::kLanes + 1];
+    std::vector<uint32_t> events;
+    std::vector<float> acc;
+    int high[kit::kLanes] = {};  // samples each trigger lane was high
+};
+static KitRun runKit(KitModule& k, int nBlocks, const float* run = nullptr, const float* clk = nullptr,
+                     int base = 0) {
+    KitRun r;
+    float prev[kit::kLanes + 1] = {};
+    const float* ins[kMaxIns] = {run, clk};
+    bool c[kMaxIns] = {run != nullptr, clk != nullptr};
+    for (int b = 0; b < nBlocks; b++) {
+        k.process(ins, c);
+        r.events.push_back(k.events());
+        for (int i = 0; i < kBlock; i++) {
+            for (int o = 0; o <= kit::kLanes; o++) {
+                const float v = k.out(o)[i];
+                if (v > 0.f && prev[o] <= 0.f) r.rises[o].push_back(base + b * kBlock + i);
+                prev[o] = v;
+                if (o < kit::kLanes && v > 0.f) r.high[o]++;
+            }
+            r.acc.push_back(k.out(kit::kAccOut)[i]);
+        }
+    }
+    return r;
+}
+
+void test_kit_one_shot_pass() {
+    KitModule k;
+    k.setParam(kit::kLen, 3.f);
+    k.setParam(kit::kGap, 150.f);  // 7200 samples
+    KitRun idle = runKit(k, 10);
+    for (int o = 0; o < kit::kLanes; o++) TEST_ASSERT_EQUAL(0, (int)idle.rises[o].size());
+    TEST_ASSERT_FALSE(k.running());
+    k.start();
+    KitRun r = runKit(k, 900 * 48 / kBlock);  // 900 ms
+    // default lanes: lane l plays step l
+    TEST_ASSERT_EQUAL(1, (int)r.rises[0].size());
+    TEST_ASSERT_EQUAL(0, r.rises[0][0]);
+    TEST_ASSERT_EQUAL(1, (int)r.rises[1].size());
+    TEST_ASSERT_EQUAL(7200, r.rises[1][0]);
+    TEST_ASSERT_EQUAL(1, (int)r.rises[2].size());
+    TEST_ASSERT_EQUAL(14400, r.rises[2][0]);
+    for (int o = 3; o < kit::kLanes; o++) TEST_ASSERT_EQUAL(0, (int)r.rises[o].size());
+    TEST_ASSERT_FALSE(k.running());
+    // events: lane bits on the firing blocks, a step edge there and at the pass end (21600)
+    TEST_ASSERT_EQUAL_UINT32(kit::kStepEdge | 1u, r.events[0]);
+    TEST_ASSERT_EQUAL_UINT32(kit::kStepEdge | 2u, r.events[7200 / kBlock]);
+    TEST_ASSERT_EQUAL_UINT32(kit::kStepEdge, r.events[21600 / kBlock]);
+    int edges = 0;
+    for (uint32_t e : r.events) edges += (e & kit::kStepEdge) != 0;
+    TEST_ASSERT_EQUAL(4, edges);
+    TEST_ASSERT_EQUAL(kit::kTrigSamples, r.high[0]);  // 5 ms triggers
+    TEST_ASSERT_EQUAL_FLOAT(-1.f, k.monitor(0));       // idle: no playhead
+}
+
+void test_kit_stacks_loops_and_accents() {
+    KitModule k;
+    k.setParam(kit::kL1 + 0, (float)0b11);  // T1 on steps 1 and 2
+    k.setParam(kit::kL1 + 1, (float)0b10);  // T2 on step 2: stacked with T1
+    k.setParam(kit::kAccLane, (float)0b10);
+    k.setParam(kit::kAcc, 0.5f);
+    k.setParam(kit::kLen, 2.f);
+    k.setParam(kit::kGap, 200.f);  // 9600 samples
+    k.setParam(kit::kMode, 1.f);   // loop
+    k.start();
+    KitRun r = runKit(k, 4 * 9600 / kBlock + 1);
+    // T1: 0, 9600, 19200, 28800, 38400; T2 with T1 on the 2nd step of each loop
+    TEST_ASSERT_EQUAL(5, (int)r.rises[0].size());
+    TEST_ASSERT_EQUAL(19200, r.rises[0][2]);
+    TEST_ASSERT_EQUAL(2, (int)r.rises[1].size());
+    TEST_ASSERT_EQUAL(9600, r.rises[1][0]);
+    TEST_ASSERT_EQUAL(28800, r.rises[1][1]);
+    TEST_ASSERT_EQUAL_UINT32(kit::kStepEdge | 3u, r.events[9600 / kBlock]);
+    TEST_ASSERT_TRUE(k.running());
+    // ACC: 2.5 V through the accented step, 0 on the other
+    TEST_ASSERT_EQUAL_FLOAT(0.f, r.acc[100]);
+    TEST_ASSERT_EQUAL_FLOAT(2.5f, r.acc[9600 + 5000]);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, r.acc[19200 + 100]);
+    // the step shows for the playhead
+    TEST_ASSERT_EQUAL_FLOAT(0.f, k.monitor(0));
+}
+
+void test_kit_run_and_clock_inputs() {
+    KitModule k;
+    k.setParam(kit::kLen, 3.f);
+    float lo[kBlock], hi[kBlock];
+    constBlock(lo, 0.f);
+    constBlock(hi, 5.f);
+    // RUN rising starts a pass
+    runKit(k, 2, lo);
+    KitRun a = runKit(k, 1, hi, nullptr);
+    TEST_ASSERT_EQUAL(1, (int)a.rises[0].size());
+    TEST_ASSERT_TRUE(k.running());
+    // CLK patched: no step without a clock rise, however long the gap
+    KitModule c;
+    c.setParam(kit::kLen, 3.f);
+    c.setParam(kit::kGap, 150.f);
+    c.start();
+    KitRun b = runKit(c, 400, nullptr, lo);  // 266 ms, no clock
+    TEST_ASSERT_EQUAL(1, (int)b.rises[0].size());
+    TEST_ASSERT_EQUAL(0, (int)b.rises[1].size());
+    runKit(c, 1, nullptr, hi);
+    runKit(c, 1, nullptr, lo);
+    KitRun d = runKit(c, 1, nullptr, hi);  // 2nd rise: step 3
+    TEST_ASSERT_EQUAL(1, (int)d.rises[2].size());
+    runKit(c, 1, nullptr, lo);
+    KitRun e = runKit(c, 1, nullptr, hi);  // past the last step: the pass ends
+    TEST_ASSERT_EQUAL_UINT32(kit::kStepEdge, e.events[0]);
+    TEST_ASSERT_FALSE(c.running());
+}
+
+void test_kit_worst_step() {
+    Patch p;
+    uint16_t id = 0;
+    TEST_ASSERT_EQUAL(PatchError::None, p.addModule(kKitType, 0, 0, &id));
+    ModuleRec& r = *p.find(id);
+    r.params[kit::kLen] = 4.f;
+    const uint32_t cost[kit::kLanes] = {100, 200, 300, 400, 5000, 0, 0, 0};
+    TEST_ASSERT_EQUAL_UINT32(400, kitWorstStep(r, cost));  // lane 4 plays step 5: past LEN
+    r.params[kit::kL1 + 0] = (float)0b1001;                 // T1 also on step 4, with T4
+    TEST_ASSERT_EQUAL_UINT32(500, kitWorstStep(r, cost));
+    r.bypass = 1;
+    TEST_ASSERT_EQUAL_UINT32(0, kitWorstStep(r, cost));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_registry);
@@ -1588,5 +1719,9 @@ int main() {
     RUN_TEST(test_grd_short_triggers_at_block_edges);
     RUN_TEST(test_grd_timbre_cv_heard_at_default_amount);
     RUN_TEST(test_grd_pitch_tracks);
+    RUN_TEST(test_kit_one_shot_pass);
+    RUN_TEST(test_kit_stacks_loops_and_accents);
+    RUN_TEST(test_kit_run_and_clock_inputs);
+    RUN_TEST(test_kit_worst_step);
     return UNITY_END();
 }
