@@ -38,7 +38,8 @@ void patchView(SideIcons& r, const UiState& s, const Patch& p, bool fnHeld) {
     else if (moving) set(r, Side::Fn, Ic::Copy, "COPY");
     else set(r, Side::Fn, Ic::Plus, "PLACE");
     set(r, Side::Ctrl, Ic::Move, "MOVE", moving);
-    if (sel && !moving) {
+    if (s.carry.active) set(r, Side::Del, Ic::Cancel, "CANCEL");  // del drops the carried cable
+    else if (sel && !moving) {
         if (fnHeld) set(r, Side::Del, Ic::Bypass, sel->bypass ? "ENABLE" : "BYPASS", sel->bypass);
         else set(r, Side::Del, Ic::Trash, "DELETE");
     }

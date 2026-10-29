@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 #include <map>
+#include <string>
 #include "core/modules/dly.h"
 #include "core/modules/env.h"
 #include "core/modules/keys.h"
@@ -374,6 +375,28 @@ void test_widest_patch_fits() {
     TEST_ASSERT_FALSE(patchFits(std::string(kMaxPatchJson + 1, ' ')));
 }
 
+// Loads never skip for CPU: OSCs past the 4000 budget, then a GRD last, bypassed or enabled.
+static std::string oscsThenGrd(bool bypass) {
+    std::string json = "{\"format\":1,\"modules\":[";
+    for (int i = 0; i < 15; i++)  // 15 x OSC 290 = 4350 > 4000
+        json += "{\"id\":" + std::to_string(i + 1) + ",\"type\":\"osc\",\"page\":0,\"cell\":" + std::to_string(i) + "},";
+    json += "{\"id\":20,\"type\":\"grd\",\"page\":0,\"cell\":20";
+    if (bypass) json += ",\"bypass\":true";
+    return json + "}],\"cables\":[]}";
+}
+
+void test_load_never_skips_for_cpu_with_bypass() {
+    for (int bypass = 0; bypass < 2; bypass++) {
+        Engine eng(bigHeap);
+        Patch p;
+        const LoadReport r = patchFromJson(oscsThenGrd(bypass), p, &eng);
+        TEST_ASSERT_EQUAL(LoadError::None, r.error);
+        TEST_ASSERT_EQUAL(0, r.skippedModules);
+        TEST_ASSERT_EQUAL(16, p.moduleCount());
+        TEST_ASSERT_EQUAL_UINT8(bypass, p.find(20)->bypass);
+    }
+}
+
 // v1.3: "bypass":true only on a bypassed module; files without the key load unbypassed.
 void test_bypass_round_trip() {
     Patch p = voice();
@@ -395,6 +418,7 @@ void test_bypass_round_trip() {
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_bypass_round_trip);
+    RUN_TEST(test_load_never_skips_for_cpu_with_bypass);
     RUN_TEST(test_slot_path);
     RUN_TEST(test_roundtrip);
     RUN_TEST(test_bad_json);

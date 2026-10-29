@@ -1,9 +1,20 @@
 #include "modsynth_iram.h"
 #include "engine.h"
 #include <cmath>
+#include <new>
 #include "delay_pool.h"
 #include "dsp_util.h"
 #include "modules/dly.h"
+
+namespace {
+// A module created while bypassed: its out buffers (zero, or input 0 on output 0) and params,
+// without the DSP or its heap. It becomes the real module when enabled.
+class BypassStub final : public Module {
+   public:
+    explicit BypassStub(const ModuleTypeInfo& t) : Module(t) {}
+    void process(const float* const*, const bool*) override {}
+};
+}  // namespace
 
 Engine::Engine(HeapFreeFn heapFree) : heapFree_(heapFree), scratch_{} {}
 
@@ -133,7 +144,16 @@ Module* Engine::instanceOf(uint16_t id) const {
     return nullptr;
 }
 
-Module* Engine::instance(uint16_t id) { return instanceOf(id); }
+Module* Engine::instance(uint16_t id) {
+    const int k = indexOf(id);
+    return k >= 0 && !insts_[k].stub ? insts_[k].m : nullptr;
+}
+
+int Engine::indexOf(uint16_t id) const {
+    for (size_t k = 0; k < insts_.size(); k++)
+        if (insts_[k].id == id) return (int)k;
+    return -1;
+}
 
 void Engine::retire(Module* m, Program* p, uint32_t gen) { retired_.push_back({gen, m, p}); }
 
@@ -143,18 +163,37 @@ void Engine::pushValues(Module* m, const ModuleRec& r) {
     for (int i = 0; i < r.type->numIns && i < kMaxIns; i++) m->setInAmount(i, r.inAmount[i]);
 }
 
-int Engine::instantiateAll(const Patch& p) {
+int Engine::instantiateAll(const Patch& p, uint32_t gen) {
     int missing = 0;
     for (int i = 0; i < p.moduleCount(); i++) {
         const ModuleRec& r = p.moduleAt(i);
-        Module* m = instanceOf(r.id);
-        if (!m) {
-            m = tryCreate(*r.type);
+        const int k = indexOf(r.id);
+        Module* m = k >= 0 ? insts_[k].m : nullptr;
+        if (r.bypass) {  // an existing instance stays; a new one is only a stub (no heap)
             if (!m) {
+                m = new (std::nothrow) BypassStub(*r.type);
+                if (!m) {
+                    missing++;
+                    continue;
+                }
+                insts_.push_back({r.id, m, true});
+            }
+            pushValues(m, r);
+            continue;
+        }
+        if (!m || insts_[k].stub) {
+            Module* real = tryCreate(*r.type);
+            if (!real) {
                 missing++;
                 continue;
             }
-            insts_.push_back({r.id, m});
+            if (m) {  // enabled: the stub goes once the audio thread has left the old program
+                retire(m, nullptr, gen);
+                insts_[k] = {r.id, real, false};
+            } else {
+                insts_.push_back({r.id, real, false});
+            }
+            m = real;
         }
         pushValues(m, r);
     }
@@ -163,7 +202,12 @@ int Engine::instantiateAll(const Patch& p) {
 
 void Engine::publish(uint32_t gen) {
     Module* inst[kMaxModules];
-    for (int i = 0; i < patch_.moduleCount(); i++) inst[i] = instanceOf(patch_.moduleAt(i).id);
+    for (int i = 0; i < patch_.moduleCount(); i++) {
+        const ModuleRec& r = patch_.moduleAt(i);
+        const int k = indexOf(r.id);
+        // an enabled module still on its stub (no RAM yet) is missing, not silent-but-present
+        inst[i] = k < 0 || (insts_[k].stub && !r.bypass) ? nullptr : insts_[k].m;
+    }
     Program* prog = compileProgram(patch_, inst, gen);
     pending_.exchange(prog, std::memory_order_release);  // an unconsumed older program is still published_
     if (published_) retire(nullptr, published_, gen);
@@ -184,7 +228,7 @@ int Engine::apply(const Patch& p) {
             k++;
         }
     }
-    missing_ = instantiateAll(p);
+    missing_ = instantiateAll(p, gen);
     publish(gen);
     return missing_;
 }
@@ -231,15 +275,22 @@ void Engine::collect() {
     retryTick_ = 0;
     bool any = false;
     int missing = 0;
+    const uint32_t gen = gen_ + 1;  // the program published below
     for (int i = 0; i < patch_.moduleCount(); i++) {
         const ModuleRec& r = patch_.moduleAt(i);
-        if (instanceOf(r.id)) continue;
+        const int k = indexOf(r.id);
+        if (k >= 0 && (!insts_[k].stub || r.bypass)) continue;
         Module* m = tryCreate(*r.type);
         if (!m) {
             missing++;
             continue;
         }
-        insts_.push_back({r.id, m});
+        if (k >= 0) {
+            retire(insts_[k].m, nullptr, gen);
+            insts_[k] = {r.id, m, false};
+        } else {
+            insts_.push_back({r.id, m, false});
+        }
         pushValues(m, r);
         any = true;
     }

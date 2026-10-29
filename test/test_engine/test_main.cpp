@@ -6,6 +6,7 @@
 #include <cstring>
 #include "core/modules/dly.h"
 #include "core/modules/env.h"
+#include "core/modules/grd.h"
 #include "core/modules/keys.h"
 #include "core/modules/osc.h"
 #include "core/modules/out.h"
@@ -550,8 +551,9 @@ void test_bypass_passes_effect() {
     wire(p, d, 0, f, 0);
     wire(p, f, 0, s, 0);
     p.find(f)->inAmount[0] = 0.5f;
-    p.setBypass(f, true);
     Engine eng(bigHeap);
+    eng.apply(p);  // enabled first: the real filter exists, then bypassed it stays
+    p.setBypass(f, true);
     eng.setCycleCounter(fakeClock);
     eng.apply(p);
     run(eng, 4);
@@ -559,6 +561,43 @@ void test_bypass_passes_effect() {
     TEST_ASSERT_EQUAL_FLOAT(2.5f, gSinkIn);  // 5 V x 0.5: the filter did not run
     TEST_ASSERT_EQUAL(0, eng.instance(f)->measuredCycles());
     TEST_ASSERT_EQUAL_FLOAT(2.5f, eng.instance(f)->peak());
+}
+
+// Bypassed before it ever ran (a load, an undo): no real instance and no heap, only a stub that
+// still passes audio; enabling creates the real module. RAM short: it waits, missing.
+void test_bypassed_module_not_created() {
+    Patch p;
+    const uint16_t d = add(p, kDcType, 0), f = add(p, kVcfType, 1), s = add(p, kSinkType, 2);
+    uint16_t g = 0;
+    p.addModule(kGrdType, 0, 3, &g);
+    wire(p, d, 0, f, 0);
+    wire(p, f, 0, s, 0);
+    p.setBypass(f, true);
+    p.setBypass(g, true);
+    gHeap = 70 * 1024;  // a GRD would fit (26 KB + the 32 KB reserve), but bypassed it is not made
+    Engine eng(setHeap);
+    TEST_ASSERT_EQUAL(0, eng.apply(p));
+    run(eng, 2);
+    TEST_ASSERT_NULL(eng.instance(f));
+    TEST_ASSERT_NULL(eng.instance(g));
+    TEST_ASSERT_EQUAL(0, eng.missing());
+    TEST_ASSERT_EQUAL_FLOAT(5.f, gSinkIn);  // the stub passes input 0
+    p.setBypass(f, false);
+    TEST_ASSERT_EQUAL(0, eng.apply(p));
+    run(eng, 2);
+    TEST_ASSERT_NOT_NULL(eng.instance(f));  // the real filter now
+    gHeap = 40 * 1024;
+    p.setBypass(g, false);
+    TEST_ASSERT_EQUAL(1, eng.apply(p));  // enabled without the RAM: missing, retried by collect()
+    TEST_ASSERT_NULL(eng.instance(g));
+    gHeap = 1000000;
+    for (int i = 0; i < 70; i++) {
+        run(eng, 1);
+        eng.collect();
+    }
+    TEST_ASSERT_NOT_NULL(eng.instance(g));
+    TEST_ASSERT_EQUAL(0, eng.missing());
+    gHeap = 0;
 }
 
 // Any other bypassed module outputs 0 (not the last block it computed) and the instance stays.
@@ -628,6 +667,7 @@ int main() {
     UNITY_BEGIN();
     RUN_TEST(test_basic_voice);
     RUN_TEST(test_bypass_passes_effect);
+    RUN_TEST(test_bypassed_module_not_created);
     RUN_TEST(test_bypass_zeroes_others);
     RUN_TEST(test_bypass_out_silent_and_free);
     RUN_TEST(test_bypass_pass_types);

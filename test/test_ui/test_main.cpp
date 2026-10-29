@@ -244,6 +244,11 @@ void test_fn_del_icon_names() {
     gPatch.setBypass(gPatch.findAt(0, 13)->id, true);
     SideIcons c = sideIcons(f.ui.state(), gPatch, true);
     TEST_ASSERT_EQUAL_STRING("ENABLE", c.name[(int)Side::Del]);
+    f.ui.mut().carry.active = true;  // carrying a cable: del cancels it
+    for (bool fn : {false, true}) {
+        SideIcons d = sideIcons(f.ui.state(), gPatch, fn);
+        TEST_ASSERT_EQUAL_STRING("CANCEL", d.name[(int)Side::Del]);
+    }
 }
 
 void test_move() {

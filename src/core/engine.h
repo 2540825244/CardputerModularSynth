@@ -54,7 +54,7 @@ class Engine {
     void setParam(uint16_t id, uint8_t i, float v);
     void setOutAmount(uint16_t id, uint8_t o, float a);
     void setInAmount(uint16_t id, uint8_t i, float a);
-    Module* instance(uint16_t id);
+    Module* instance(uint16_t id);  // the real instance; nullptr while missing or a bypass stub
     void collect();  // UI thread: frees retired programs/modules the audio thread has passed
 
     void processBlock(float* mono);  // audio thread: kBlock samples, +-1
@@ -67,6 +67,7 @@ class Engine {
     struct Inst {
         uint16_t id;
         Module* m;
+        bool stub;  // a bypassed module created while bypassed: only its out buffers, no DSP/heap
     };
     struct Retired {
         uint32_t gen;
@@ -81,7 +82,10 @@ class Engine {
     Module* tryCreate(const ModuleTypeInfo& t) const { return canCreate(t) ? t.create() : nullptr; }
     void retire(Module* m, Program* p, uint32_t gen);
     static void pushValues(Module*, const ModuleRec&);
-    int instantiateAll(const Patch&);  // creates missing, pushes params; returns # missing
+    // Creates missing instances (a bypassed one gets a stub), swaps an enabled module's stub for
+    // the real thing, pushes params; returns # missing.
+    int instantiateAll(const Patch&, uint32_t gen);
+    int indexOf(uint16_t id) const;  // into insts_, -1 = none
     void publish(uint32_t gen);
 
     struct Learned {

@@ -149,14 +149,17 @@ void drawStrip(const UiState& s, const ModuleRec& m) {
     cv.setFont(&fonts::Font0);
     cv.setTextColor(PText);
     cv.setTextDatum(textdatum_t::top_left);
-    cv.drawString(name, cellX(0) + 3, cellY(0) + 3);
+    int nameX = cellX(0) + 3;
+    if (m.bypass) {  // fn+del in the patch view toggles it: "BYP" leads the name, so it never
+                     // overlaps it or the value (<= 11 + 8 characters of the 34 the strip holds)
+        cv.setTextColor(PAccent);
+        cv.drawString("BYP", nameX, cellY(0) + 3);
+        cv.setTextColor(PText);
+        nameX += 24;
+    }
+    cv.drawString(name, nameX, cellY(0) + 3);
     cv.setTextDatum(textdatum_t::top_right);
     cv.drawString(val, cellX(11) + cellW(11) - 3, cellY(0) + 3);
-    if (m.bypass) {  // fn+del in the patch view toggles it
-        cv.setTextColor(PAccent);
-        cv.setTextDatum(textdatum_t::top_center);
-        cv.drawString("BYPASS", kGridX + kGridW / 2, cellY(0) + 3);
-    }
 }
 
 void paramCell(const ModuleRec& m, int col, int row, uint8_t idx, bool selected) {
