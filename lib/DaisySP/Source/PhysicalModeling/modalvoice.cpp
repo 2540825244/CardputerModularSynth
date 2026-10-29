@@ -7,7 +7,8 @@ void ModalVoice::Init(float sample_rate)
 {
     sample_rate_ = sample_rate;
     aux_         = 0.f;
-    dirty_       = true; // modsynth
+    dirty_       = true; // modsynth: the setters below compare against these
+    f0_ = accent_ = brightness_ = -1.f;
 
     excitation_filter_.Init();
     resonator_.Init(0.015f, 24, sample_rate_);

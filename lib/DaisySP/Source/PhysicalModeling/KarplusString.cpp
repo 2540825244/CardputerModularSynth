@@ -9,7 +9,8 @@ using namespace daisysp;
 void String::Init(float sample_rate)
 {
     sample_rate_ = sample_rate;
-    dirty_       = true; // modsynth
+    dirty_       = true; // modsynth: the setters below compare against these
+    frequency_ = non_linearity_amount_ = brightness_ = damping_ = -1.f;
 
     SetFreq(440.f);
     non_linearity_amount_ = .5f;
@@ -40,6 +41,7 @@ void String::Reset()
     curved_bridge_    = 0.0f;
     out_sample_[0] = out_sample_[1] = 0.0f;
     src_phase_                      = 0.0f;
+    dirty_                          = true; // modsynth
 }
 
 float String::Process(const float in)

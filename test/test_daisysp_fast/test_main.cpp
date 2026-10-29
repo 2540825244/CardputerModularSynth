@@ -218,6 +218,37 @@ void test_svf_cache_is_exact() {
     }
 }
 
+// NaN and signed zeros through the cache: NaN never equals the last value (always recomputed,
+// like the original); -0 equals +0 (skipped, and the original gives the same coefficients).
+void test_svf_cache_nan_and_zero() {
+    daisysp::Svf a;
+    daisysp_ref::Svf b;
+    a.Init(kSampleRate);
+    b.Init(kSampleRate);
+    const float nan = __builtin_nanf("");
+    auto both = [&](auto f) {
+        f(a);
+        f(b);
+    };
+    both([&](auto& v) { v.SetFreq(nan); });
+    both([&](auto& v) { v.SetFreq(nan); });
+    both([&](auto& v) { v.SetRes(nan); });
+    both([&](auto& v) { v.SetFreq(1000.f); });
+    both([&](auto& v) { v.SetRes(0.f); });
+    both([&](auto& v) { v.SetRes(-0.f); });
+    both([&](auto& v) { v.SetFreq(0.f); });
+    both([&](auto& v) { v.SetFreq(-0.f); });
+    both([&](auto& v) { v.SetFreq(1000.f); });
+    both([&](auto& v) { v.SetRes(0.5f); });
+    for (int i = 0; i < 2000; i++) {
+        const float x = (i & 32) ? 0.1f : -0.1f;
+        a.Process(x);
+        b.Process(x);
+        TEST_ASSERT_TRUE(fabsf(b.Band()) < 1e6f);
+        TEST_ASSERT_TRUE(a.Band() == b.Band() && a.Low() == b.Low() && a.High() == b.High());
+    }
+}
+
 // ---------------------------------------------------------------- drums
 // Old wrapper state: the DaisySP object plus the trigger detector.
 template <typename D>
@@ -231,6 +262,7 @@ void test_snr_matches_old() {
     const int n = 1500;  // 1 s, a hit every 187 ms
     Inputs in;
     in.ch[0] = triggers(n, 9000);
+    in.ch[1] = ramp(n, -2.f, 2.f);  // ACC input: each hit's accent differs
     auto make = [] {
         auto s = std::make_shared<OldDrum<daisysp_ref::AnalogSnareDrum>>();
         return [s](const Params& p, const float* const* ins, float* o) {
@@ -251,12 +283,14 @@ void test_snr_matches_old() {
     };
     compare("snr 808 modes", kSnrType, {{1, 0.3f}}, in, n, {700, 2, 0.8f}, 1e-4f, make);
     compare("snr extra modes", kSnrType, {{1, 0.9f}}, in, n, {700, 3, 0.2f}, 1e-4f, make);
+    compare("snr FRQ change", kSnrType, {}, in, n, {700, 0, 320.f}, 1e-4f, make);
 }
 
 void test_kck_matches_old() {
     const int n = 1500;
     Inputs in;
     in.ch[0] = triggers(n, 12000);
+    in.ch[1] = ramp(n, 2.f, -2.f);  // ACC input
     in.ch[2] = constant(n, 0.5f);  // half an octave up
     auto make = [] {
         auto s = std::make_shared<OldDrum<daisysp_ref::AnalogBassDrum>>();
@@ -280,12 +314,14 @@ void test_kck_matches_old() {
     // the resonator retunes every sample (self FM) through the fast SetFreq/SetRes: a few ulps
     // per sample, hence the looser tolerance
     compare("kck", kKckType, {{4, 0.6f}}, in, n, {700, 1, 0.9f}, 1e-3f, make);
+    compare("kck FRQ change", kKckType, {}, in, n, {700, 0, 90.f}, 1e-3f, make);
 }
 
 void test_hat_matches_old() {
     const int n = 1200;
     Inputs in;
     in.ch[0] = triggers(n, 6000);
+    in.ch[1] = ramp(n, -2.f, 2.f);  // ACC input
     auto make = [] {
         auto s = std::make_shared<OldDrum<daisysp_ref::HiHat<>>>();
         return [s](const Params& p, const float* const* ins, float* o) {
@@ -305,6 +341,7 @@ void test_hat_matches_old() {
         };
     };
     compare("hat", kHatType, {}, in, n, {600, 1, 0.2f}, 1e-4f, make);
+    compare("hat FRQ change", kHatType, {}, in, n, {600, 0, 7000.f}, 1e-4f, make);
 }
 
 // ---------------------------------------------------------------- physical models
@@ -314,6 +351,7 @@ void physCompare(const char* name, const ModuleTypeInfo& t, float gain, bool pit
     Inputs in;
     in.ch[0] = triggers(n, 9000);
     in.ch[1] = pitchRamp ? ramp(n, -0.5f, 0.5f) : constant(n, 0.f);
+    in.ch[2] = ramp(n, -2.f, 2.f);  // ACC input
     auto make = [gain] {
         auto s = std::make_shared<OldDrum<RefVoice>>();
         return [s, gain](const Params& p, const float* const* ins, float* o) {
@@ -508,6 +546,7 @@ void test_awh_matches_old() {
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_svf_cache_is_exact);
+    RUN_TEST(test_svf_cache_nan_and_zero);
     RUN_TEST(test_snr_matches_old);
     RUN_TEST(test_kck_matches_old);
     RUN_TEST(test_hat_matches_old);
