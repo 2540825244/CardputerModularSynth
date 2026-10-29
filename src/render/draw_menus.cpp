@@ -156,8 +156,8 @@ void presetsPage(const UiState& s) {
 
 void systemPage(const UiState& s) {
     const Settings& st = s.settings;
-    auto tile = [](int col, const char* label, bool on) {
-        const int x = cellX(col), y = cellY(0), w = cellW(col), h = cellH(0);
+    auto tile = [](int col, const char* label, bool on, int row = 0) {
+        const int x = cellX(col), y = cellY(row), w = cellW(col), h = cellH(row);
         cv.fillRect(x, y, w, h, on ? PAccent : PEmpty);
         smallText(label, x + w / 2, y + h / 2 - 2, on ? PBg : PText);
     };
@@ -172,6 +172,9 @@ void systemPage(const UiState& s) {
     smallText("THEME", cellX(0) + cellW(0) / 2, cellY(1) + 4, PDim);
     smallText("BRIGHTNESS", (cellX(2) + cellX(6) + cellW(6)) / 2, cellY(1) + 4, PDim);
     smallText("HOLD MS", (cellX(8) + cellX(10) + cellW(10)) / 2, cellY(1) + 4, PDim);
+    static const char* const kSleep[] = {"OFF", "1", "2", "5", "10"};
+    for (int i = 0; i < 5; i++) tile(i, kSleep[i], i == st.sleep, 2);
+    smallText("SCREEN SLEEP MIN", (cellX(0) + cellX(4) + cellW(4)) / 2, cellY(3) + 4, PDim);
     bandText("SYSTEM", "TAP TO SET");
 }
 

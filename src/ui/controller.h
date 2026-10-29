@@ -10,6 +10,7 @@
 #include "core/undo.h"
 #include "gesture.h"
 #include "key_input.h"
+#include "screen.h"
 #include "ui_state.h"
 
 class UiController {
@@ -64,6 +65,7 @@ class UiController {
     bool loadJson(const std::string& text, bool keepUndo, char* msg, size_t msgSize);
     void newPatch();  // clears the patch (undoable)
     void loadSettings();
+    Screen screen(uint32_t nowMs) const;  // from the last key and the SYSTEM sleep time
     void saveSettings();  // bumps settingsGen, writes /modsynth/settings.json
     uint32_t holdMs() const;
     void validate();  // end a carry / close a view whose module is gone (after undo, load, delete)
@@ -90,6 +92,9 @@ class UiController {
     } tilt_ = {};
     uint32_t tiltGen_ = 0;
     uint32_t now_ = 0;
+    uint32_t lastKeyMs_ = 0;  // screen sleep
+    bool waking_ = false;     // the waking key is swallowed down to its Up
+    KeyEvent wakeKey_{};
     bool autosaveBackoff_ = false, autosaveWarned_ = false;
     bool missingWarned_ = false, cpuFullWarned_ = false;
     uint32_t missingSinceMs_ = 0, cpuFullSinceMs_ = 0;

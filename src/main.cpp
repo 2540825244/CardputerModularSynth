@@ -14,6 +14,7 @@
 #include "render/renderer.h"
 #include "ui/controller.h"
 #include "ui/key_input.h"
+#include "ui/screen.h"
 
 // Big objects are statics, never on a task stack.
 static Patch gPatch;
@@ -37,6 +38,9 @@ static void uiTask(void*) {
     bool steadyPrinted = false;
     uint32_t lastTiltGen = 0, settingsGen = 0, lastTiltPoll = 0;
     bool inputPending = false;  // redraw soon after a key, not at the next 30 fps tick
+    RedrawGate gate;            // otherwise only when the frame would change (the UI's draws cost
+                                // the audio through the shared cache)
+    Screen shown = Screen::On;
     float rollAtStart = 0.f;
     KeyPos pressed[16];
     KeyEvent ev[16];
@@ -68,13 +72,23 @@ static void uiTask(void*) {
         if (gUi.state().settingsGen != settingsGen) {  // theme, brightness, hold time
             settingsGen = gUi.state().settingsGen;
             renderSetTheme(gUi.state().settings.theme);
-            renderSetBrightness(gUi.state().settings.brightness);
+            if (shown == Screen::On) renderSetBrightness(gUi.state().settings.brightness);
             gDecoder.setHoldMs(gUi.holdMs());
         }
-        if (now - lastDraw >= 33 || (inputPending && now - lastDraw >= 12)) {  // core 0 only
+        const Screen sc = gUi.screen(now);  // sleep: dim, then off and no redraws; audio runs on
+        if (sc != shown) {
+            if (sc == Screen::On) renderSetBrightness(gUi.state().settings.brightness);
+            else renderSetBacklight(sc == Screen::Dim ? 8 : 0);
+            inputPending = inputPending || shown == Screen::Off;  // waking: draw at once
+            shown = sc;
+        }
+        if (sc != Screen::Off && (now - lastDraw >= 33 || (inputPending && now - lastDraw >= 12))) {  // core 0 only
             lastDraw = now;
+            const float total = (float)heap_caps_get_total_size(MALLOC_CAP_8BIT);
+            const float ram = total > 0 ? 1.f - heap_caps_get_free_size(MALLOC_CAP_8BIT) / total : 0.f;
+            const bool due = gate.due(frameKey(gUi.state(), gPatch, gEngine, now, gUi.fnHeld(), ram), now);
+            if (due || inputPending) renderFrame(gUi.state(), gPatch, gEngine, gSd, now, gUi.fnHeld());
             inputPending = false;
-            renderFrame(gUi.state(), gPatch, gEngine, gSd, now, gUi.fnHeld());
         }
         if (now - lastStatus >= 500) {
             lastStatus = now;

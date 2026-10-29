@@ -251,6 +251,8 @@ bool renderBegin() {
     return true;
 }
 
+void renderSetBacklight(int raw) { M5Cardputer.Display.setBrightness((uint8_t)(raw < 0 ? 0 : (raw > 255 ? 255 : raw))); }
+
 uint32_t renderSpriteBytes() { return g_spriteBytes; }
 
 void renderFrame(const UiState& s, const Patch& p, Engine& e, Storage& st, uint32_t nowMs, bool fnHeld) {

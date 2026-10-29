@@ -39,13 +39,15 @@ void run(UiController& ui) {
     }
 }
 
-// SYSTEM page, row 0: col 0 theme, cols 2..6 brightness 1..5, cols 8..10 hold 300/400/600 ms.
-// A tap applies at once: settings are harmless to change.
+// SYSTEM page, row 0: col 0 theme, cols 2..6 brightness 1..5, cols 8..10 hold 300/400/600 ms;
+// row 2: cols 0..4 screen sleep OFF/1/2/5/10 min. A tap applies at once: settings are harmless
+// to change.
 void system(UiController& ui, int cell) {
     Settings& st = ui.mut().settings;
     if (cell == 0) st.theme ^= 1;
     else if (cell >= 2 && cell <= 6) st.brightness = (uint8_t)(cell - 1);
     else if (cell >= 8 && cell <= 10) st.hold = (uint8_t)(cell - 8);
+    else if (cell >= 24 && cell <= 28) st.sleep = (uint8_t)(cell - 24);
     else return;
     ui.saveSettings();
 }

@@ -19,6 +19,7 @@
 #include "core/presets.h"
 #include "ui/anim.h"
 #include "ui/side_icons.h"
+#include "ui/screen.h"
 
 void setUp() {}
 void tearDown() {}
@@ -2052,6 +2053,95 @@ void test_kit_enter_starts_pass() {
     TEST_ASSERT_TRUE(kitRuns(f, id));
 }
 
+// ---- v1.3 Task 8: screen sleep, redraw only on change ----
+void test_screen_sleep_times() {
+    const uint32_t m = 60000;
+    TEST_ASSERT_TRUE(screenFor(10 * 60 * m, 0) == Screen::On);  // OFF: never sleeps
+    TEST_ASSERT_TRUE(screenFor(2 * m - 1, 2) == Screen::On);
+    TEST_ASSERT_TRUE(screenFor(2 * m, 2) == Screen::Dim);       // 2 min: dim
+    TEST_ASSERT_TRUE(screenFor(5 * m - 1, 2) == Screen::Dim);
+    TEST_ASSERT_TRUE(screenFor(5 * m, 2) == Screen::Off);       // 3 min later: off
+    TEST_ASSERT_TRUE(screenFor(1 * m, 1) == Screen::Dim);
+    TEST_ASSERT_TRUE(screenFor(4 * m, 1) == Screen::Off);
+    TEST_ASSERT_TRUE(screenFor(5 * m, 3) == Screen::Dim);
+    TEST_ASSERT_TRUE(screenFor(13 * m, 4) == Screen::Off);
+    TEST_ASSERT_EQUAL_UINT32(10 * m, sleepAfterMs(4));
+}
+
+void test_first_key_only_wakes() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    const int sel = f.ui.state().selCell;
+    TEST_ASSERT_TRUE(f.ui.screen(f.t) == Screen::On);
+    f.t += 6 * 60000;
+    TEST_ASSERT_TRUE(f.ui.screen(f.t) == Screen::Off);  // default: dim at 2 min, off at 5
+    f.tap(5, 2);  // wakes; selects nothing
+    TEST_ASSERT_TRUE(f.ui.screen(f.t) == Screen::On);
+    TEST_ASSERT_EQUAL(sel, f.ui.state().selCell);
+    f.side(Side::Esc);  // the next key works
+    TEST_ASSERT_EQUAL(View::File, f.ui.state().view);
+    // a held side key that wakes is swallowed down to its Up (fn: no help, no PREV)
+    f.t += 6 * 60000;
+    f.sideDown(Side::Fn);
+    TEST_ASSERT_FALSE(f.ui.fnHeld());
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_TRUE(f.ui.screen(f.t) == Screen::On);
+}
+
+void test_sleep_setting_saved() {
+    Fx f;
+    f.side(Side::Esc);
+    for (int i = 0; i < 3; i++) f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(2, f.ui.state().settings.sleep);  // default 2 min
+    f.tap(0, 2);  // OFF
+    TEST_ASSERT_EQUAL(0, f.ui.state().settings.sleep);
+    f.tap(4, 2);  // 10 min
+    TEST_ASSERT_EQUAL(4, f.ui.state().settings.sleep);
+    TEST_ASSERT_TRUE(gStore.files["/modsynth/settings.json"].find("\"sleep\":10") != std::string::npos);
+    Fx g;
+    gStore.files["/modsynth/settings.json"] = "{\"theme\":0,\"bright\":4,\"hold\":400,\"sleep\":5}";
+    g.ui.loadSettings();
+    TEST_ASSERT_EQUAL(3, g.ui.state().settings.sleep);
+}
+
+void test_redraw_only_on_change() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.side(Side::Esc);  // FILE: no animation
+    f.side(Side::Esc);
+    RedrawGate g;
+    uint32_t now = f.t + 500;  // past the last key's pressed highlight
+    auto key = [&]() { return frameKey(f.ui.state(), gPatch, f.eng, now, f.ui.fnHeld(), 0.3f); };
+    TEST_ASSERT_TRUE(g.due(key(), now));  // the first frame
+    int frames = 0;
+    for (int i = 0; i < 60; i++) {  // 2 s idle at 30 fps: the 300 ms settle, then the 1 s keepalive
+        now += 33;
+        frames += g.due(key(), now);
+    }
+    TEST_ASSERT_TRUE(frames >= 9 && frames <= 13);
+    now += 33;
+    g.due(key(), now);
+    // a module on this page sounds: its activity meter is visible
+    float buf[kBlock];
+    f.eng.processBlock(buf);
+    now += 33;
+    TEST_ASSERT_TRUE(g.due(key(), now));
+    // a toast shows, and its end is a change too
+    f.ui.toast("HI", now);
+    TEST_ASSERT_TRUE(g.due(key(), now += 33));
+    bool drawnAtEnd = false;
+    for (int i = 0; i < 60; i++) {
+        now += 33;
+        const bool d = g.due(key(), now);
+        if (now - (f.ui.state().toastUntilMs) < 33) drawnAtEnd = d;
+    }
+    TEST_ASSERT_TRUE(drawnAtEnd);
+    // idle: a frame right after a drawn one is not due; one RAM-bar pixel more is
+    while (!g.due(key(), now += 33)) {}
+    TEST_ASSERT_FALSE(g.due(key(), now += 33));
+    TEST_ASSERT_TRUE(g.due(frameKey(f.ui.state(), gPatch, f.eng, now, f.ui.fnHeld(), 0.3f + 2.f / 135), now += 33));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -2068,6 +2158,10 @@ int main() {
     RUN_TEST(test_move_cancel_by_esc);
     RUN_TEST(test_paging);
     RUN_TEST(test_audition);
+    RUN_TEST(test_screen_sleep_times);
+    RUN_TEST(test_first_key_only_wakes);
+    RUN_TEST(test_sleep_setting_saved);
+    RUN_TEST(test_redraw_only_on_change);
     RUN_TEST(test_kit_play_key_starts_pass);
     RUN_TEST(test_kit_play_key_keys_first);
     RUN_TEST(test_kit_enter_starts_pass);

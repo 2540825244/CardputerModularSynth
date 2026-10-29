@@ -15,6 +15,7 @@ struct Settings {
     uint8_t theme;       // 0 style B, 1 style A
     uint8_t brightness;  // 1..5
     uint8_t hold;        // 0 = 300, 1 = 400, 2 = 600 ms
+    uint8_t sleep;       // screen sleep: 0 OFF, 1, 2, 5, 10 min (ui/screen.h)
 };
 
 struct UiState {

@@ -370,6 +370,12 @@ just map keys to virtual midi/oct/gate/etc out".
     and cost 0.
   - CPU guard: always-on modules + the costliest set of groups one step fires; the live check adds
     that worst step to the measured load.
+- **Screen sleep and redraws** (v1.3 **[owner]**, details **[Claude's call]**): no key for the SYSTEM
+  sleep time (OFF / 1 / 2 / 5 / 10 min, default 2) dims the backlight to its lowest; 3 min later it
+  goes off and nothing is drawn. Audio keeps running. The first key only wakes (swallowed down to
+  its Up). Frames are drawn only when what they show changes: a key, the patch, the CPU/RAM bars,
+  the meters of modules in view, a toast, a blink. After a change they run at 30 fps for 300 ms,
+  and at least once a second otherwise.
 
 ## 11. Patch storage **[owner: SD; format details proposed]**
 

@@ -12,6 +12,7 @@
 UiController::UiController(Patch& p, Engine& e, UndoStack& u, Storage& st)
     : patch_(p), engine_(e), undo_(u), storage_(st), s_{} {
     s_.view = View::Patch;
+    s_.settings.sleep = 2;  // until loadSettings
     s_.selCell = -1;
     s_.modCell = -1;
     s_.moveFromId = -1;
@@ -32,8 +33,25 @@ const ViewDef& viewDef(View v) {
     return kPatch;
 }
 
+static bool sameKey(const KeyEvent& a, const KeyEvent& b) {
+    return a.grid == b.grid && (a.grid ? a.col == b.col && a.row == b.row : a.side == b.side);
+}
+
 void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     now_ = nowMs;
+    // A sleeping screen: the first key only wakes, and stays swallowed down to its Up.
+    if (waking_ && sameKey(e, wakeKey_)) {
+        if (e.type == KeyEvent::Up) waking_ = false;
+        lastKeyMs_ = nowMs;
+        return;
+    }
+    if (e.type == KeyEvent::Down && screen(nowMs) != Screen::On) {
+        waking_ = true;
+        wakeKey_ = e;
+        lastKeyMs_ = nowMs;
+        return;
+    }
+    lastKeyMs_ = nowMs;
     if (!e.grid && e.side == Side::Fn) fn_ = e.type != KeyEvent::Up;
     if (!e.grid && e.side == Side::Ctrl) ctrl_ = e.type != KeyEvent::Up;
     coalescedEdit_ = false;
@@ -287,8 +305,10 @@ uint32_t UiController::holdMs() const {
     return kHold[s_.settings.hold < 3 ? s_.settings.hold : 1];
 }
 
+Screen UiController::screen(uint32_t nowMs) const { return screenFor(nowMs - lastKeyMs_, s_.settings.sleep); }
+
 void UiController::loadSettings() {
-    s_.settings = {0, 4, 1};
+    s_.settings = {0, 4, 1, 2};
     std::string text;
     if (storage_.available() && storage_.read(kSettingsPath, text)) {
         JsonDocument doc;
@@ -297,6 +317,8 @@ void UiController::loadSettings() {
             s_.settings.theme = theme ? 1 : 0;
             s_.settings.brightness = (uint8_t)(bright < 1 ? 1 : (bright > 5 ? 5 : bright));
             s_.settings.hold = hold <= 300 ? 0 : (hold >= 600 ? 2 : 1);
+            const int sleep = doc["sleep"] | 2;  // minutes
+            s_.settings.sleep = sleep <= 0 ? 0 : sleep <= 1 ? 1 : sleep <= 2 ? 2 : sleep <= 5 ? 3 : 4;
         }
     }
     s_.settingsGen++;
@@ -308,6 +330,7 @@ void UiController::saveSettings() {
     doc["theme"] = s_.settings.theme;
     doc["bright"] = s_.settings.brightness;
     doc["hold"] = holdMs();
+    doc["sleep"] = sleepAfterMs(s_.settings.sleep) / 60000u;
     std::string out;
     serializeJson(doc, out);
     if (storage_.available()) storage_.write(kSettingsPath, out);

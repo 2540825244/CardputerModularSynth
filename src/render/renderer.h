@@ -11,5 +11,6 @@ bool renderBegin();
 void renderFrame(const UiState&, const Patch&, Engine&, Storage&, uint32_t nowMs, bool fnHeld);
 void renderSetTheme(int theme);  // 0 = style B (grey LCD), 1 = style A (dark)
 void renderSetBrightness(int level);  // 1..5
+void renderSetBacklight(int raw);  // 0..255 direct: screen sleep dims (8) or turns it off (0)
 // Sprite buffer bytes, for the RAM report.
 uint32_t renderSpriteBytes();
