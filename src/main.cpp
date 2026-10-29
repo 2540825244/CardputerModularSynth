@@ -86,7 +86,7 @@ static void uiTask(void*) {
             lastDraw = now;
             const float total = (float)heap_caps_get_total_size(MALLOC_CAP_8BIT);
             const float ram = total > 0 ? 1.f - heap_caps_get_free_size(MALLOC_CAP_8BIT) / total : 0.f;
-            const bool due = gate.due(frameKey(gUi.state(), gPatch, gEngine, now, gUi.fnHeld(), ram), now);
+            const bool due = gate.due(frameKeys(gUi.state(), gPatch, gEngine, now, gUi.fnHeld(), ram), now, sc == Screen::Dim);
             if (due || inputPending) renderFrame(gUi.state(), gPatch, gEngine, gSd, now, gUi.fnHeld());
             inputPending = false;
         }

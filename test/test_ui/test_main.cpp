@@ -2129,6 +2129,32 @@ void test_first_key_only_wakes() {
     TEST_ASSERT_TRUE(f.ui.screen(f.t) == Screen::On);
 }
 
+// Review M4: fn that wakes the screen is no modifier while it stays down (the decoder sees it).
+void test_wake_modifier_is_no_modifier() {
+    Fx f;
+    f.place(TOsc, 1, 1);  // selected
+    const uint16_t id = gPatch.findAt(0, 13)->id;
+    KeyDecoder dec;
+    f.ui.setDecoder(&dec);
+    uint32_t t = f.t + 6 * 60000;
+    KeyEvent ev[16];
+    int n = 0;
+    const KeyPos fn = {0, 2}, del = {13, 0};
+    KeyPos one[] = {fn}, two[] = {fn, del};
+    dec.update(one, 1, t, ev, &n, 16);
+    for (int i = 0; i < n; i++) f.ui.handle(ev[i], t);
+    TEST_ASSERT_FALSE(f.ui.fnHeld());
+    dec.update(two, 2, t += 50, ev, &n, 16);
+    for (int i = 0; i < n; i++) f.ui.handle(ev[i], t);
+    const ModuleRec* m = gPatch.find(id);
+    TEST_ASSERT_TRUE(!m || !m->bypass);  // a plain del, not fn+del
+    dec.update(nullptr, 0, t += 50, ev, &n, 16);
+    for (int i = 0; i < n; i++) f.ui.handle(ev[i], t);
+    dec.update(one, 1, t += 50, ev, &n, 16);  // awake: fn is fn again
+    for (int i = 0; i < n; i++) f.ui.handle(ev[i], t);
+    TEST_ASSERT_TRUE(f.ui.fnHeld());
+}
+
 void test_sleep_setting_saved() {
     Fx f;
     f.side(Side::Esc);
@@ -2152,7 +2178,7 @@ void test_redraw_only_on_change() {
     f.side(Side::Esc);
     RedrawGate g;
     uint32_t now = f.t + 500;  // past the last key's pressed highlight
-    auto key = [&]() { return frameKey(f.ui.state(), gPatch, f.eng, now, f.ui.fnHeld(), 0.3f); };
+    auto key = [&]() { return frameKeys(f.ui.state(), gPatch, f.eng, now, f.ui.fnHeld(), 0.3f); };
     TEST_ASSERT_TRUE(g.due(key(), now));  // the first frame
     int frames = 0;
     for (int i = 0; i < 60; i++) {  // 2 s idle at 30 fps: the 300 ms settle, then the 1 s keepalive
@@ -2165,7 +2191,7 @@ void test_redraw_only_on_change() {
     // a module on this page sounds: its activity meter is visible
     float buf[kBlock];
     f.eng.processBlock(buf);
-    now += 33;
+    now += 120;  // a meter alone: at most 10 fps
     TEST_ASSERT_TRUE(g.due(key(), now));
     // a toast shows, and its end is a change too
     f.ui.toast("HI", now);
@@ -2180,7 +2206,25 @@ void test_redraw_only_on_change() {
     // idle: a frame right after a drawn one is not due; one RAM-bar pixel more is
     while (!g.due(key(), now += 33)) {}
     TEST_ASSERT_FALSE(g.due(key(), now += 33));
-    TEST_ASSERT_TRUE(g.due(frameKey(f.ui.state(), gPatch, f.eng, now, f.ui.fnHeld(), 0.3f + 2.f / 135), now += 33));
+    now += 200;
+    TEST_ASSERT_TRUE(g.due(frameKeys(f.ui.state(), gPatch, f.eng, now, f.ui.fnHeld(), 0.3f + 2.f / 135), now));
+    // review M3: meters that move every frame (audio playing) draw at 10 fps, not 30
+    int drawn = 0;
+    for (int i = 0; i < 30; i++) {  // 1 s
+        f.eng.processBlock(buf);
+        FrameKeys k = key();
+        k.live += (uint32_t)i;  // a meter moved
+        drawn += g.due(k, now += 33);
+    }
+    TEST_ASSERT_TRUE(drawn >= 6 && drawn <= 10);  // every 4th 33 ms frame
+    // dimmed: only real changes (and the keepalive) draw
+    drawn = 0;
+    for (int i = 0; i < 30; i++) {
+        FrameKeys k = key();
+        k.live += 1000u + (uint32_t)i;
+        drawn += g.due(k, now += 33, true);
+    }
+    TEST_ASSERT_TRUE(drawn <= 2);
 }
 
 int main() {
@@ -2202,6 +2246,7 @@ int main() {
     RUN_TEST(test_screen_sleep_times);
     RUN_TEST(test_first_key_only_wakes);
     RUN_TEST(test_sleep_setting_saved);
+    RUN_TEST(test_wake_modifier_is_no_modifier);
     RUN_TEST(test_redraw_only_on_change);
     RUN_TEST(test_kit_play_key_starts_pass);
     RUN_TEST(test_kit_play_key_keys_first);

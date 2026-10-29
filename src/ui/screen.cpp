@@ -26,18 +26,18 @@ int px(float f) { return (int)((f < 0.f ? 0.f : (f > 1.f ? 1.f : f)) * 135.f + 0
 int q(float v, float steps) { return (int)(v * steps); }
 }  // namespace
 
-uint32_t frameKey(const UiState& s, const Patch& p, Engine& e, uint32_t now, bool fnHeld, float ramFrac) {
-    Fnv f;
+FrameKeys frameKeys(const UiState& s, const Patch& p, Engine& e, uint32_t now, bool fnHeld, float ramFrac) {
+    Fnv f, l;
     f.add(s);  // value-initialised and only ever assigned: its padding stays put
     for (int i = 0; i < p.moduleCount(); i++) f.add(p.moduleAt(i));
     for (int i = 0; i < p.cableCount(); i++) f.add(p.cableAt(i));
     f.add(fnHeld);
-    f.add(px(e.cpuLoad()));
-    f.add(px(ramFrac));
     f.add((bool)(s.toast[0] && (int32_t)(now - s.toastUntilMs) < 0));
     f.add(helpVisible(s, now));
     for (int i = 0; i < 8; i++) f.add(sidePressed(s, i, now));
     if (s.carry.active || s.sideHeld) f.add((now / 250) % 2);  // carry pulses, held lit keys blink
+    l.add(px(e.cpuLoad()));
+    l.add(px(ramFrac));
     // Live readouts of the modules in view: tile meters on this page, or the open module's view.
     for (int i = 0; i < p.moduleCount(); i++) {
         const ModuleRec& r = p.moduleAt(i);
@@ -45,23 +45,23 @@ uint32_t frameKey(const UiState& s, const Patch& p, Engine& e, uint32_t now, boo
         if (!shown) continue;
         const Module* m = e.instance(r.id);
         if (!m) continue;
-        f.add(q(m->peak(), 32.f / kAudioVolts));
-        f.add(q(m->monitor(0), 64.f));
-        f.add(q(m->monitor(1), 64.f));
+        l.add(q(m->peak(), 32.f / kAudioVolts));
+        l.add(q(m->monitor(0), 64.f));
+        l.add(q(m->monitor(1), 64.f));
         int n = 0, head = 0;
-        if (s.view == View::Module && m->displayBuffer(&n, &head)) f.add(head);  // a scope scrolls
+        if (s.view == View::Module && m->displayBuffer(&n, &head)) l.add(head);  // a scope scrolls
     }
-    return f.h;
+    return {f.h, l.h};
 }
 
-bool RedrawGate::due(uint32_t key, uint32_t now) {
-    if (first_ || key != key_) {
-        first_ = false;
-        key_ = key;
-        changedMs_ = now;
-    } else if (now - changedMs_ >= kSettleMs && now - drawnMs_ < kKeepAliveMs) {
-        return false;
-    }
+bool RedrawGate::due(const FrameKeys& k, uint32_t now, bool dim) {
+    const bool ui = first_ || k.ui != key_.ui, live = k.live != key_.live;
+    first_ = false;
+    if (ui) changedMs_ = now;
+    const bool draw = ui || now - changedMs_ < kSettleMs || (live && !dim && now - drawnMs_ >= kLiveMs) ||
+                      now - drawnMs_ >= kKeepAliveMs;
+    if (!draw) return false;
+    key_ = k;  // a live change not drawn yet stays pending until it is
     drawnMs_ = now;
     return true;
 }

@@ -10,18 +10,24 @@ enum class Screen : uint8_t { On, Dim, Off };
 uint32_t sleepAfterMs(uint8_t setting);  // setting 0..4 = OFF, 1, 2, 5, 10 min; 0 = never
 Screen screenFor(uint32_t idleMs, uint8_t setting);
 
-// Everything a frame shows, hashed: the UI state, the patch, the CPU and RAM bars, the activity of
-// the modules in view, and the time-driven bits (toast, help, carry blink). ramFrac: heap in use.
-uint32_t frameKey(const UiState&, const Patch&, Engine&, uint32_t nowMs, bool fnHeld, float ramFrac);
+// Everything a frame shows, hashed in two parts. ui: the UI state, the patch and the time-driven
+// bits (toast, help, carry blink) - a change draws at once. live: the CPU and RAM bars and the
+// activity of the modules in view - they move all the time while audio plays, so they draw at
+// most at kLiveMs. ramFrac: heap in use.
+struct FrameKeys {
+    uint32_t ui, live;
+};
+FrameKeys frameKeys(const UiState&, const Patch&, Engine&, uint32_t nowMs, bool fnHeld, float ramFrac);
 
-// Redraw only when the frame would change: then at full rate for kSettleMs (short animations - zoom,
-// flashes, easing - run on time alone), and once a second regardless.
+// A ui change draws, then full rate for kSettleMs (short animations - zoom, flashes, easing - run
+// on time alone); a live change draws every kLiveMs (not while dim); and once a second regardless.
 class RedrawGate {
    public:
-    static constexpr uint32_t kSettleMs = 300, kKeepAliveMs = 1000;
-    bool due(uint32_t key, uint32_t nowMs);
+    static constexpr uint32_t kSettleMs = 300, kLiveMs = 100, kKeepAliveMs = 1000;
+    bool due(const FrameKeys& k, uint32_t nowMs, bool dim = false);
 
    private:
     bool first_ = true;
-    uint32_t key_ = 0, changedMs_ = 0, drawnMs_ = 0;
+    FrameKeys key_{};
+    uint32_t changedMs_ = 0, drawnMs_ = 0;
 };

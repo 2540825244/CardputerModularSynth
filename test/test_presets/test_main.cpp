@@ -9,15 +9,28 @@
 #include "core/patch_io.h"
 #include "core/presets.h"
 #include "core/registry.h"
+#include "core/dsp_util.h"
 
 // The v1.3 preset bench (native stand-in for the device bench while the device is away): every
-// preset loads, plays on its own for 3 s (a KIT gets one PLAY), fits the CPU budget from the
-// per-type costs (device-measured), and sits near -3 dBFS peak at OUT's line volume.
+// preset loads, plays on its own for 20 s (slow LFOs, 20 bpm clocks and feedback build up; a KIT
+// gets one PLAY and plays its pass), fits the CPU budget from the per-type costs (device-measured),
+// and peaks near -3 dBFS at OUT's line volume before its soft clip (so nothing is squashed).
 
 void setUp() {}
 void tearDown() {}
 
 static uint32_t bigHeap() { return 1000000; }
+
+// OUT soft-clips: the level going in, from the level coming out (monotonic below 1).
+static double unclip(double y) {
+    if (y >= 1.0) return 3.0;
+    double lo = 0, hi = 3;
+    for (int i = 0; i < 40; i++) {
+        const double mid = 0.5 * (lo + hi);
+        (softClip((float)mid) < y ? lo : hi) = mid;
+    }
+    return 0.5 * (lo + hi);
+}
 
 struct Level {
     double peak, rms;
@@ -43,9 +56,8 @@ static Level play(const Patch& p, Engine& eng, float sec) {
             gap = (int)(p.moduleAt(i).params[kit::kGap] * kSampleRate / 1000.f);
         }
     double sum = 0;
-    // a KIT pass may be longer than sec: play it all
-    int blocks = (int)(sec * kSampleRate / kBlock);
-    if (l.steps && l.steps * gap / kBlock > blocks) blocks = l.steps * gap / kBlock;
+    // a KIT: its pass (the take), else sec
+    int blocks = l.steps ? l.steps * gap / kBlock + (int)(0.3f * kSampleRate / kBlock) : (int)(sec * kSampleRate / kBlock);
     for (int b = 0; b < blocks; b++) {
         eng.processBlock(buf);
         eng.collect();
@@ -58,15 +70,19 @@ static Level play(const Patch& p, Engine& eng, float sec) {
         }
     }
     l.rms = sqrt(sum / (blocks * kBlock));
+    l.peak = unclip(l.peak);
+    for (int s = 0; s < l.steps; s++) l.step[s] = unclip(l.step[s]);
     return l;
 }
 
 static double db(double x) { return 20.0 * log10(x > 1e-9 ? x : 1e-9); }
 
+
+
 void test_preset_bench() {
     int n = 0;
     const Preset* ps = presets(&n);
-    printf("\n%-7s %5s %7s %7s\n", "PRESET", "CPU%", "PEAKdB", "RMSdB");
+    printf("\n%-7s %5s %7s %7s  (peak before OUT's soft clip)\n", "PRESET", "CPU%", "PEAKdB", "RMSdB");
     int bad = 0;
     for (int i = 0; i < n; i++) {
         std::unique_ptr<Patch> p(new Patch());
@@ -74,7 +90,7 @@ void test_preset_bench() {
         Engine eng(bigHeap);
         TEST_ASSERT_EQUAL_MESSAGE(0, eng.apply(*p), ps[i].name);
         const uint32_t cyc = eng.estimatedCycles();
-        const Level l = play(*p, eng, 3.f);
+        const Level l = play(*p, eng, 20.f);
         const bool cpuOk = cyc <= kCpuBudget, loud = db(l.peak) > -1.0, quiet = db(l.peak) < -9.0,
                    silent = db(l.rms) < -40.0;
         bool slice = false;  // a KIT step too quiet to be a usable PO-33 slice

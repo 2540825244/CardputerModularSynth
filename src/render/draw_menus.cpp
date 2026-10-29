@@ -174,7 +174,7 @@ void systemPage(const UiState& s) {
     smallText("HOLD MS", (cellX(8) + cellX(10) + cellW(10)) / 2, cellY(1) + 4, PDim);
     static const char* const kSleep[] = {"OFF", "1", "2", "5", "10"};
     for (int i = 0; i < 5; i++) tile(i, kSleep[i], i == st.sleep, 2);
-    smallText("SCREEN SLEEP MIN", (cellX(0) + cellX(4) + cellW(4)) / 2, cellY(3) + 4, PDim);
+    smallText("SCREEN SLEEP MIN", (cellX(5) + cellX(11) + cellW(11)) / 2, cellY(2) + cellH(2) / 2 - 2, PDim);
     bandText("SYSTEM", "TAP TO SET");
 }
 

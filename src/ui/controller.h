@@ -48,8 +48,9 @@ class UiController {
     // Modifier state comes from the decoder (state after update()), because a same-frame chord
     // emits the grid Down before the modifier Down. Without a decoder, falls back to event tracking.
     void setDecoder(const KeyDecoder* d) { dec_ = d; }
-    bool fnHeld() const { return dec_ ? dec_->sideHeld(Side::Fn) : fn_; }
-    bool ctrlHeld() const { return dec_ ? dec_->sideHeld(Side::Ctrl) : ctrl_; }
+    // A modifier that woke the screen is no modifier until it is released.
+    bool fnHeld() const { return !wakingSide(Side::Fn) && (dec_ ? dec_->sideHeld(Side::Fn) : fn_); }
+    bool ctrlHeld() const { return !wakingSide(Side::Ctrl) && (dec_ ? dec_->sideHeld(Side::Ctrl) : ctrl_); }
     uint32_t now() const { return now_; }
     KeysModule* keysInstance();  // the KEYS instance, or nullptr
     KitModule* kitInstance();    // the KIT instance, or nullptr
@@ -96,6 +97,7 @@ class UiController {
     uint32_t lastKeyMs_ = 0;  // screen sleep
     bool waking_ = false;     // the waking key is swallowed down to its Up
     KeyEvent wakeKey_{};
+    bool wakingSide(Side s) const { return waking_ && !wakeKey_.grid && wakeKey_.side == s; }
     bool autosaveBackoff_ = false, autosaveWarned_ = false;
     bool missingWarned_ = false, cpuFullWarned_ = false;
     uint32_t missingSinceMs_ = 0, cpuFullSinceMs_ = 0;

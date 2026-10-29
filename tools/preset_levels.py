@@ -34,6 +34,8 @@ def bench():
     for line in out.splitlines():
         m = re.match(r"^(\S+)\s+[\d.]+\s+(-?[\d.]+)\s+(-?[\d.]+)", line)
         if m and m.group(1) != "PRESET": peaks[m.group(1)] = float(m.group(2))
+    if not peaks:
+        raise SystemExit("bench produced no table (build or test failure):\n" + out[-2000:])
     return peaks
 
 
