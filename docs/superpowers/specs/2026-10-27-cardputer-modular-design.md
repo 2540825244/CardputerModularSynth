@@ -518,3 +518,39 @@ input, and more keyboard layouts that switch without rewiring. **[owner]** How e
   a shift arrow (PREV) where fn only reverses tab/enter (KEYS play page, SYSTEM page). **[owner report]**
 - KEYS: a latched note keeps sounding when you leave the Play page (space audition is off while latched). CHROMATIC starts at C3 again
   (v1.1's bottom row), so old patches keep their octave.
+
+## 15. v1.4: pictures for every module, 5 new modules, 14 presets (session 8, 2026-10-29)
+Plan `docs/superpowers/plans/2026-10-29-v1.4-pictures-modules-presets.md` (its "calls made" table
+lists Claude's calls). Owner: "revamp all the modules to be more graphical if the hardware budget
+allows ... something fresh while keeping the current well established interaction logic"; mockups
+approved ("good to go"); "more modules and presets as you see fit".
+- **Pictures** (`ui/pictures*.{h,cpp}`, `ui/pic_*.cpp`): every module with automatic pages, plus
+  GRD (TONE / VOICE / MOD), KEYS SET and SEQ SET, draws a picture over cols 5..11 of its page.
+  Painters draw through `ui/gfx.h` (the M5Canvas on the device, a framebuffer in test_pictures that
+  catches out-of-box draws and writes `.pio/pictures/*.png` and a contact sheet `_sheet.png`).
+  Static pictures cost nothing until a param changes; live ones (LFO phase, ENV/AD/LPG level, EUC
+  / ARP step, TUR register, MUX/DMX choice, TLT, OUT meter, DYN gain reduction, VCA gain, CHS
+  point, OSC Hz, KEYS held note, CLK beat) redraw through the RedrawGate (<= 10 fps, on change).
+  The selected param's part of a picture is the accent; ENV / VCF / AD draw a dashed ghost of the
+  defaults. VSO FMO FOR VOS ZOS are the real DaisySP oscillators run for two cycles; FLD / OVD the
+  real shapers; EQ3 its own biquads; drums and physical models are sketches of their knobs (too
+  heavy to run). **[owner: the direction; every picture's content Claude's call]**
+- **Layout**: on a picture page, params past row 1 continue on row 3 after the outs, so most
+  modules keep every knob beside the picture. GRD's pages are TONE (ENG, its 3 knobs, OCT; TUN and
+  the mod amounts; VCA DEC COL), PATCH (pins), VOICE, MOD. KEYS SET: LAY SCL ROT OCT GLD / VEL LEG
+  LAT / outs.
+- **GRD's knobs are named per engine** in cells, strip and picture (FM: RAT IDX FBK ...), from the
+  Plaits manual and checked against `lib/plaits/.../engine*/` (the owner knows the Grind: a wrong
+  name is one table line in `ui/pictures.cpp`).
+- **Whole UI**: the value strip fills a bipolar knob from its zero (zero marked), ticks the default;
+  the place menu shows the type's picture at its defaults; patch tiles of OSC VSO LFO VCF LAD ENV AD
+  EUC draw a glyph that follows their params; SEQ TRG EUC KIT tiles show the step on their category
+  bar, CLK lights it on the beat; SEQ step cells draw their pitch as a bar; steps past LEN hatch.
+- **New modules** (`core/modules/v14.cpp`): ARP (7 chords, UP / DN / U/D / RND, 1-3 octaves, CLK or
+  its RATE, GATE holds, a new gate starts at the root), CLP (handclap), PRC (TOM CNG CB CLV RIM),
+  VOW (A E I O U formants, SHF, RES, MIX), EQ3 (low shelf 200 Hz, mid peak, high shelf 4 kHz, +-15 dB).
+  cpuCycles are estimates until the device bench.
+- **Presets**: a second PRESETS page (file menu: LOAD SAVE PRESETS PRESETS-2 SYSTEM); 14 presets
+  on it for the new modules, at -3 dBFS from the bench.
+- Found, not changed: DaisySP's Fm2 adds the modulator into the carrier's phase for good (an FM,
+  not a PM), so FMO's index is very strong (~40 cycles of deviation at 30 %); FMO's picture shows it.
