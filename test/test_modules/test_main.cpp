@@ -380,6 +380,16 @@ void test_out_volume_select() {
     delete o;
 }
 
+void test_out_trim() {
+    OutModule* o = static_cast<OutModule*>(kOutType.create());
+    o->setParam(1, 0.5f);
+    o->setParam(2, 1.f);  // LINE
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, softClip(0.1f), outPeak(*o, 1.f, 300));  // 1 V = 0.2 FS x 0.5
+    o->setParam(3, 12.f);  // +12 dB: x 3.98
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, softClip(0.398f), outPeak(*o, 1.f, 300));
+    delete o;
+}
+
 void test_out_bounded() {
     OutModule* o = static_cast<OutModule*>(kOutType.create());
     o->setParam(0, 1.f);
@@ -1653,6 +1663,7 @@ int main() {
     RUN_TEST(test_keys_retrigger_gap);
     RUN_TEST(test_keys_quick_tap);
     RUN_TEST(test_out_volume_select);
+    RUN_TEST(test_out_trim);
     RUN_TEST(test_out_bounded);
     RUN_TEST(test_pool_exhaustion);
     RUN_TEST(test_dly_create_refused);

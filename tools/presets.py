@@ -5,6 +5,7 @@ Each preset: name (<= 6 chars), modules {key: (type, cell, {param: value})}, cab
 [(from_key, out_pin, to_key, in_pin, amount)] (amount = the source output amount; 1 = leave).
 Cells: row*12 + col on page 0 (row 0 = number keys, row 1 = q row ...).
 Run: python3 tools/presets.py   (then rebuild; test_every_preset_loads_clean checks them)
+Levels: python3 tools/preset_levels.py   (runs the native bench, sets GAIN for -3 dBFS peaks)
 """
 import json, os
 
@@ -16,22 +17,23 @@ def preset(name, mods, cables, inamt=None):
 preset("BASIC", {
     "k": ("keys", 12, {}), "o": ("osc", 13, {"wave": 2}), "f": ("vcf", 14, {"cutoff": 900, "res": 0.3}),
     "a": ("vca", 15, {}), "e": ("env", 26, {"a": 5, "d": 300, "s": 0.4, "r": 400}), "x": ("out", 16, {}),
+    "c": ("clk", 24, {"bpm": 60}),
 }, [("k", "pitch", "o", "pitch"), ("o", "out", "f", "in"), ("f", "out", "a", "in"), ("k", "gate", "e", "gate"),
-    ("e", "out", "a", "cv"), ("a", "out", "x", "in")])
+    ("c", "out", "e", "gate"), ("e", "out", "a", "cv"), ("a", "out", "x", "in")])
 
 preset("WOBBLE", {
     "k": ("keys", 12, {}), "o": ("osc", 13, {"wave": 3, "oct": -1}), "f": ("vcf", 14, {"cutoff": 400, "res": 0.65}),
     "a": ("vca", 15, {}), "e": ("env", 26, {"a": 2, "d": 200, "s": 0.8, "r": 200}), "l": ("lfo", 27, {"rate": 3}),
-    "x": ("out", 16, {}),
+    "x": ("out", 16, {}), "c": ("clk", 24, {"bpm": 30}),
 }, [("k", "pitch", "o", "pitch"), ("o", "out", "f", "in"), ("f", "out", "a", "in"), ("k", "gate", "e", "gate"),
-    ("e", "out", "a", "cv"), ("l", "out", "f", "cut", 0.5), ("a", "out", "x", "in")])
+    ("c", "out", "e", "gate"), ("e", "out", "a", "cv"), ("l", "out", "f", "cut", 0.5), ("a", "out", "x", "in")])
 
 preset("ECHO", {
     "k": ("keys", 12, {}), "o": ("osc", 13, {"wave": 1}), "a": ("vca", 14, {}),
     "e": ("env", 26, {"a": 1, "d": 250, "s": 0, "r": 250}), "d": ("dly", 15, {"time": 375, "fdbk": 0.55, "mix": 0.4}),
-    "x": ("out", 16, {}),
-}, [("k", "pitch", "o", "pitch"), ("o", "out", "a", "in"), ("k", "gate", "e", "gate"), ("e", "out", "a", "cv"),
-    ("a", "out", "d", "in"), ("d", "out", "x", "in")])
+    "x": ("out", 16, {}), "c": ("clk", 24, {"bpm": 80}),
+}, [("k", "pitch", "o", "pitch"), ("o", "out", "a", "in"), ("k", "gate", "e", "gate"), ("c", "out", "e", "gate"),
+    ("e", "out", "a", "cv"), ("a", "out", "d", "in"), ("d", "out", "x", "in")])
 
 preset("RANDOM", {
     "c": ("clk", 12, {"bpm": 132}), "s": ("snh", 13, {}), "o": ("osc", 14, {"wave": 2}),
@@ -45,14 +47,25 @@ preset("RANDOM", {
 preset("TILT", {
     "k": ("keys", 12, {}), "o": ("osc", 13, {"wave": 2}), "f": ("vcf", 14, {"cutoff": 800, "res": 0.55}),
     "a": ("vca", 15, {}), "e": ("env", 26, {"a": 5, "d": 400, "s": 0.7, "r": 500}), "t": ("tilt", 27, {}),
-    "x": ("out", 16, {}),
+    "x": ("out", 16, {}), "c": ("clk", 24, {"bpm": 45}),
 }, [("k", "pitch", "o", "pitch"), ("o", "out", "f", "in"), ("f", "out", "a", "in"), ("k", "gate", "e", "gate"),
-    ("e", "out", "a", "cv"), ("t", "roll", "f", "cut"), ("t", "pitch", "o", "fm", 0.1), ("a", "out", "x", "in")])
+    ("c", "out", "e", "gate"), ("e", "out", "a", "cv"), ("t", "roll", "f", "cut"), ("t", "pitch", "o", "fm", 0.1), ("a", "out", "x", "in")])
 
 # --- later tasks append presets here ---
+GAIN = {}  # preset name -> OUT gain dB (tools/preset_levels.py sets it from the bench)
 EXTRA = os.path.join(os.path.dirname(__file__), "presets_more.py")
 if os.path.exists(EXTRA):
     exec(open(EXTRA).read())
+
+
+def apply_out(name, mods, inamt):
+    """Every OUT: DEST LINE; GAIN dB > 0 is its TRIM, < 0 its input amount."""
+    g = GAIN.get(name, 0)
+    for k, (t, cell, params) in mods.items():
+        if t == "out":
+            params["dest"] = 1
+            if g > 0: params["trim"] = round(g, 1)
+            if g < 0: inamt.setdefault(k, {})["in"] = round(10 ** (g / 20), 3)
 
 
 def to_json(mods, cables, inamt):
@@ -76,6 +89,7 @@ def main():
              '#include "presets.h"', '', 'namespace {', 'const Preset kPresets[] = {']
     for name, mods, cables, inamt in P:
         assert len(name) <= 6, name
+        apply_out(name, mods, inamt)
         js = to_json(mods, cables, inamt).replace("\\", "\\\\").replace('"', '\\"')
         lines.append('    {"%s",\n     "%s"},' % (name, js))
     lines += ['};', '}  // namespace', '',

@@ -25,6 +25,7 @@ Backlog not in the plan: `docs/todo.md`.
 - Delivered as a `.bin` for bmorcelli's Launcher. **No custom partitions.** Assets go on SD
   under `/modsynth/`.
 - DaisySP (MIT core only, not DaisySP-LGPL). Plaits (MIT) is vendored in `lib/plaits`, built with `-DTEST`.
-- New presets: edit `tools/presets.py` / `tools/presets_more.py`, then run `python3 tools/presets.py`.
+- New presets: edit `tools/presets.py` / `tools/presets_more.py`, then run `python3 tools/presets.py`;
+  `python3 tools/preset_levels.py` sets their OUT gain (-3 dBFS) from the native bench (test_presets).
 - Git is on `main` with no remote yet. The owner will push to a private GitHub repo later;
   `gh` is logged in.

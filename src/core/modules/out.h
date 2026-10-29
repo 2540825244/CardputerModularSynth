@@ -17,5 +17,6 @@ class OutModule : public Module {
     std::atomic<int> autoDest_{-1};
     daisysp::DcBlock dc_;
     Slew vol_;
+    float trimDb_ = 0.f, trimGain_ = 1.f;  // audio thread
     float y_[kBlock] = {};
 };
