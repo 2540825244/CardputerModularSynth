@@ -4,6 +4,10 @@
 
 bool SdStorage::mount() {
     if (!spiStarted_) {
+        // G5 is the Cap LoRa-1262's SX1262 NSS on the EXT header, on the same SPI bus. It floats
+        // low after reset, so the radio answers on MISO and the card's CMD0 fails. A pull-up keeps
+        // the radio deselected (harmless with no cap fitted).
+        pinMode(5, INPUT_PULLUP);
         SPI.begin(40, 39, 14, 12);
         spiStarted_ = true;
     } else {
@@ -19,6 +23,20 @@ bool SdStorage::mount() {
 }
 
 bool SdStorage::begin() { return mount(); }
+
+void SdStorage::selfTest() {
+    if (!ok_) {
+        Serial.println("SD none");
+        return;
+    }
+    static const char* kProbe = "/modsynth/probe.txt";
+    const std::string want = "modsynth sd probe";
+    std::string got;
+    const bool rw = write(kProbe, want) && read(kProbe, got) && got == want;
+    SD.remove(kProbe);
+    Serial.printf("SD %s type=%d %u MB\n", rw ? "ok" : "FAIL rw", (int)SD.cardType(),
+                  (unsigned)(SD.cardSize() >> 20));
+}
 
 bool SdStorage::available() {
     if (!ok_ && millis() - lastTryMs_ >= 5000) mount();
@@ -56,7 +74,7 @@ bool SdStorage::write(const char* path, const std::string& data) {
         SD.remove(tmp.c_str());
         return false;
     }
-    SD.remove(path);
+    if (SD.exists(path)) SD.remove(path);  // remove() logs an error for a missing file
     return SD.rename(tmp.c_str(), path);
 }
 

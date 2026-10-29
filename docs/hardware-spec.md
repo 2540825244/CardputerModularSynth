@@ -16,7 +16,7 @@ real device.
 | SRAM | 512 KB total; probe: 325,820 B free, 294,900 B largest block (252,432 / 233,460 with a 65 KB sprite + 8 KB stack) | **Tight**: limits delay/reverb/granular buffers |
 | PSRAM | **None** ("N8" = 8 MB flash, no PSRAM) | No large sample RAM; no multi-second buffers |
 | Flash | 8 MB | ~3 MB app + ~4 MB for wavetables/samples (memory-mapped, read-only) |
-| microSD | SPI: CS G12, MOSI G14, CLK G40, MISO G39 | SD confirmed working (probe: SDHC, 59,818 MB). Patch storage, sample streaming (mono 48k/16-bit = 96 KB/s, easy) |
+| microSD | SPI: CS G12, MOSI G14, CLK G40, MISO G39 | SD confirmed working (probe: SDHC, 59,818 MB). Hold G5 high first (see §6). Mounted, FATFS takes ~28 KB of heap in one block (5 open files x 4 KB cache). Patch storage, sample streaming (mono 48k/16-bit = 96 KB/s, easy) |
 
 CPU budget at 48 kHz: 240 MHz / 48 000 ≈ **5 000 cycles per sample per core**.
 
@@ -106,6 +106,7 @@ Audio-thread code must never block on I2C.
 | Extra port | HY2.0-4P I2C (G8/G9) on the cap |
 | Power | LoRa ~163 mA @ 5 V TX; GNSS ~33 mA |
 | Warning | Never transmit without the antenna attached |
+| SD bus | G5 (NSS) floats low after reset. With the cap fitted, the SX1262 is then selected and drives MISO, so SD init fails (`Card Failed! cmd: 0x00`, `f_mount failed: (3)`). A pull-up on G5 before `SD.begin` fixes it (device, 2026-10-29) |
 
 **Relevance to the synth: low.** LoRa latency (tens to hundreds of ms) and duty
 cycle rule out note/clock sync. ESP-NOW over the built-in WiFi is far better

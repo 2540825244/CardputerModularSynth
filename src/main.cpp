@@ -108,6 +108,8 @@ void setup() {
     if (!renderBegin()) Serial.println("renderBegin FAILED (sprite)");
     printHeap("sprite");
     gSd.begin();
+    gSd.selfTest();
+    printHeap("sd");
     gUi.setDecoder(&gDecoder);
     gUi.bootLoad();
     gEngine.setCycleCounter(cycleCount);

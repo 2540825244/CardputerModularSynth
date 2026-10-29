@@ -2,10 +2,11 @@
 #include <cstdint>
 #include "core/storage.h"
 
-// SD on SPI G40/G39/G14, CS G12.
+// SD on SPI G40/G39/G14, CS G12. G5 (LoRa cap NSS, same bus) is held high.
 class SdStorage : public Storage {
    public:
     bool begin();  // mounts and creates /modsynth/patches
+    void selfTest();  // one serial line: writes, reads back and deletes /modsynth/probe.txt
     bool available() override;  // while unmounted, re-attempts begin() at most every 5 s
     bool read(const char* path, std::string& out) override;
     bool write(const char* path, const std::string& data) override;  // tmp + rename

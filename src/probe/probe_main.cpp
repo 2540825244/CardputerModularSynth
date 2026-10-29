@@ -281,6 +281,7 @@ void setup() {
     startAudio();
     scanInit();
 
+    pinMode(5, INPUT_PULLUP);  // LoRa cap NSS (same bus): keep the radio off MISO
     SPI.begin(40, 39, 14, 12);
     g_sdOk = SD.begin(12, SPI, 25000000);
     if (g_sdOk) {
