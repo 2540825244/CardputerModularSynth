@@ -210,6 +210,42 @@ void test_delete_and_undo() {
     TEST_ASSERT_NOT_NULL(f.eng.instance(id));
 }
 
+// v1.3: fn+del on a module bypasses it (del alone still deletes), again enables it; undoable.
+void test_fn_del_bypasses() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    const uint16_t id = gPatch.findAt(0, 13)->id;
+    Module* inst = f.eng.instance(id);
+    f.sideDown(Side::Fn);
+    f.side(Side::Del);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());
+    TEST_ASSERT_EQUAL_UINT8(1, gPatch.find(id)->bypass);
+    TEST_ASSERT_EQUAL(View::Patch, f.ui.state().view);  // fn released after a combo: no place menu
+    TEST_ASSERT_TRUE(f.eng.instance(id) == inst);  // the instance stays
+    TEST_ASSERT_TRUE(f.eng.canAdd(gPatch, kOscType).ok);
+    f.side(Side::Backslash);  // undo
+    TEST_ASSERT_EQUAL_UINT8(0, gPatch.find(id)->bypass);
+    f.sideDown(Side::Fn);
+    f.side(Side::Del);
+    f.side(Side::Del);  // enable again
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL_UINT8(0, gPatch.find(id)->bypass);
+}
+
+// The side strip says what fn+del does on the selected module.
+void test_fn_del_icon_names() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    SideIcons a = sideIcons(f.ui.state(), gPatch, false);
+    TEST_ASSERT_EQUAL_STRING("DELETE", a.name[(int)Side::Del]);
+    SideIcons b = sideIcons(f.ui.state(), gPatch, true);
+    TEST_ASSERT_EQUAL_STRING("BYPASS", b.name[(int)Side::Del]);
+    gPatch.setBypass(gPatch.findAt(0, 13)->id, true);
+    SideIcons c = sideIcons(f.ui.state(), gPatch, true);
+    TEST_ASSERT_EQUAL_STRING("ENABLE", c.name[(int)Side::Del]);
+}
+
 void test_move() {
     Fx f;
     f.place(TOsc, 1, 1);
@@ -1972,6 +2008,8 @@ int main() {
     RUN_TEST(test_select_open_back);
     RUN_TEST(test_keys_opens_play);
     RUN_TEST(test_delete_and_undo);
+    RUN_TEST(test_fn_del_bypasses);
+    RUN_TEST(test_fn_del_icon_names);
     RUN_TEST(test_move);
     RUN_TEST(test_move_cancel_by_esc);
     RUN_TEST(test_paging);

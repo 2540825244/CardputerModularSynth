@@ -62,6 +62,7 @@ std::string patchToJson(const Patch& p) {
         m["type"] = t.id;
         m["page"] = r.page;
         m["cell"] = r.cell;
+        if (r.bypass) m["bypass"] = true;  // only when set: older files stay byte-identical
         JsonObject ps = m["params"].to<JsonObject>();
         for (int k = 0; k < t.numParams && k < kMaxParams; k++) ps[t.params[k].key] = r.params[k];
         JsonObject am = m["amounts"].to<JsonObject>();
@@ -109,7 +110,7 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
     JsonDocument filter;  // keep only what the loader reads
     filter["format"] = true;
     JsonObject fm = filter["modules"][0].to<JsonObject>();
-    for (const char* k : {"id", "type", "page", "cell", "params", "amounts", "inamounts"}) fm[k] = true;
+    for (const char* k : {"id", "type", "page", "cell", "bypass", "params", "amounts", "inamounts"}) fm[k] = true;
     JsonObject fc = filter["cables"][0].to<JsonObject>();
     for (const char* k : {"from", "to", "color"}) fc[k] = true;
     JsonDocument doc;
@@ -156,6 +157,7 @@ LoadReport patchFromJson(const std::string& json, Patch& out, const Engine* budg
             continue;
         }
         ModuleRec* r = scratch.find(static_cast<uint16_t>(id));
+        r->bypass = m["bypass"].is<bool>() && m["bypass"].as<bool>() ? 1 : 0;
         JsonObjectConst ps = m["params"].as<JsonObjectConst>();
         for (int k = 0; k < t->numParams && k < kMaxParams; k++) {
             JsonVariantConst v = ps[t->params[k].key];

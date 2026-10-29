@@ -106,6 +106,13 @@ PatchError Patch::copyModule(uint16_t id, uint8_t page, uint8_t cell, uint16_t* 
     return PatchError::None;
 }
 
+bool Patch::setBypass(uint16_t id, bool on) {
+    ModuleRec* m = find(id);
+    if (!m) return false;
+    m->bypass = on ? 1 : 0;
+    return true;
+}
+
 PatchError Patch::swapModules(uint16_t a, uint16_t b) {
     ModuleRec* x = find(a);
     ModuleRec* y = find(b);

@@ -175,7 +175,7 @@ void test_swap_modules() {
     TEST_ASSERT_EQUAL(0, p.find(b)->cell);
 }
 
-void test_patch_size_budget() { TEST_ASSERT_TRUE(sizeof(Patch) <= (sizeof(void*) == 4 ? 5376u : 5504u)); }
+void test_patch_size_budget() { TEST_ASSERT_TRUE(sizeof(Patch) <= (sizeof(void*) == 4 ? 5504u : 5760u)); }  // +4 B a record: bypass
 
 int main() {
     UNITY_BEGIN();

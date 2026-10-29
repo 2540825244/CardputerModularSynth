@@ -38,7 +38,10 @@ void patchView(SideIcons& r, const UiState& s, const Patch& p, bool fnHeld) {
     else if (moving) set(r, Side::Fn, Ic::Copy, "COPY");
     else set(r, Side::Fn, Ic::Plus, "PLACE");
     set(r, Side::Ctrl, Ic::Move, "MOVE", moving);
-    if (sel && !moving) set(r, Side::Del, Ic::Trash, "DELETE");
+    if (sel && !moving) {
+        if (fnHeld) set(r, Side::Del, Ic::Bypass, sel->bypass ? "ENABLE" : "BYPASS", sel->bypass);
+        else set(r, Side::Del, Ic::Trash, "DELETE");
+    }
     undo(r, fnHeld);
     if (s.selCell >= 0 && !moving) set(r, Side::Enter, sel ? Ic::Open : Ic::Plus, sel ? "OPEN" : "PLACE");
     for (int i = 0; i < p.moduleCount(); i++)

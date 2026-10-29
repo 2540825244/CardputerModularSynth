@@ -1,4 +1,5 @@
 #include "module.h"
+#include <cstring>
 
 Module::Module(const ModuleTypeInfo& t) : type_(t) {
     const int n = (t.numOuts > 0 ? t.numOuts : 1) * kBlock;
@@ -35,4 +36,9 @@ float Module::monitor(int i) const {
 }
 void Module::setMonitor(int i, float v) {
     if (i >= 0 && i < 2) monitors_[i].store(v, std::memory_order_relaxed);
+}
+
+bool bypassPasses(const ModuleTypeInfo& t) {
+    if (t.category != Category::Processor && t.category != Category::Effect) return false;
+    return t.numIns > 0 && t.numOuts > 0 && strcmp(t.inKeys[0], "in") == 0 && strcmp(t.outKeys[0], "out") == 0;
 }

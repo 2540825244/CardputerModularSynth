@@ -374,8 +374,27 @@ void test_widest_patch_fits() {
     TEST_ASSERT_FALSE(patchFits(std::string(kMaxPatchJson + 1, ' ')));
 }
 
+// v1.3: "bypass":true only on a bypassed module; files without the key load unbypassed.
+void test_bypass_round_trip() {
+    Patch p = voice();
+    const uint16_t id = p.moduleAt(2).id;
+    const std::string plain = patchToJson(p);
+    TEST_ASSERT_TRUE(plain.find("bypass") == std::string::npos);  // unbypassed files are unchanged
+    p.setBypass(id, true);
+    const std::string json = patchToJson(p);
+    TEST_ASSERT_TRUE(json.find("\"bypass\":true") != std::string::npos);
+    Patch q;
+    TEST_ASSERT_EQUAL(LoadError::None, patchFromJson(json, q, nullptr).error);
+    for (int i = 0; i < q.moduleCount(); i++)
+        TEST_ASSERT_EQUAL_UINT8(q.moduleAt(i).id == id ? 1 : 0, q.moduleAt(i).bypass);
+    Patch r;
+    TEST_ASSERT_EQUAL(LoadError::None, patchFromJson(plain, r, nullptr).error);
+    for (int i = 0; i < r.moduleCount(); i++) TEST_ASSERT_EQUAL_UINT8(0, r.moduleAt(i).bypass);
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_bypass_round_trip);
     RUN_TEST(test_slot_path);
     RUN_TEST(test_roundtrip);
     RUN_TEST(test_bad_json);

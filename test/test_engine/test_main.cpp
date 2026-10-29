@@ -2,6 +2,8 @@
 #include <cmath>
 #include "core/delay_pool.h"
 #include "core/engine.h"
+#include "core/registry.h"
+#include <cstring>
 #include "core/modules/dly.h"
 #include "core/modules/env.h"
 #include "core/modules/keys.h"
@@ -540,9 +542,95 @@ void test_peak_meter() {
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 5.f, eng.instance(d)->peak());
 }
 
+// ---- v1.3 bypass ----
+// A bypassed effect is not processed and passes input 0 to output 0 (with its input amount).
+void test_bypass_passes_effect() {
+    Patch p;
+    const uint16_t d = add(p, kDcType, 0), f = add(p, kVcfType, 1), s = add(p, kSinkType, 2);
+    wire(p, d, 0, f, 0);
+    wire(p, f, 0, s, 0);
+    p.find(f)->inAmount[0] = 0.5f;
+    p.setBypass(f, true);
+    Engine eng(bigHeap);
+    eng.setCycleCounter(fakeClock);
+    eng.apply(p);
+    run(eng, 4);
+    TEST_ASSERT_TRUE(bypassPasses(kVcfType));
+    TEST_ASSERT_EQUAL_FLOAT(2.5f, gSinkIn);  // 5 V x 0.5: the filter did not run
+    TEST_ASSERT_EQUAL(0, eng.instance(f)->measuredCycles());
+    TEST_ASSERT_EQUAL_FLOAT(2.5f, eng.instance(f)->peak());
+}
+
+// Any other bypassed module outputs 0 (not the last block it computed) and the instance stays.
+void test_bypass_zeroes_others() {
+    Patch p;
+    const uint16_t d = add(p, kDcType, 0), s = add(p, kSinkType, 1);
+    wire(p, d, 0, s, 0);
+    Engine eng(bigHeap);
+    eng.apply(p);
+    run(eng, 2);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, gSinkIn);
+    Module* before = eng.instance(d);
+    p.setBypass(d, true);
+    eng.apply(p);
+    run(eng, 2);
+    TEST_ASSERT_FALSE(bypassPasses(kDcType));
+    TEST_ASSERT_EQUAL_FLOAT(0.f, gSinkIn);
+    TEST_ASSERT_TRUE(eng.instance(d) == before);  // kept: instant toggle, no RAM churn
+    p.setBypass(d, false);
+    eng.apply(p);
+    run(eng, 2);
+    TEST_ASSERT_EQUAL_FLOAT(5.f, gSinkIn);
+}
+
+// A bypassed OUT adds nothing to the master; a bypassed module is not in the CPU sums.
+void test_bypass_out_silent_and_free() {
+    Patch p;
+    uint16_t k = add(p, kKeysType, 0), o = add(p, kOscType, 1), out = add(p, kOutType, 2);
+    wire(p, k, 0, o, 0);
+    wire(p, o, 0, out, 0);
+    Engine eng(bigHeap);
+    eng.apply(p);
+    TEST_ASSERT_TRUE(run(eng, 20) > 0.01);
+    p.setBypass(out, true);
+    eng.apply(p);
+    run(eng, 1);
+    TEST_ASSERT_TRUE(run(eng, 10) == 0.0);
+
+    Patch q;
+    ModuleTypeInfo heavy = kDcType;
+    heavy.cpuCycles = 3000;
+    uint16_t h = 0;
+    q.addModule(heavy, 0, 0, &h);
+    TEST_ASSERT_FALSE(eng.canAdd(q, heavy).ok);
+    q.setBypass(h, true);
+    TEST_ASSERT_TRUE(eng.canAdd(q, heavy).ok);
+    eng.apply(q);
+    TEST_ASSERT_EQUAL(0, eng.estimatedCycles());
+}
+
+// Which types pass audio through when bypassed (the report lists them).
+void test_bypass_pass_types() {
+    const char* const pass[] = {"vcf", "vca", "dly", "rev", "cho", "flg", "pha", "trm", "psh", "lad",
+                                "fld", "ovd", "cru", "lpg", "dyn", "awh", "res"};
+    int n = 0, count = 0;
+    const ModuleTypeInfo* const* t = allTypes(&n);
+    for (int i = 0; i < n; i++) {
+        bool want = false;
+        for (const char* id : pass) want |= strcmp(id, t[i]->id) == 0;
+        TEST_ASSERT_EQUAL_MESSAGE(want, bypassPasses(*t[i]), t[i]->id);
+        count += want;
+    }
+    TEST_ASSERT_EQUAL(17, count);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_basic_voice);
+    RUN_TEST(test_bypass_passes_effect);
+    RUN_TEST(test_bypass_zeroes_others);
+    RUN_TEST(test_bypass_out_silent_and_free);
+    RUN_TEST(test_bypass_pass_types);
     RUN_TEST(test_order);
     RUN_TEST(test_feedback_finite);
     RUN_TEST(test_nan_recovers);

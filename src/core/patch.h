@@ -8,6 +8,7 @@ struct ModuleRec {
     const ModuleTypeInfo* type;  // first: no padding before the floats
     uint16_t id;
     uint8_t page, cell;  // cell = row*12 + col
+    uint8_t bypass;      // 1: not processed, not counted by the CPU guard (see bypassPasses)
     float params[kMaxParams];
     float outAmount[kMaxOuts];
     float inAmount[kMaxIns];  // input attenuverter, -1..+1, default 1
@@ -36,6 +37,7 @@ class Patch {
     // A new module of the same type with the same params and amounts, no cables.
     PatchError copyModule(uint16_t id, uint8_t page, uint8_t cell, uint16_t* outId);
     PatchError swapModules(uint16_t a, uint16_t b);  // exchanges page and cell
+    bool setBypass(uint16_t id, bool on);
     uint8_t nextCableColor() const;  // the colour addCable would pick
     PatchError addCable(uint16_t fromId, uint8_t fromOut, uint16_t toId, uint8_t toIn);  // picks colour
     int removeCablesAtPin(uint16_t id, bool isOutput, uint8_t pin);  // returns how many were removed
@@ -59,6 +61,6 @@ class Patch {
 };
 
 static_assert(std::is_trivially_copyable<Patch>::value, "undo snapshots Patch with =");
-// ~5.3 KB on the device (4-byte pointers; 22 params, 9 inputs for the GRD voice); 64-bit hosts
-// pad each record to 152 B.
-static_assert(sizeof(Patch) <= (sizeof(void*) == 4 ? 5376 : 5504), "Patch snapshot size budget");
+// ~5.4 KB on the device (4-byte pointers; 22 params, 9 inputs for the GRD voice; the bypass byte
+// pads each record by 4); 64-bit hosts pad each record to 160 B.
+static_assert(sizeof(Patch) <= (sizeof(void*) == 4 ? 5376 + 128 : 5760), "Patch snapshot size budget");

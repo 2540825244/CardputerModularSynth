@@ -190,7 +190,11 @@ Screenshot: `docs/design/01-patch-view-style-b.png`.
   - `tab` next page, `fn`+`tab` previous page **[owner, plan review]**
   - `fn` place
   - `ctrl` move module (ctrl+module, then target cell)
-  - `del` delete module
+  - `del` delete module; `fn`+`del` bypass / enable it (v1.3 **[owner]**: the soft delete; the
+    module keeps its instance and cables, is not processed and not counted by the CPU guard;
+    effects and processors with audio in 0 / out 0 pass it through, others output 0; the tile
+    draws dim with a slash, the module view says BYPASS; undoable, saved as `"bypass":true`;
+    enabling is not CPU-gated, CPU FULL warns)
   - `\` undo
   - `enter` do-it on the selection (open module / place menu)
   - `space` audition (hold to play a note)

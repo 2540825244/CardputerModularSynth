@@ -53,7 +53,9 @@ Program* compileProgram(const Patch& patch, Module* const* instances, uint32_t g
         ProgramNode& node = prog->nodes[prog->numNodes++];
         node.m = instances[pick];
         const ModuleRec& rec = patch.moduleAt(pick);
-        const int numIns = rec.type->numIns;
+        node.bypass = !rec.bypass ? Bypass::None : (bypassPasses(*rec.type) ? Bypass::Pass : Bypass::Zero);
+        const int numIns = node.bypass == Bypass::None ? rec.type->numIns
+                                                       : (node.bypass == Bypass::Pass ? 1 : 0);
         for (int in = 0; in < kMaxIns; in++) {
             node.nSrc[in] = 0;
             node.firstSrc[in] = 0;

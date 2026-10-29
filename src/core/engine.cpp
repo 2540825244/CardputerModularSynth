@@ -34,7 +34,8 @@ Refusal Engine::fits(const Patch& p, const ModuleTypeInfo& t, bool cpu) const {
     if (t.maxInstances && p.countOfType(t) >= t.maxInstances) return {false, "MAX 1"};
     if (!cpu) return {true, nullptr};
     uint32_t cycles = costOf(t);
-    for (int i = 0; i < p.moduleCount(); i++) cycles += costOf(*p.moduleAt(i).type);
+    for (int i = 0; i < p.moduleCount(); i++)
+        if (!p.moduleAt(i).bypass) cycles += costOf(*p.moduleAt(i).type);  // bypassed: not run
     if (cycles > kCpuBudget) return {false, "NO CPU"};
     return {true, nullptr};
 }
@@ -98,7 +99,8 @@ uint32_t Engine::costOf(const ModuleTypeInfo& t) const {
 
 uint32_t Engine::estimatedCycles() const {
     uint32_t c = 0;
-    for (int i = 0; i < patch_.moduleCount(); i++) c += costOf(*patch_.moduleAt(i).type);
+    for (int i = 0; i < patch_.moduleCount(); i++)
+        if (!patch_.moduleAt(i).bypass) c += costOf(*patch_.moduleAt(i).type);
     return c;
 }
 
@@ -276,13 +278,21 @@ MODSYNTH_IRAM void Engine::processBlock(float* mono) {
             if (ia != 1.f)
                 for (int k = 0; k < kBlock; k++) acc[k] *= ia;
         }
-        m->process(ins, conn);
         const int numOuts = m->type().numOuts;
+        if (node.bypass == Bypass::None) {
+            m->process(ins, conn);
+        } else {  // not processed: output 0 carries input 0 (Pass) or 0, the other outputs 0
+            float* o = m->out(0);
+            for (int k = 0; k < numOuts * kBlock; k++) o[k] = 0.f;
+            if (node.bypass == Bypass::Pass && conn[0] && numOuts > 0)
+                for (int k = 0; k < kBlock; k++) o[k] = ins[0][k];
+        }
         if (numOuts > 0) {  // the peak is out 0's
             float* o = m->out(0);
             m->setPeak(sanitizeBlock(o, kBlock));
             if (numOuts > 1) sanitizeBlock(o + kBlock, (numOuts - 1) * kBlock);
         }
+        if (node.bypass != Bypass::None) continue;  // no master out, and its measured cost stays
         if (const float* mo = m->masterOut())
             for (int k = 0; k < kBlock; k++) mono[k] += mo[k];
         if (cycles_) m->addCycles(cycles_() - t0);

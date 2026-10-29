@@ -9,6 +9,14 @@ struct Cell {
 };
 
 void doRemove(Patch& p, void* c) { p.removeModule(static_cast<Cell*>(c)->id); }
+struct BypassEdit {
+    uint16_t id;
+    bool on;
+};
+void doBypass(Patch& p, void* c) {
+    const BypassEdit* b = static_cast<BypassEdit*>(c);
+    p.setBypass(b->id, b->on);
+}
 void doMove(Patch& p, void* c) {
     const Cell* m = static_cast<Cell*>(c);
     p.moveModule(m->id, m->page, m->cell);
@@ -131,8 +139,14 @@ void sideKey(UiController& ui, const KeyEvent& e) {
         case Side::Del: {
             const ModuleRec* m = s.selCell >= 0 ? ui.patch().findAt(s.page, (uint8_t)s.selCell) : nullptr;
             if (!m) break;
-            Cell c{m->id, 0, 0};
             s.moveFromId = -1;
+            if (ui.fnHeld()) {  // fn+del: bypass / enable (not CPU-gated: CPU FULL warns)
+                BypassEdit b{m->id, !m->bypass};
+                ui.edit(doBypass, &b);
+                ui.toast(b.on ? "BYPASSED" : "ENABLED", ui.now());
+                break;
+            }
+            Cell c{m->id, 0, 0};
             ui.edit(doRemove, &c);
             break;
         }

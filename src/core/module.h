@@ -61,6 +61,10 @@ struct ModuleTypeInfo {
     bool costVaries = false;    // cost depends on a live param (GRD's engine): never trust a lower measurement
 };
 
+// A bypassed module of this type passes input 0 to output 0 (an audio processor or effect: input
+// 0 is "in" and output 0 is "out"); any other bypassed module outputs 0.
+bool bypassPasses(const ModuleTypeInfo& t);
+
 class Module {
    public:
     explicit Module(const ModuleTypeInfo& t);  // allocates t.numOuts x kBlock floats
