@@ -1339,13 +1339,13 @@ void test_auto_pages_overflow() {
 }
 
 void test_drawing_page0_width5() {
-    const ModuleTypeInfo& t = bigType(Drawing::FilterCurve);
+    const ModuleTypeInfo& t = bigType(Drawing::Picture);
     TEST_ASSERT_EQUAL(2, modulePageCount(t));  // page 0 holds params 0-4, page 1 holds 5-13
     TEST_ASSERT_TRUE(is(moduleCell(t, 0, 1, 5), CellKind::Drawing));
     TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 0), CellKind::Param, 5));
     TEST_ASSERT_TRUE(is(moduleCell(t, 1, 2, 2), CellKind::In, 7));
     TEST_ASSERT_TRUE(is(moduleCell(t, 1, 1, 9), CellKind::Empty));
-    TEST_ASSERT_EQUAL(Drawing::FilterCurve, modulePageDrawing(t, 0));
+    TEST_ASSERT_EQUAL(Drawing::Picture, modulePageDrawing(t, 0));
     TEST_ASSERT_EQUAL(Drawing::None, modulePageDrawing(t, 1));
 }
 

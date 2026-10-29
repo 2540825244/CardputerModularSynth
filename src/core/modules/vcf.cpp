@@ -80,5 +80,5 @@ Module* create() { return new Vcf(); }
 
 const ModuleTypeInfo kVcfType = {
     "vcf", "VCF", "12 dB LP/HP/BP/notch filter", Category::Processor, Icon::Vcf,
-    Drawing::FilterCurve, 4, kParams, 3, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
+    Drawing::Picture, 4, kParams, 3, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     440, sizeof(Vcf) + kBlock * sizeof(float), 0, create};

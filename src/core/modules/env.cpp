@@ -61,5 +61,5 @@ Module* create() { return new Env(); }
 
 const ModuleTypeInfo kEnvType = {
     "env", "ENV", "ADSR envelope with retrigger", Category::Modulator, Icon::Env,
-    Drawing::Envelope, 4, kParams, 2, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
+    Drawing::Picture, 4, kParams, 2, kInKeys, kInLabels, 1, kOutKeys, kOutLabels,
     200, sizeof(Env) + kBlock * sizeof(float), 0, create};

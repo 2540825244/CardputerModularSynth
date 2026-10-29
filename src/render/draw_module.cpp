@@ -7,6 +7,8 @@
 #include "ui/keys_layout.h"
 #include "ui/layout.h"
 #include "ui/views.h"
+#include "ui/pictures.h"
+#include "gfx_canvas.h"
 
 namespace rd {
 
@@ -250,63 +252,6 @@ void drawScope(Module* inst, int x, int y, int w, int h) {
     }
 }
 
-void drawFilterCurve(const ModuleRec& m, Module* inst, int x, int y, int w, int h) {
-    float fc = inst ? inst->monitor(0) : m.params[0];
-    if (fc < 20.f) fc = m.params[0];
-    // DaisySP Svf: Q = 1 / (2 * (1 - res^0.25)), res = monitor(1)
-    const float res = inst ? inst->monitor(1) : m.params[1];
-    float q = 1.f / (2.f * (1.f - powf(res < 0.f ? 0.f : res, 0.25f)));
-    q = q > 20.f ? 20.f : q;
-    const int mode = (int)(m.params[2] + 0.5f);
-    auto fx = [&](float f) { return x + (int)(log10f(f / 20.f) / 3.f * (w - 1)); };
-    for (float f : {100.f, 1000.f, 10000.f}) cv.drawFastVLine(fx(f), y, h, PBorder);
-    int prev = 0;
-    for (int px = 0; px < w; px++) {
-        const float f = 20.f * powf(1000.f, (float)px / (float)(w - 1));
-        const float r = f / fc, r2 = r * r;
-        const float d = 1.f - r2;
-        float mag = 1.f / sqrtf(d * d + (r / q) * (r / q));
-        if (mode == 1) mag *= r2;
-        else if (mode == 2) mag *= r / q;
-        else if (mode == 3) mag *= fabsf(d);
-        const float db = 20.f * log10f(mag + 1e-6f);
-        int yy = y + (int)((12.f - db) / 60.f * h);
-        yy = yy < y ? y : (yy > y + h - 1 ? y + h - 1 : yy);
-        if (px) cv.drawLine(x + px - 1, prev, x + px, yy, PAccent);
-        prev = yy;
-    }
-    const int xc = fx(fc < 20.f ? 20.f : (fc > 20000.f ? 20000.f : fc));
-    for (int j = 0; j < h; j += 4) cv.drawFastVLine(xc, y + j, 2, PAccent);
-    static const char* const kModes[] = {"LP 12DB", "HP 12DB", "BP 12DB", "NOTCH"};
-    smallText(kModes[mode < 0 ? 0 : (mode > 3 ? 3 : mode)], x + 18, y + h - 8, PDim);
-}
-
-void drawEnvelope(const ModuleRec& m, Module* inst, int x, int y, int w, int h) {
-    const float a = m.params[0], d = m.params[1], sus = m.params[2], r = m.params[3];
-    const float sum = a + d + r;
-    const float flow = w * 0.75f;
-    const int bottom = y + h - 6, top = y + 6;
-    const int xa = x + (int)(flow * a / sum), xd = xa + (int)(flow * d / sum), xs = xd + (int)(w * 0.25f) - 2,
-              xr = x + w - 2;
-    const int ys = bottom - (int)(sus * (bottom - top));
-    cv.drawLine(x, bottom, xa, top, PAccent);
-    cv.drawLine(xa, top, xd, ys, PAccent);
-    cv.drawLine(xd, ys, xs, ys, PAccent);
-    cv.drawLine(xs, ys, xr, bottom, PAccent);
-    cv.drawFastHLine(x, bottom, w, PBorder);
-    if (!inst) return;
-    const int stage = (int)inst->monitor(0);
-    const float lvl = inst->monitor(1);
-    if (stage < 1 || stage > 4) return;  // gate closed and idle
-    int dx;
-    if (stage == 1) dx = x + (int)((xa - x) * lvl);
-    else if (stage == 2) dx = xa + (int)((xd - xa) * (sus < 1.f ? (1.f - lvl) / (1.f - sus) : 1.f));
-    else if (stage == 3) dx = (xd + xs) / 2;
-    else dx = xs + (int)((xr - xs) * (sus > 0.f ? 1.f - lvl / sus : 1.f));
-    const int dyy = bottom - (int)(lvl * (bottom - top));
-    cv.fillCircle(dx, dyy, 2, PText);
-}
-
 }  // namespace
 
 void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
@@ -320,13 +265,19 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
     if (s.carry.active) drawBanner(s, p);
     else drawStrip(s, *m);
     const Drawing drawing = modulePageDrawing(t, s.modPage);
-    if (drawing != Drawing::None && drawing != Drawing::Playhead) {
+    if (drawing == Drawing::Picture || drawing == Drawing::Scope) {
         const int x = cellX(5), y = cellY(1), w = cellX(11) + cellW(11) - x, h = cellY(3) + cellH(3) - y;
         cv.fillRect(x, y, w, h, PEmpty);
         Module* inst = e.instance(m->id);
-        if (drawing == Drawing::FilterCurve) drawFilterCurve(*m, inst, x, y, w, h);
-        else if (drawing == Drawing::Scope) drawScope(inst, x, y, w, h);
-        else if (drawing == Drawing::Envelope) drawEnvelope(*m, inst, x, y, w, h);
+        if (drawing == Drawing::Scope) {
+            drawScope(inst, x, y, w, h);
+        } else {
+            const Sel sel = selection(s, *m);
+            const int param = sel.c.kind == CellKind::Param ? sel.c.index : -1;
+            cv.setClipRect(x, y, w, h);
+            drawPicture(PicCtx{canvasGfx(), *m, inst, s.modPage, param, x, y, w, h, false});
+            cv.clearClipRect();
+        }
     }
     for (int row = 1; row < kGridRows; row++) {
         for (int col = 0; col < kGridCols; col++) {
