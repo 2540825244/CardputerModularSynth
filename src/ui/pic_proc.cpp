@@ -464,7 +464,7 @@ void rev(const PicCtx& c) {
 void vowPic(const PicCtx& c) {
     float f[3];
     vowFormants(par(c, 0), f);
-    const float shift = powf(2.f, par(c, 1) / 12.f), q = 1.f / (2.f * (0.25f - 0.21f * clampf(par(c, 2), 0.f, 1.f)));
+    const float shift = powf(2.f, par(c, 1) / 12.f), q = 1.f / (0.25f - 0.21f * clampf(par(c, 2), 0.f, 1.f));  // the Svf's Q = 1 / damp
     static const float kG[3] = {0.f, -6.f, -12.f};
     auto resp = [&](float u) {
         const float hz = logF(u);

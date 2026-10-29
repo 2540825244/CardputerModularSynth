@@ -1773,6 +1773,39 @@ void test_vow_formants_and_filter() {
         return r;
     };
     TEST_ASSERT_TRUE(gainAt(730.f) > 3.f * gainAt(5000.f));
+    // review: a 5 V sine on F1 passes about at unity, nowhere near the +-10 V clamp, at any RES
+    for (float res : {0.f, 0.6f, 1.f}) {
+        Module* m = kVowType.create();
+        m->setParam(2, res);
+        static float in[kBlock];
+        const float* ins[2] = {in, nullptr};
+        const bool c[2] = {true, false};
+        float ph = 0.f, peak = 0.f;
+        for (int b = 0; b < 300; b++) {
+            for (int i = 0; i < kBlock; i++, ph += 730.f / kSampleRate) in[i] = 5.f * sinf(6.2831853f * ph);
+            m->process(ins, c);
+            if (b > 150)
+                for (int i = 0; i < kBlock; i++) peak = fabsf(m->out(0)[i]) > peak ? fabsf(m->out(0)[i]) : peak;
+        }
+        TEST_ASSERT_TRUE_MESSAGE(peak < 9.f && peak > 2.f, "VOW at F1: no clamp, no collapse");
+        delete m;
+    }
+}
+
+// review: with GATE patched and CLK not, a new gate sounds at once (not at the next RATE tick)
+void test_arp_gate_sounds_at_once() {
+    Module* m = kArpType.create();
+    m->setParam(3, 1.f);  // RATE 1 Hz: the next tick is a second away
+    static float z[kBlock], gt[kBlock];
+    const float* ins[kMaxIns] = {z, z, gt, z, z, z, z, z};
+    bool c[kMaxIns] = {false, false, true};
+    constBlock(gt, 0.f);
+    for (int b = 0; b < 100; b++) m->process(ins, c);
+    constBlock(gt, 5.f);
+    m->process(ins, c);
+    m->process(ins, c);
+    TEST_ASSERT_EQUAL_FLOAT(kGateHighVolts, m->out(1)[kBlock - 1]);
+    delete m;
 }
 
 void test_eq3_shapes() {
@@ -1887,5 +1920,6 @@ int main() {
     RUN_TEST(test_prc_modes);
     RUN_TEST(test_vow_formants_and_filter);
     RUN_TEST(test_eq3_shapes);
+    RUN_TEST(test_arp_gate_sounds_at_once);
     return UNITY_END();
 }

@@ -79,7 +79,10 @@ class Arp : public Module {
             if (gt) {
                 gate_.process(gt[i]);
                 held = gate_.high;
-                if (gate_.rose) first_ = true;
+                if (gate_.rose) {
+                    first_ = true;
+                    ph_ = 1.f;  // with its own clock, a new gate ticks at once
+                }
             }
             bool tick = false, clkHigh = false;
             if (ck) {
@@ -163,7 +166,11 @@ const char* const kInLabels[] = {"TRG", "ACC"};
 class Clp : public Module {
    public:
     Clp() : Module(kClpType) {}
-    void silence() override { burst_ = tail_ = 0.f; t_ = -1; }
+    void silence() override {
+        burst_ = tail_ = 0.f;
+        t_ = -1;
+        bp_.lp = bp_.bp = 0.f;
+    }
     void process(const float* const* ins, const bool* c) override {
         const float* tr = inOrNull(ins, c, 0);
         const float* ac = inOrNull(ins, c, 1);
@@ -183,8 +190,8 @@ class Clp : public Module {
                 else t_++;
             }
             const float env = burst_ + tail_;
-            burst_ *= kBurst;
-            tail_ *= kTail;
+            burst_ = burst_ > 1e-6f ? burst_ * kBurst : 0.f;  // flushed: no subnormal tail
+            tail_ = tail_ > 1e-6f ? tail_ * kTail : 0.f;
             out(0)[i] = clampf(bp_.band(rng_.bi() * env) * 3.f * acc_, -2.f, 2.f) * kAudioVolts;
         }
     }
@@ -253,7 +260,7 @@ class Prc : public Module {
                 amp_ = clampf(param(kLevel) + at(ac, i) * 0.2f, 0.f, 1.f);
                 fast_ = amp_;
                 sw_ = sweep;
-                hz_ = kPrcBaseHz[mode] * fastExp2(param(kTune) * (1.f / 12.f) + at(pit, i));
+                hz_ = clampf(kPrcBaseHz[mode] * fastExp2(param(kTune) * (1.f / 12.f) + at(pit, i)), 20.f, 12000.f);
                 ph1_ = ph2_ = 0.f;
             }
             const float f = hz_ * (1.f + sw_) / kSampleRate;
@@ -272,9 +279,9 @@ class Prc : public Module {
             } else {
                 y = fsin(ph1_) * amp_ + (clickMs > 0.f ? rng_.bi() * fast_ * 0.25f : 0.f);
             }
-            amp_ *= kBody;
-            fast_ *= kFast;
-            sw_ *= kSweep;
+            amp_ = amp_ > 1e-6f ? amp_ * kBody : 0.f;
+            fast_ = fast_ > 1e-6f ? fast_ * kFast : 0.f;
+            sw_ = sw_ > 1e-6f ? sw_ * kSweep : 0.f;
             out(0)[i] = clampf(y, -1.5f, 1.5f) * kAudioVolts;
         }
     }
@@ -336,7 +343,7 @@ class Vow : public Module {
             }
             const float x = in ? in[i] * 0.2f : 0.f;
             float y = 0.f;
-            for (int k = 0; k < 3; k++) y += bp_[k].band(x) * kGain[k];
+            for (int k = 0; k < 3; k++) y += bp_[k].band(x) * damp * kGain[k];  // x damp: unity at each peak (review)
             o[i] = clampf(x * (1.f - mix) + y * mix * 1.4f, -2.f, 2.f) * kAudioVolts;
         }
     }

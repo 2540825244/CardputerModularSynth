@@ -67,8 +67,14 @@ struct FbGfx : Gfx {
             if (e2 <= dx) { e += dx; y0 += sy; }
         }
     }
-    void hline(int x, int y, int w, uint8_t c) override { for (int i = 0; i < w; i++) pixel(x + i, y, c); }
-    void vline(int x, int y, int h, uint8_t c) override { for (int i = 0; i < h; i++) pixel(x, y + i, c); }
+    void hline(int x, int y, int w, uint8_t c) override {
+        if (w < 0) nan++;  // LovyanGFX flips a negative length: a fault here
+        for (int i = 0; i < w; i++) pixel(x + i, y, c);
+    }
+    void vline(int x, int y, int h, uint8_t c) override {
+        if (h < 0) nan++;
+        for (int i = 0; i < h; i++) pixel(x, y + i, c);
+    }
     // the device draws a negative width or height (LovyanGFX flips it): a fault here
     void fillRect(int x, int y, int w, int h, uint8_t c) override {
         if (w < 0 || h < 0) nan++;
@@ -188,7 +194,7 @@ void paint(FbGfx& f, const ModuleRec& m, int page, int sel, int x, int y, int w,
     f.box(x, y, w, h);
     pic::gNonFinite = 0;
     drawPicture(PicCtx{f, m, nullptr, page, sel, x, y, w, h, small});
-    f.nan += pic::gNonFinite;  // a NaN a painter computed counts as a fault
+    f.nan += (int)pic::gNonFinite;  // a NaN a painter computed counts as a fault
 }
 
 }  // namespace
@@ -252,7 +258,9 @@ void test_tile_glyphs_stay_in_their_box() {
                 else if (variant == 2) m.params[k] = all[i]->params[k].max;
             f.clear(PEmpty);
             f.box(20, 20, 13, 11);
+            pic::gNonFinite = 0;
             drawTileGlyph(f, m, 20, 20, 13, 11, PText);
+            f.nan += (int)pic::gNonFinite;
             TEST_ASSERT_EQUAL_MESSAGE(0, f.outside, all[i]->id);
             TEST_ASSERT_EQUAL_MESSAGE(0, f.nan, all[i]->id);
         }

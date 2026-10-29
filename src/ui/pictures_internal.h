@@ -46,7 +46,7 @@ inline int xUnit(Box b, float u) { return b.x + (int)lroundf(clampf(u, 0.f, 1.f)
 
 // Values a painter computed that were not finite (NaN / inf): drawing clamps them to an edge, so
 // the tests read this to catch them (test_pictures).
-extern int gNonFinite;
+extern unsigned gNonFinite;
 inline float finite(float v) {
     if (!std::isfinite(v)) {
         gNonFinite++;

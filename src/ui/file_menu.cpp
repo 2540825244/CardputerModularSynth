@@ -14,6 +14,7 @@ void run(UiController& ui) {
     if (s.fileSlot < 0) return;
     char msg[24];
     if (s.filePage == kPresets || s.filePage == kPresets2) {
+        if (s.fileSlot >= kPresetsPerPage) return;  // the bottom row is the band, not presets
         const int i = s.fileSlot + (s.filePage - kPresets) * kPresetsPerPage;
         if (ui.loadPreset(i, true, msg, sizeof msg)) ui.toast(msg, ui.now());
         else ui.toast(msg, ui.now());
@@ -63,6 +64,7 @@ bool fileViewAction(UiController& ui, const Action& a) {
     switch (a.act) {
         case Act::Select:
             if (s.filePage == kSystem) system(ui, a.cell);
+            else if ((s.filePage == kPresets || s.filePage == kPresets2) && a.cell >= kPresetsPerPage) s.fileSlot = -1;
             else s.fileSlot = a.cell;
             break;
         case Act::Activate:

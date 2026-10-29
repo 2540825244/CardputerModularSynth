@@ -5,7 +5,7 @@
 #include "pictures_internal.h"
 
 namespace pic {
-int gNonFinite = 0;
+unsigned gNonFinite = 0;
 namespace {
 
 const Entry* find(const char* id) {

@@ -174,8 +174,8 @@ void presetsPage(const UiState& s, int first) {
         smallText(b, x + w / 2, y + 18, PText);
         if (cell == s.fileSlot) outline(col, row, PAccent);
     }
-    bandText(s.fileSlot >= 0 && s.fileSlot < n ? ps[s.fileSlot].name : (first ? "PRESETS 2" : "PRESETS"),
-             s.fileSlot >= 0 && s.fileSlot < n ? "ENTER = LOAD" : "FACTORY PATCHES");
+    const bool sel = s.fileSlot >= 0 && s.fileSlot < 36 && s.fileSlot < n;
+    bandText(sel ? ps[s.fileSlot].name : (first ? "PRESETS 2" : "PRESETS"), sel ? "ENTER = LOAD" : "FACTORY PATCHES");
 }
 
 void systemPage(const UiState& s) {

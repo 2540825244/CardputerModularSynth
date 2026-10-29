@@ -1835,6 +1835,18 @@ void test_file_tab_pages() {
     TEST_ASSERT_EQUAL(4, f.ui.state().filePage);
 }
 
+// v1.4 review: the PRESETS page's bottom row is its band, not presets 37..48
+void test_preset_page_band_row_loads_nothing() {
+    Fx f;
+    f.place(TOsc, 1, 1);
+    f.side(Side::Esc);
+    for (int i = 0; i < 2; i++) f.side(Side::Tab);
+    TEST_ASSERT_EQUAL(2, f.ui.state().filePage);
+    f.tap(0, 3);  // cell 36
+    f.side(Side::Enter);
+    TEST_ASSERT_EQUAL(1, gPatch.moduleCount());  // the patch is untouched
+}
+
 // v1.4: the second PRESETS page holds presets 37..72; its cell 0 is preset 37
 void test_preset_page_two() {
     Fx f;
@@ -2479,6 +2491,7 @@ int main() {
     RUN_TEST(test_first_boot_loads_basic);
     RUN_TEST(test_file_tab_pages);
     RUN_TEST(test_preset_page_two);
+    RUN_TEST(test_preset_page_band_row_loads_nothing);
     RUN_TEST(test_slot_36_save);
     RUN_TEST(test_system_settings_saved);
     RUN_TEST(test_bit_cell_tap_toggles);
