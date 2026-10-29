@@ -93,6 +93,11 @@ class ModalVoice
     ResonatorSvf<1> excitation_filter_;
     Resonator       resonator_;
     Dust            dust_;
+
+    // modsynth: the cutoff and the excitation filter's coefficients, computed again only after
+    // f0, accent, brightness or sustain change
+    bool  dirty_;
+    float cutoff_, q_, ex_g_, ex_r_plus_g_, ex_h_;
 };
 } // namespace daisysp
 #endif

@@ -1,3 +1,4 @@
+#include "modsynth_fast.h" // modsynth
 #include "stringvoice.h"
 #include <algorithm>
 #include "dsp.h"
@@ -107,7 +108,7 @@ float StringVoice::Process(bool trigger)
     }
     else if(remaining_noise_samples_)
     {
-        temp = 2.0f * rand() * kRandFrac - 1.0f;
+        temp = 2.0f * FastRand() /* modsynth */ * kRandFrac - 1.0f;
         remaining_noise_samples_--;
         remaining_noise_samples_ = DSY_MAX(remaining_noise_samples_, 0.f);
     }

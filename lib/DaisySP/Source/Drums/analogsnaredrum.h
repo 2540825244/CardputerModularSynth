@@ -100,6 +100,15 @@ class AnalogSnareDrum
 
     // Replace the resonators in "free running" (sustain) mode.
     float phase_[kNumModes];
+
+    // modsynth: everything Process() derived from f0/tone/decay/snappy each sample, computed
+    // again only after one of them changes.
+    void  UpdateCoefs();
+    bool  dirty_;
+    int   trigger_pulse_duration_;
+    float pulse_decay_;
+    float noise_envelope_decay_, exciter_leak_, snappy_gain_;
+    float mode_f_[kNumModes], mode_gain_[kNumModes];
 };
 } // namespace daisysp
 #endif

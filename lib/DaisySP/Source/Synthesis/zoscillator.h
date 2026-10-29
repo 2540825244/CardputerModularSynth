@@ -66,6 +66,7 @@ class ZOscillator
     inline float Z(float c, float d, float f, float shape, float mode);
 
     float sample_rate_;
+    float sr_recip_; // modsynth: 1 / sample_rate_ (setters run per sample)
 
     // Oscillator state.
     float carrier_phase_;

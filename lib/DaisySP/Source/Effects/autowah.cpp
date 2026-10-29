@@ -1,5 +1,6 @@
 #include "autowah.h"
 #include <math.h>
+#include "modsynth_fast.h"
 
 using namespace daisysp;
 
@@ -38,16 +39,21 @@ float Autowah::Process(float in)
         = fmaxf(fTemp1, (const4_ * rec3_[1]) + ((1.0f - const4_) * fTemp1));
     rec2_[0]     = (const2_ * rec2_[1]) + ((1.0f - const2_) * rec3_[0]);
     float fTemp2 = fminf(1.0f, rec2_[0]);
-    float fTemp3 = powf(2.0f, (2.3f * fTemp2));
+    // modsynth: libm per sample (3 powf, a cosf, a divide) -> fast helpers; fTemp2 is in
+    // [0, 1], so every exp2 argument is in [-3, 2.3] and the cos argument below 0.3.
+    float fTemp3 = FastExp2(2.3f * fTemp2);
     float fTemp4
         = 1.0f
-          - (const1_ * fTemp3 / powf(2.0f, (1.0f + 2.0f * (1.0f - fTemp2))));
+          - (const1_ * fTemp3 * FastExp2(-(1.0f + 2.0f * (1.0f - fTemp2))));
     rec1_[0]
         = ((0.999f * rec1_[1])
            + (0.001f
-              * (0.0f - (2.0f * (fTemp4 * cosf((const1_ * 2 * fTemp3)))))));
+              * (0.0f
+                 - (2.0f
+                    * (fTemp4
+                       * FastSinHalfPi(1.57079633f - const1_ * 2 * fTemp3))))));
     rec4_[0] = ((0.999f * rec4_[1]) + (0.001f * fTemp4 * fTemp4));
-    rec5_[0] = ((0.999f * rec5_[1]) + (0.0001f * powf(4.0f, fTemp2)));
+    rec5_[0] = ((0.999f * rec5_[1]) + (0.0001f * FastExp2(2.0f * fTemp2)));
     rec0_[0] = (0.0f
                 - (((rec1_[0] * rec0_[1]) + (rec4_[0] * rec0_[2]))
                    - (fSlow2 * (rec5_[0] * in))));

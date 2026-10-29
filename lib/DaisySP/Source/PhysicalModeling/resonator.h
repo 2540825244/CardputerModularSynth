@@ -13,6 +13,7 @@ https://opensource.org/licenses/MIT.
 #include <stdint.h>
 #include <stddef.h>
 #include "Utility/dsp.h"
+#include "Utility/modsynth_fast.h" // modsynth
 #ifdef __cplusplus
 
 
@@ -106,6 +107,52 @@ class ResonatorSvf
         }
     }
 
+    // modsynth: Process() split in two. Coefs() is its coefficient loop, ProcessCoefs() its
+    // filter loop: with cached coefficients the result is identical, without the two divides
+    // and the tan per mode and sample.
+    static void Coefs(const float* f, const float* q, float* g, float* r_plus_g, float* h)
+    {
+        for(int i = 0; i < batch_size; ++i)
+        {
+            g[i]        = fasttan(f[i]);
+            const float r = FastRecip(q[i]); // q >= 1; 1/x by recip0.s on the device
+            h[i]        = FastRecip(1.0f + r * g[i] + g[i] * g[i]);
+            r_plus_g[i] = r + g[i];
+        }
+    }
+
+    template <FilterMode mode, bool add>
+    void ProcessCoefs(const float* __restrict g,
+                      const float* __restrict r_plus_g,
+                      const float* __restrict h,
+                      const float* __restrict gains,
+                      const float  in,
+                      float*       out)
+    {
+        // unrolled with the states in registers: the modes' chains interleave
+        float s_in  = in;
+        float s_out = 0.0f;
+#pragma GCC unroll 8
+        for(int i = 0; i < batch_size; ++i)
+        {
+            const float s1 = state_1_[i], s2 = state_2_[i];
+            const float hp = (s_in - r_plus_g[i] * s1 - s2) * h[i];
+            const float bp = g[i] * hp + s1;
+            state_1_[i]    = g[i] * hp + bp;
+            const float lp = g[i] * bp + s2;
+            state_2_[i]    = g[i] * bp + lp;
+            s_out += gains[i] * ((mode == LOW_PASS) ? lp : bp);
+        }
+        if(add)
+        {
+            *out++ += s_out;
+        }
+        else
+        {
+            *out++ = s_out;
+        }
+    }
+
   private:
     static constexpr float kPiPow3 = PI_F * PI_F * PI_F;
     static constexpr float kPiPow5 = kPiPow3 * PI_F * PI_F;
@@ -184,6 +231,12 @@ class Resonator
 
     float                        mode_amplitude_[kMaxNumModes];
     ResonatorSvf<kModeBatchSize> mode_filters_[kMaxNumModes / kModeBatchSize];
+
+    // modsynth: per-mode filter coefficients, computed again only after a setter changes a value
+    void  UpdateCoefs();
+    bool  dirty_;
+    int   batches_;
+    float g_[kMaxNumModes], r_plus_g_[kMaxNumModes], h_[kMaxNumModes], a_[kMaxNumModes];
 };
 
 } // namespace daisysp

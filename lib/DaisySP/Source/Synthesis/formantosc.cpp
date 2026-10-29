@@ -1,6 +1,7 @@
 #include "dsp.h"
 #include "formantosc.h"
 #include <math.h>
+#include "modsynth_fast.h"
 
 using namespace daisysp;
 
@@ -15,6 +16,7 @@ void FormantOscillator::Init(float sample_rate)
     phase_shift_       = 0.0f;
 
     sample_rate_ = sample_rate;
+    sr_recip_    = 1.f / sample_rate; // modsynth
 }
 
 float FormantOscillator::Process()
@@ -59,7 +61,7 @@ float FormantOscillator::Process()
 void FormantOscillator::SetFormantFreq(float freq)
 {
     //convert from Hz to phase_inc / sample
-    formant_frequency_ = freq / sample_rate_;
+    formant_frequency_ = freq * sr_recip_ /* modsynth: no divide */;
     formant_frequency_ = formant_frequency_ >= .25f ? .25f : formant_frequency_;
     formant_frequency_
         = formant_frequency_ <= -.25f ? -.25f : formant_frequency_;
@@ -68,7 +70,7 @@ void FormantOscillator::SetFormantFreq(float freq)
 void FormantOscillator::SetCarrierFreq(float freq)
 {
     //convert from Hz to phase_inc / sample
-    carrier_frequency_ = freq / sample_rate_;
+    carrier_frequency_ = freq * sr_recip_ /* modsynth: no divide */;
     carrier_frequency_ = carrier_frequency_ >= .25f ? .25f : carrier_frequency_;
     carrier_frequency_
         = carrier_frequency_ <= -.25f ? -.25f : carrier_frequency_;
@@ -81,7 +83,7 @@ void FormantOscillator::SetPhaseShift(float ps)
 
 inline float FormantOscillator::Sine(float phase)
 {
-    return sinf(phase * TWOPI_F);
+    return FastSin2Pi(phase); // modsynth: sinf costs ~260 cycles
 }
 
 inline float FormantOscillator::ThisBlepSample(float t)

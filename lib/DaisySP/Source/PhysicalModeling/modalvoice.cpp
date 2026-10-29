@@ -7,6 +7,7 @@ void ModalVoice::Init(float sample_rate)
 {
     sample_rate_ = sample_rate;
     aux_         = 0.f;
+    dirty_       = true; // modsynth
 
     excitation_filter_.Init();
     resonator_.Init(0.015f, 24, sample_rate_);
@@ -23,6 +24,7 @@ void ModalVoice::Init(float sample_rate)
 
 void ModalVoice::SetSustain(bool sustain)
 {
+    dirty_   = true; // modsynth
     sustain_ = sustain;
 }
 
@@ -34,13 +36,16 @@ void ModalVoice::Trig()
 void ModalVoice::SetFreq(float freq)
 {
     resonator_.SetFreq(freq);
-    f0_ = freq / sample_rate_;
-    f0_ = fclamp(f0_, 0.f, .25f);
+    const float v = fclamp(freq / sample_rate_, 0.f, .25f);
+    dirty_        = dirty_ || v != f0_; // modsynth
+    f0_           = v;
 }
 
 void ModalVoice::SetAccent(float accent)
 {
-    accent_ = fclamp(accent, 0.f, 1.f);
+    const float v = fclamp(accent, 0.f, 1.f);
+    dirty_        = dirty_ || v != accent_; // modsynth
+    accent_       = v;
 }
 
 void ModalVoice::SetStructure(float structure)
@@ -50,8 +55,10 @@ void ModalVoice::SetStructure(float structure)
 
 void ModalVoice::SetBrightness(float brightness)
 {
-    brightness_ = fclamp(brightness, 0.f, 1.f);
-    density_    = brightness_ * brightness_;
+    const float v = fclamp(brightness, 0.f, 1.f);
+    dirty_        = dirty_ || v != brightness_; // modsynth
+    brightness_   = v;
+    density_      = brightness_ * brightness_;
 }
 
 void ModalVoice::SetDamping(float damping)
@@ -69,15 +76,22 @@ float ModalVoice::Process(bool trigger)
     float brightness = brightness_ + 0.25f * accent_ * (1.0f - brightness_);
     float damping    = damping_ + 0.25f * accent_ * (1.0f - damping_);
 
-    const float range  = sustain_ ? 36.0f : 60.0f;
-    const float f      = sustain_ ? 4.0f * f0_ : 2.0f * f0_;
-    const float cutoff = fmin(
-        f
-            * powf(2.f,
-                   kOneTwelfth
-                       * ((brightness * (2.0f - brightness) - 0.5f) * range)),
-        0.499f);
-    const float q = sustain_ ? 0.7f : 1.5f;
+    // modsynth: cutoff (a powf) and the excitation filter coefficients only after a change
+    if(dirty_)
+    {
+        dirty_            = false;
+        const float range = sustain_ ? 36.0f : 60.0f;
+        const float f     = sustain_ ? 4.0f * f0_ : 2.0f * f0_;
+        cutoff_           = fmin(
+            f
+                * powf(2.f,
+                       kOneTwelfth
+                           * ((brightness * (2.0f - brightness) - 0.5f) * range)),
+            0.499f);
+        q_ = sustain_ ? 0.7f : 1.5f;
+        ResonatorSvf<1>::Coefs(&cutoff_, &q_, &ex_g_, &ex_r_plus_g_, &ex_h_);
+    }
+    const float cutoff = cutoff_;
 
     float temp = 0.f;
     // Synthesize excitation signal.
@@ -97,8 +111,8 @@ float ModalVoice::Process(bool trigger)
     }
 
     const float one = 1.0f;
-    excitation_filter_.Process<ResonatorSvf<1>::LOW_PASS, false>(
-        &cutoff, &q, &one, temp, &temp);
+    excitation_filter_.ProcessCoefs<ResonatorSvf<1>::LOW_PASS, false>(
+        &ex_g_, &ex_r_plus_g_, &ex_h_, &one, temp, &temp);
 
     aux_ = temp;
 

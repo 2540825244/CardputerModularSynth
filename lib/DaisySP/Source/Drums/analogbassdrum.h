@@ -107,6 +107,14 @@ class AnalogBassDrum
 
     //for use in sin + cos osc. in sustain mode
     float phase_;
+
+    // modsynth: constants and the f0/tone/decay terms Process() derived each sample, now
+    // computed in Init or again only after a setter changes a value.
+    void  UpdateCoefs();
+    bool  dirty_;
+    int   trigger_pulse_duration_, fm_pulse_duration_;
+    float pulse_decay_, pulse_filter_coef_, retrig_decay_;
+    float scale_, q_, tone_f_, exciter_leak_;
 };
 } // namespace daisysp
 #endif

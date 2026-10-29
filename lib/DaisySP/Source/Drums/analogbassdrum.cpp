@@ -1,5 +1,6 @@
 #include "dsp.h"
 #include "analogbassdrum.h"
+#include "modsynth_fast.h"
 #include <cmath>
 
 using namespace daisysp;
@@ -22,6 +23,14 @@ void AnalogBassDrum::Init(float sample_rate)
     sustain_gain_               = 0.0f;
     phase_                      = 0.f;
 
+    // modsynth: the per-sample constants of the old Process(), once.
+    trigger_pulse_duration_ = static_cast<int>(1.0e-3f * sample_rate_);
+    fm_pulse_duration_      = static_cast<int>(6.0e-3f * sample_rate_);
+    pulse_decay_            = 1.0f - 1.0f / (0.2e-3f * sample_rate_);
+    pulse_filter_coef_      = 1.0f / (0.1e-3f * sample_rate_);
+    retrig_decay_           = 1.0f - 1.0f / (0.05f * sample_rate_);
+    dirty_                  = true;
+    f0_ = tone_ = decay_ = -1.f;
 
     SetSustain(false);
     SetAccent(.1f);
@@ -43,24 +52,31 @@ inline float AnalogBassDrum::Diode(float x)
     else
     {
         x *= 2.0f;
-        return 0.7f * x / (1.0f + fabsf(x));
+        return 0.7f * x * FastRecip(1.0f + fabsf(x)); // modsynth: no divide
     }
+}
+
+// modsynth: the f0/tone/decay terms of the old Process(), same expressions.
+void AnalogBassDrum::UpdateCoefs()
+{
+    dirty_  = false;
+    scale_  = 0.001f / f0_;
+    q_      = 1500.0f * powf(2.f, kOneTwelfth * decay_ * 80.0f);
+    tone_f_ = fmin(4.0f * f0_ * powf(2.f, kOneTwelfth * tone_ * 108.0f), 1.0f);
+    exciter_leak_ = 0.08f * (tone_ + 0.25f);
 }
 
 float AnalogBassDrum::Process(bool trigger)
 {
-    const int kTriggerPulseDuration  = static_cast<int>(1.0e-3f * sample_rate_);
-    const int kFMPulseDuration       = static_cast<int>(6.0e-3f * sample_rate_);
-    const float kPulseDecayTime      = 0.2e-3f * sample_rate_;
-    const float kPulseFilterTime     = 0.1e-3f * sample_rate_;
-    const float kRetrigPulseDuration = 0.05f * sample_rate_;
-
-    const float scale = 0.001f / f0_;
-    const float q     = 1500.0f * powf(2.f, kOneTwelfth * decay_ * 80.0f);
-    const float tone_f
-        = fmin(4.0f * f0_ * powf(2.f, kOneTwelfth * tone_ * 108.0f), 1.0f);
-    const float exciter_leak = 0.08f * (tone_ + 0.25f);
-
+    // modsynth: constants from Init, coefficients from UpdateCoefs()
+    if(dirty_)
+        UpdateCoefs();
+    const int   kTriggerPulseDuration = trigger_pulse_duration_;
+    const int   kFMPulseDuration      = fm_pulse_duration_;
+    const float scale                 = scale_;
+    const float q                     = q_;
+    const float tone_f                = tone_f_;
+    const float exciter_leak          = exciter_leak_;
 
     if(trigger || trig_)
     {
@@ -82,7 +98,7 @@ float AnalogBassDrum::Process(bool trigger)
     }
     else
     {
-        pulse_ *= 1.0f - 1.0f / kPulseDecayTime;
+        pulse_ *= pulse_decay_;
         pulse = pulse_;
     }
     if(sustain_)
@@ -91,7 +107,7 @@ float AnalogBassDrum::Process(bool trigger)
     }
 
     // C40 / R163 / R162 / D83
-    fonepole(pulse_lp_, pulse, 1.0f / kPulseFilterTime);
+    fonepole(pulse_lp_, pulse, pulse_filter_coef_);
     pulse = Diode((pulse - pulse_lp_) + pulse * 0.044f);
 
     // Q41 / Q42
@@ -106,13 +122,13 @@ float AnalogBassDrum::Process(bool trigger)
     else
     {
         // C39 / R161
-        retrig_pulse_ *= 1.0f - 1.0f / kRetrigPulseDuration;
+        retrig_pulse_ *= retrig_decay_;
     }
     if(sustain_)
     {
         fm_pulse = 0.0f;
     }
-    fonepole(fm_pulse_lp_, fm_pulse, 1.0f / kPulseFilterTime);
+    fonepole(fm_pulse_lp_, fm_pulse, pulse_filter_coef_);
 
     // Q43 and R170 leakage
     float punch = 0.7f + Diode(10.0f * lp_out_ - 1.0f);
@@ -135,9 +151,8 @@ float AnalogBassDrum::Process(bool trigger)
     }
     else
     {
-        resonator_.SetFreq(f * sample_rate_);
-        //resonator_.SetRes(1.0f + q * f);
-        resonator_.SetRes(.4f * q * f);
+        // modsynth: f moves every sample (self FM): one fast SetFreq + SetRes
+        resonator_.SetFreqResFast(f * sample_rate_, .4f * q * f);
 
         resonator_.Process((pulse - retrig_pulse_ * 0.2f) * scale);
         resonator_out = resonator_.Band();
@@ -164,21 +179,28 @@ void AnalogBassDrum::SetAccent(float accent)
     accent_ = fclamp(accent, 0.f, 1.f);
 }
 
+// modsynth: SetFreq/SetTone/SetDecay mark the coefficients dirty only on a change.
 void AnalogBassDrum::SetFreq(float f0)
 {
     f0 /= sample_rate_;
-    f0_ = fclamp(f0, 0.f, .5f);
+    const float v = fclamp(f0, 0.f, .5f);
+    dirty_        = dirty_ || v != f0_;
+    f0_           = v;
 }
 
 void AnalogBassDrum::SetTone(float tone)
 {
-    tone_ = fclamp(tone, 0.f, 1.f);
+    const float v = fclamp(tone, 0.f, 1.f);
+    dirty_        = dirty_ || v != tone_;
+    tone_         = v;
 }
 
 void AnalogBassDrum::SetDecay(float decay)
 {
-    decay_ = decay * .1f;
-    decay_ -= .1f;
+    float v = decay * .1f;
+    v -= .1f;
+    dirty_ = dirty_ || v != decay_;
+    decay_ = v;
 }
 
 void AnalogBassDrum::SetAttackFmAmount(float attack_fm_amount)

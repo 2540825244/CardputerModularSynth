@@ -230,7 +230,7 @@ Module* create() { return new For(); }
 const ModuleTypeInfo kForType = {
     "for", "FOR", "Formant oscillator", Category::Source, Icon::Osc, Drawing::None,
     4, fmt::kParams, 2, fmt::kInKeys, fmt::kInLabels, 1, kOutOnly, kOutLbl,
-    790, sizeof(fmt::For) + kBlock * sizeof(float), 0, fmt::create};
+    740, sizeof(fmt::For) + kBlock * sizeof(float), 0, fmt::create};
 
 // ---------------------------------------------------------------- SSW
 // Supersaw: 7 polyBLEP saws spread by DETUNE; MIX balances the centre saw against the six others.
@@ -244,13 +244,13 @@ const ParamSpec kParams[] = {
 const char* const kInKeys[] = {"pitch", "detune"};
 const char* const kInLabels[] = {"PIT", "DET"};
 const float kSpread[7] = {0.f, -0.11002f, 0.10929f, -0.06288f, 0.06123f, -0.01953f, 0.01953f};
-float blep(float t, float dt) {
+inline float blep(float t, float dt, float idt) {  // idt = 1 / dt
     if (t < dt) {
-        t /= dt;
+        t *= idt;
         return t + t - t * t - 1.f;
     }
     if (t > 1.f - dt) {
-        t = (t - 1.f) / dt;
+        t = (t - 1.f) * idt;
         return t * t + t + t + 1.f;
     }
     return 0.f;
@@ -269,12 +269,20 @@ class Ssw : public Module {
         for (int i = 0; i < kBlock; i++) {
             const float hz = hzClamp(voltsToHz(base + at(pit, i)), 1.f, 12000.f);
             const float det = clampf(param(kDetune) + at(dc, i) * 0.2f, 0.f, 1.f);
+            if (hz != lastHz_ || det != lastDet_) {  // steps and their reciprocals, on a change only
+                lastHz_ = hz;
+                lastDet_ = det;
+                for (int v = 0; v < 7; v++) {
+                    dt_[v] = hz * (1.f + kSpread[v] * det * det) * (1.f / kSampleRate);
+                    idt_[v] = recipPos(dt_[v]);
+                }
+            }
             float y = 0.f;
             for (int v = 0; v < 7; v++) {
-                const float dt = hz * (1.f + kSpread[v] * det * det) / kSampleRate;
+                const float dt = dt_[v];
                 ph_[v] += dt;
                 if (ph_[v] >= 1.f) ph_[v] -= 1.f;
-                const float s = 2.f * ph_[v] - 1.f - blep(ph_[v], dt);
+                const float s = 2.f * ph_[v] - 1.f - blep(ph_[v], dt, idt_[v]);
                 y += v == 0 ? s * (1.f - 0.5f * mix) : s * mix * 0.3f;
             }
             o[i] = clampf(y * 0.6f, -1.5f, 1.5f) * kAudioVolts;
@@ -283,6 +291,8 @@ class Ssw : public Module {
 
    private:
     float ph_[7];
+    float dt_[7], idt_[7];
+    float lastHz_ = -1.f, lastDet_ = -1.f;
 };
 Module* create() { return new Ssw(); }
 }  // namespace ssw
@@ -290,7 +300,7 @@ Module* create() { return new Ssw(); }
 const ModuleTypeInfo kSswType = {
     "ssw", "SSW", "Supersaw, 7 detuned saws", Category::Source, Icon::Saw, Drawing::None,
     4, ssw::kParams, 2, ssw::kInKeys, ssw::kInLabels, 1, kOutOnly, kOutLbl,
-    1460, sizeof(ssw::Ssw) + kBlock * sizeof(float), 0, ssw::create};
+    1050, sizeof(ssw::Ssw) + kBlock * sizeof(float), 0, ssw::create};
 
 // ---------------------------------------------------------------- STR / MDL
 // String and modal voices (Rings-style, from DaisySP): TRIG strikes, PITCH tunes, ACC in adds accent.
@@ -346,11 +356,11 @@ Module* create() { return new phys::Phys<daisysp::ModalVoice, kMdlType>(0.5f); }
 const ModuleTypeInfo kStrType = {
     "str", "STR", "Plucked string (Karplus)", Category::Source, Icon::String, Drawing::None,
     6, phys::kParams, 4, phys::kInKeys, phys::kInLabels, 1, kOutOnly, kOutLbl,
-    2830, sizeof(phys::Phys<daisysp::StringVoice, kStrType>) + kBlock * sizeof(float), 0, str::create};
+    1050, sizeof(phys::Phys<daisysp::StringVoice, kStrType>) + kBlock * sizeof(float), 0, str::create};
 const ModuleTypeInfo kMdlType = {
     "mdl", "MDL", "Modal voice: bells, bars", Category::Source, Icon::Bell, Drawing::None,
     6, phys::kParams, 4, phys::kInKeys, phys::kInLabels, 1, kOutOnly, kOutLbl,
-    9700, sizeof(phys::Phys<daisysp::ModalVoice, kMdlType>) + kBlock * sizeof(float), 0, mdl::create};
+    1460, sizeof(phys::Phys<daisysp::ModalVoice, kMdlType>) + kBlock * sizeof(float), 0, mdl::create};
 
 // ---------------------------------------------------------------- RES
 // Modal resonator excited by IN (24 modes, Rings' resonator).
@@ -387,7 +397,7 @@ Module* create() { return new Res(); }
 const ModuleTypeInfo kResType = {
     "res", "RES", "Modal resonator for any input", Category::Processor, Icon::Bell, Drawing::None,
     5, res::kParams, 2, res::kInKeys, res::kInLabels, 1, kOutOnly, kOutLbl,
-    6310, sizeof(res::Res) + kBlock * sizeof(float), 0, res::create};
+    940, sizeof(res::Res) + kBlock * sizeof(float), 0, res::create};
 
 // ---------------------------------------------------------------- KCK / SNR / HAT
 namespace drum {
@@ -437,7 +447,7 @@ Module* create() { return new Kck(); }
 const ModuleTypeInfo kKckType = {
     "kck", "KCK", "Analog kick drum", Category::Source, Icon::Drum, Drawing::None,
     6, kck::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
-    3300, sizeof(kck::Kck) + kBlock * sizeof(float), 0, kck::create};
+    730, sizeof(kck::Kck) + kBlock * sizeof(float), 0, kck::create};
 
 namespace snr {
 enum { kFreq, kTone, kDecay, kSnappy, kAccent };
@@ -479,7 +489,7 @@ Module* create() { return new Snr(); }
 const ModuleTypeInfo kSnrType = {
     "snr", "SNR", "Analog snare drum", Category::Source, Icon::Drum, Drawing::None,
     5, snr::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
-    10740, sizeof(snr::Snr) + kBlock * sizeof(float), 0, snr::create};
+    950, sizeof(snr::Snr) + kBlock * sizeof(float), 0, snr::create};
 
 namespace hat {
 enum { kFreq, kTone, kDecay, kNoise, kAccent };
@@ -521,7 +531,7 @@ Module* create() { return new Hat(); }
 const ModuleTypeInfo kHatType = {
     "hat", "HAT", "Metallic hi-hat", Category::Source, Icon::Hat, Drawing::None,
     5, hat::kParams, 3, drum::kInKeys, drum::kInLabels, 1, kOutOnly, kOutLbl,
-    6870, sizeof(hat::Hat) + kBlock * sizeof(float), 0, hat::create};
+    750, sizeof(hat::Hat) + kBlock * sizeof(float), 0, hat::create};
 
 // ---------------------------------------------------------------- PRT
 namespace prt {
@@ -600,7 +610,7 @@ Module* create() { return new Vos(); }
 const ModuleTypeInfo kVosType = {
     "vos", "VOS", "VOSIM: two formants", Category::Source, Icon::Osc, Drawing::None,
     5, vos::kParams, 2, vos::kInKeys, vos::kInLabels, 1, kOutOnly, kOutLbl,
-    2140, sizeof(vos::Vos) + kBlock * sizeof(float), 0, vos::create};
+    850, sizeof(vos::Vos) + kBlock * sizeof(float), 0, vos::create};
 
 // ---------------------------------------------------------------- ZOS
 namespace zos {
@@ -639,7 +649,7 @@ Module* create() { return new Zos(); }
 const ModuleTypeInfo kZosType = {
     "zos", "ZOS", "Z oscillator: formant sync", Category::Source, Icon::Osc, Drawing::None,
     5, zos::kParams, 2, zos::kInKeys, zos::kInLabels, 1, kOutOnly, kOutLbl,
-    1580, sizeof(zos::Zos) + kBlock * sizeof(float), 0, zos::create};
+    900, sizeof(zos::Zos) + kBlock * sizeof(float), 0, zos::create};
 
 // ---------------------------------------------------------------- HRM
 // Additive: 16 harmonics, amplitudes peaked at CENTRE, falling by ROLLOFF per harmonic of distance.

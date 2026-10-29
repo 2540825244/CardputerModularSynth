@@ -1,12 +1,14 @@
 #include "dsp.h"
 #include "zoscillator.h"
 #include <math.h>
+#include "modsynth_fast.h"
 
 using namespace daisysp;
 
 void ZOscillator::Init(float sample_rate)
 {
     sample_rate_ = sample_rate;
+    sr_recip_    = 1.f / sample_rate; // modsynth
 
     carrier_phase_       = 0.0f;
     discontinuity_phase_ = 0.0f;
@@ -91,20 +93,20 @@ float ZOscillator::Process()
 
 inline float ZOscillator::Sine(float phase)
 {
-    return sinf(phase * TWOPI_F);
+    return FastSin2Pi(phase); // modsynth: sinf costs ~260 cycles
 }
 
 void ZOscillator::SetFreq(float freq)
 {
     //convert from Hz to phase_inc / sample
-    carrier_frequency_ = freq / sample_rate_;
+    carrier_frequency_ = freq * sr_recip_ /* modsynth: no divide */;
     carrier_frequency_ = carrier_frequency_ >= .25f ? .25f : carrier_frequency_;
 }
 
 void ZOscillator::SetFormantFreq(float freq)
 {
     //convert from Hz to phase_inc / sample
-    formant_frequency_ = freq / sample_rate_;
+    formant_frequency_ = freq * sr_recip_ /* modsynth: no divide */;
     formant_frequency_ = formant_frequency_ >= .25f ? .25f : formant_frequency_;
 }
 

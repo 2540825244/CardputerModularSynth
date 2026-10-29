@@ -39,6 +39,25 @@ class Svf
     */
     void Process(float in);
 
+    /** modsynth: Process() computing only the band-pass output (Band()); the other outputs
+        keep stale values. Band() is bit-identical to Process(). Inline, so a caller running
+        several filters can interleave them.
+    */
+    inline void ProcessBand(float in)
+    {
+        input_    = in;
+        notch_    = input_ - damp_ * band_;
+        low_      = low_ + freq_ * band_;
+        high_     = notch_ - low_;
+        band_     = freq_ * high_ + band_ - drive_ * band_ * band_ * band_;
+        out_band_ = 0.5f * band_;
+        notch_    = input_ - damp_ * band_;
+        low_      = low_ + freq_ * band_;
+        high_     = notch_ - low_;
+        band_     = freq_ * high_ + band_ - drive_ * band_ * band_ * band_;
+        out_band_ += 0.5f * band_;
+    }
+
 
     /** sets the frequency of the cutoff frequency. 
         f must be between 0.0 and sample_rate / 3
@@ -54,6 +73,12 @@ class Svf
         affects the response of the resonance of the filter
     */
     void SetDrive(float d);
+
+    /** modsynth: SetFreq(f) then SetRes(r) with fast math (polynomial sin, rsqrt, recip
+        instead of sinf/powf/divide): for a cutoff that moves every sample. A few ulps off the
+        exact pair.
+    */
+    void SetFreqResFast(float f, float r);
     /** lowpass output
         \return low pass output of the filter
     */
@@ -81,6 +106,9 @@ class Svf
     float input_;
     float out_low_, out_high_, out_band_, out_peak_, out_notch_;
     float pre_drive_, fc_max_;
+    // modsynth: the last SetFreq/SetRes arguments. A repeated value returns early: the result
+    // only depends on (f, r), so skipping is exact (NaN until the first call).
+    float last_f_in_, last_r_in_, inv_2sr_;
 };
 } // namespace daisysp
 

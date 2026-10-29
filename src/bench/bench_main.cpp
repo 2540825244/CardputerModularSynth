@@ -5,6 +5,11 @@
 #include <esp_attr.h>
 #include <xtensa/hal.h>
 #include "Filters/ladder.h"
+#include "Utility/modsynth_fast.h"
+#include "Drums/analogsnaredrum.h"
+#include "Filters/svf.h"
+#include "PhysicalModeling/modalvoice.h"
+#include "PhysicalModeling/resonator.h"
 #include "core/engine.h"
 #include "core/modules/env.h"
 #include "core/modules/grd.h"
@@ -69,6 +74,11 @@ float runBlocks(int blocks) {
 }
 
 const char* kModes[] = {"idle", "ui30", "uiMax"};
+
+// Short runs: only these types (one line per round, UI at 30 fps) and no split/micro/GRD sweep.
+// {nullptr} alone = the full bench. Edit for the task at hand.
+const char* const kFocus[] = {"snr", "mdl", "hat", "res", "kck", "str", "awh", "vos", "zos", "ssw", "for", "grd", nullptr};
+const bool kShort = kFocus[0] != nullptr;
 
 // Patches are 5.3 KB: statics, never on the task stack.
 Patch gBuild, gEmpty;
@@ -170,6 +180,109 @@ void micro() {
     }
 }
 
+// DaisySP fast helpers vs libm on the device: worst relative error and cycles per call.
+template <typename F, typename G>
+void checkFast(const char* name, F fast, G ref, float lo, float hi, float absFloor) {
+    const int n = 4000;
+    float worst = 0.f;
+    for (int i = 0; i <= n; i++) {
+        const float x = lo + (hi - lo) * (float)i / (float)n;
+        const float r = ref(x), e = fabsf(fast(x) - r) / fmaxf(fabsf(r), absFloor);
+        worst = e > worst ? e : worst;
+    }
+    float acc = 0.f;
+    uint32_t t0 = ccount();
+    for (int i = 0; i < n; i++) acc += fast(lo + (float)i * 1e-4f);
+    const float cf = (float)(ccount() - t0) / n;
+    t0 = ccount();
+    for (int i = 0; i < n; i++) acc += ref(lo + (float)i * 1e-4f);
+    const float cr = (float)(ccount() - t0) / n;
+    gSink = acc;
+    Serial.printf("  %s: worst rel err %.2g, %.0f vs libm %.0f cyc\n", name, worst, cf, cr);
+}
+
+void fastMath() {
+    checkFast("FastSin2Pi", [](float x) { return daisysp::FastSin2Pi(x); },
+              [](float x) { return sinf(6.28318531f * x); }, -3.f, 3.f, 1e-3f);
+    checkFast("FastPowQuarter", [](float x) { return daisysp::FastPowQuarter(x); },
+              [](float x) { return powf(x, 0.25f); }, 1e-6f, 1.f, 0.f);
+    checkFast("FastSqrt", [](float x) { return daisysp::FastSqrt(x); }, [](float x) { return sqrtf(x); }, 1e-6f, 4000.f,
+              0.f);
+    checkFast("FastExp2", [](float x) { return daisysp::FastExp2(x); }, [](float x) { return powf(2.f, x); }, -12.f,
+              12.f, 0.f);
+    checkFast("FastRecip", [](float x) { return daisysp::FastRecip(x); }, [](float x) { return 1.f / x; }, 1e-3f,
+              1e4f, 0.f);
+}
+
+// Inner pieces of the heavy DaisySP voices, alone in a loop (ui idle): cycles per sample.
+void dspParts() {
+    const int n = 4800;
+    static daisysp::Resonator res;
+    res.Init(0.015f, 24, 48000.f);
+    res.SetFreq(220.f);
+    float x = 0.f;
+    for (int i = 0; i < 64; i++) x = res.Process(0.f);
+    uint32_t t0 = ccount();
+    for (int i = 0; i < n; i++) x = res.Process((i & 255) == 0 ? 1.f : 0.f) * 0.5f;
+    const float cRes = (float)(ccount() - t0) / n;
+    static daisysp::ModalVoice mv;
+    mv.Init(48000.f);
+    t0 = ccount();
+    for (int i = 0; i < n; i++) x += mv.Process((i & 1023) == 0);
+    const float cMv = (float)(ccount() - t0) / n;
+    static daisysp::Svf sv;
+    sv.Init(48000.f);
+    sv.SetFreq(500.f);
+    sv.SetRes(0.5f);
+    t0 = ccount();
+    for (int i = 0; i < n; i++) {
+        sv.Process((i & 64) ? 0.1f : -0.1f);
+        x += sv.Band();
+    }
+    const float cSvf = (float)(ccount() - t0) / n;
+    t0 = ccount();
+    for (int i = 0; i < n; i++) {
+        sv.ProcessBand((i & 64) ? 0.1f : -0.1f);
+        x += sv.Band();
+    }
+    const float cBand = (float)(ccount() - t0) / n;
+    static daisysp::AnalogSnareDrum sn;
+    sn.Init(48000.f);
+    t0 = ccount();
+    for (int i = 0; i < n; i++) x += sn.Process((i & 2047) == 0);
+    const float cSn = (float)(ccount() - t0) / n;
+    int r = 0;
+    t0 = ccount();
+    for (int i = 0; i < n; i++) r += rand();
+    const float cRand = (float)(ccount() - t0) / n;
+    gSink = x + (float)r;
+    Serial.printf("  parts (ui idle): resonator24 %.0f, modalvoice %.0f, svf %.0f, svf band %.0f, snare %.0f, rand %.0f\n",
+                  cRes, cMv, cSvf, cBand, cSn, cRand);
+}
+
+// The owner's autosave (2026-10-29): KEYS pitch+gate -> GRD (ENG 0, ladder LP, defaults) -> OUT.
+void grdLikeOwner() {
+    Patch& p = gBuild;
+    p = gEmpty;
+    const uint16_t k = add(p, kKeysType, 0), g = add(p, kGrdType, 1), o = add(p, kOutType, 2);
+    p.addCable(k, 0, g, 0);
+    p.addCable(k, 1, g, 1);
+    p.addCable(g, 0, o, 0);
+    gPatch = p;
+    gEngine.apply(gPatch);
+    Serial.print("  grd like the owner's patch:");
+    for (int mode = 0; mode < 2; mode++) {
+        gUiMode = mode;
+        runBlocks(300);
+        runBlocks(600);
+        Serial.printf(" %s grd=%u", kModes[mode], (unsigned)gEngine.instance(g)->measuredCycles());
+    }
+    Serial.println();
+    gUiMode = 0;
+    gEngine.apply(gEmpty);
+    runBlocks(4);
+}
+
 // ---- round 2: where a trivial module's ~180 cycles/sample go ----
 __attribute__((noinline)) float recipNewton(float x) {
     float r;
@@ -238,14 +351,22 @@ void split() {
     Serial.printf("  empty engine: %.1f cyc/sample\n", runBlocks(500));
 }
 
+bool inFocus(const ModuleTypeInfo& ty) {
+    for (const char* const* id = kFocus; *id; id++)
+        if (strcmp(*id, ty.id) == 0) return true;
+    return !kShort;
+}
+
 // Every type alone, an OSC into each of its inputs, UI at 30 fps: its measured cycles/sample.
 void allTypes() {
     int n = 0;
     const ModuleTypeInfo* const* types = ::allTypes(&n);
-    Serial.println("types (cyc/sample in engine, ui30; est = table value):");
+    Serial.println(kShort ? "types (cyc/sample in engine, ui30, measured/table):" : "types (cyc/sample in engine, ui30; est = table value):");
+    if (kShort) Serial.print(" ");
     gUiMode = 1;
     for (int t = 0; t < n; t++) {
         const ModuleTypeInfo& ty = *types[t];
+        if (!inFocus(ty)) continue;
         Patch& p = gBuild;
         p = gEmpty;
         const uint16_t o = add(p, kOscType, 0);
@@ -262,10 +383,12 @@ void allTypes() {
         }
         runBlocks(200);
         runBlocks(300);
-        Serial.printf("  %s=%u/%u\n", ty.id, (unsigned)gEngine.instance(id)->measuredCycles(), (unsigned)ty.cpuCycles);
+        Serial.printf(kShort ? " %s=%u/%u" : "  %s=%u/%u\n", ty.id, (unsigned)gEngine.instance(id)->measuredCycles(),
+                      (unsigned)ty.cpuCycles);
         gEngine.apply(gEmpty);
         runBlocks(4);
     }
+    if (kShort) Serial.println();
     gUiMode = 0;
 }
 
@@ -275,9 +398,12 @@ void benchTask(void*) {
     for (int round = 1;; round++) {
         Serial.printf("\n==== bench round %d (cpu %u MHz, budget 5000 cyc/sample) ====\n", round,
                       (unsigned)getCpuFrequencyMhz());
-        Serial.println("split (ui idle):");
         gUiMode = 0;
-        split();
+        if (round == 1) fastMath();
+        if (!kShort) {
+            Serial.println("split (ui idle):");
+            split();
+        }
         voicePatch();
         for (int mode = 0; mode < 3; mode++) {
             gUiMode = mode;
@@ -292,9 +418,17 @@ void benchTask(void*) {
         }
         gUiMode = 0;
         vTaskDelay(pdMS_TO_TICKS(50));
-        Serial.println("micro (ui idle):");
-        micro();
+        if (!kShort) {
+            Serial.println("micro (ui idle):");
+            micro();
+        }
         allTypes();
+        if (kShort) dspParts();
+        if (kShort) grdLikeOwner();
+        if (kShort) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
 
         // GRD alone, every engine, with the UI at 30 fps (the real case) and idle.
         Patch& g = gBuild;

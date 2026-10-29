@@ -65,6 +65,7 @@ class VosimOscillator
     float Sine(float phase);
 
     float sample_rate_;
+    float sr_recip_; // modsynth: 1 / sample_rate_ (setters run per sample)
 
     // Oscillator state.
     float carrier_phase_;

@@ -382,7 +382,7 @@ Module* create() { return new Awh(); }
 const ModuleTypeInfo kAwhType = {
     "awh", "AWH", "Auto-wah", Category::Effect, Icon::Fx, Drawing::None,
     3, awh::kParams, 1, kInOnly, kInLbl, 1, kOutOnly, kOutLbl,
-    2670, sizeof(awh::Awh) + kBlock * sizeof(float), 0, awh::create};
+    870, sizeof(awh::Awh) + kBlock * sizeof(float), 0, awh::create};
 
 // ---------------------------------------------------------------- ENF
 // Envelope follower: |in| through attack/release, x GAIN; GATE is high while it is over THRESH.

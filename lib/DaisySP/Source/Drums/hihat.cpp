@@ -10,6 +10,7 @@ void SquareNoise::Init(float sample_rate)
     {
         phase_[i] = 0;
     }
+    last_f0_ = __builtin_nanf(""); // modsynth
 }
 
 float SquareNoise::Process(float f0)
@@ -22,15 +23,23 @@ float SquareNoise::Process(float f0)
                              1.932f,
                              2.536f};
 
-    uint32_t increment[6];
-    uint32_t phase[6];
+    // modsynth: the increments only depend on f0; compute them on a change
+    if(f0 != last_f0_)
+    {
+        last_f0_ = f0;
+        for(int i = 0; i < 6; ++i)
+        {
+            float f = f0 * ratios[i];
+            if(f >= 0.499f)
+                f = 0.499f;
+            increment_[i] = static_cast<uint32_t>(f * 4294967296.0f);
+        }
+    }
+    const uint32_t* increment = increment_;
+    uint32_t        phase[6];
     for(int i = 0; i < 6; ++i)
     {
-        float f = f0 * ratios[i];
-        if(f >= 0.499f)
-            f = 0.499f;
-        increment[i] = static_cast<uint32_t>(f * 4294967296.0f);
-        phase[i]     = phase_[i];
+        phase[i] = phase_[i];
     }
 
     phase[0] += increment[0];

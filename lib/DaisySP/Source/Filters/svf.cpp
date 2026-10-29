@@ -1,6 +1,7 @@
 #include <math.h>
 #include "svf.h"
 #include "dsp.h"
+#include "modsynth_fast.h"
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 using namespace daisysp;
@@ -26,6 +27,8 @@ void Svf::Init(float sample_rate)
     out_peak_  = 0.0f;
     out_band_  = 0.0f;
     fc_max_    = sr_ / 3.f;
+    last_f_in_ = last_r_in_ = __builtin_nanf(""); // modsynth
+    inv_2sr_                = 1.f / (sr_ * 2.0f); // modsynth
 }
 
 void Svf::Process(float in)
@@ -57,6 +60,9 @@ void Svf::Process(float in)
 
 void Svf::SetFreq(float f)
 {
+    if(f == last_f_in_) // modsynth: same input, same result
+        return;
+    last_f_in_ = f;
     fc_ = fclamp(f, 1.0e-6, fc_max_);
     // Set Internal Frequency for fc_
     freq_ = 2.0f
@@ -70,6 +76,9 @@ void Svf::SetFreq(float f)
 
 void Svf::SetRes(float r)
 {
+    if(r == last_r_in_) // modsynth: same input, same result
+        return;
+    last_r_in_ = r;
     float res = fclamp(r, 0.f, 1.f);
     res_      = res;
     // recalculate damp
@@ -83,4 +92,17 @@ void Svf::SetDrive(float d)
     float drv  = fclamp(d * 0.1f, 0.f, 1.f);
     pre_drive_ = drv;
     drive_     = pre_drive_ * res_;
+}
+
+// modsynth: SetFreq(f); SetRes(r) without libm. sin(pi x) for x <= 0.25 by polynomial,
+// powf(res, 0.25) by two rsqrt steps, 2 / freq_ by recip0.s.
+void Svf::SetFreqResFast(float f, float r)
+{
+    last_f_in_ = last_r_in_ = __builtin_nanf(""); // the next exact call recomputes
+    fc_   = fclamp(f, 1.0e-6, fc_max_);
+    freq_ = 2.0f * FastSinHalfPi(PI_F * MIN(0.25f, fc_ * inv_2sr_));
+    res_  = fclamp(r, 0.f, 1.f);
+    damp_ = MIN(2.0f * (1.0f - FastPowQuarter(res_)),
+                MIN(2.0f, 2.0f * FastRecip(freq_) - freq_ * 0.5f));
+    drive_ = pre_drive_ * res_;
 }

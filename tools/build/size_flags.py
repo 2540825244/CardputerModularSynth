@@ -3,7 +3,10 @@
 #   exactly as before: -O2, flags untouched, so its object code (and the sound) cannot change.
 # - Everything else (UI, render, file I/O, M5 libraries, Arduino core and its libraries) builds
 #   with -Os and, for C++, -fno-exceptions. Nothing catches, so a throw ends in terminate() either
-#   way; the unwind tables were ~50 KB of flash.
+#   way; the unwind tables were 63 KB of flash (measured from the map).
+# - Audio hot paths must not live in header inlines shared with UI code: an out-of-line copy may be
+#   emitted from an -Os file and picked by the linker. Keep them in audio-path .cpp files or mark
+#   them always_inline.
 import os
 
 Import("env")

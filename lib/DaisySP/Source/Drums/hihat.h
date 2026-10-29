@@ -10,6 +10,7 @@ https://opensource.org/licenses/MIT.
 #ifndef DSY_HIHAT_H
 #define DSY_HIHAT_H
 
+#include "modsynth_fast.h" // modsynth
 #include "Filters/svf.h"
 #include "Synthesis/oscillator.h"
 
@@ -41,6 +42,9 @@ class SquareNoise
 
   private:
     uint32_t phase_[6];
+    // modsynth: increments for the last f0 (they only depend on it)
+    float    last_f0_;
+    uint32_t increment_[6];
 };
 
 /**  
@@ -134,6 +138,8 @@ class HiHat
         noise_sample_ = 0.0f;
         sustain_gain_ = 0.0f;
 
+        dirty_ = true; // modsynth
+        f0_ = tone_ = decay_ = noisiness_ = -1.f;
         SetFreq(3000.f);
         SetTone(.5f);
         SetDecay(.2f);
@@ -151,10 +157,9 @@ class HiHat
     */
     float Process(bool trigger = false)
     {
-        const float envelope_decay
-            = 1.0f - 0.003f * SemitonesToRatio(-decay_ * 84.0f);
-        const float cut_decay
-            = 1.0f - 0.0025f * SemitonesToRatio(-decay_ * 36.0f);
+        // modsynth: the decay/tone/f0 terms come from UpdateCoefs(), run after a change
+        if(dirty_)
+            UpdateCoefs();
 
         if(trigger || trig_)
         {
@@ -168,39 +173,26 @@ class HiHat
         float out = metallic_noise_.Process(2.0f * f0_);
 
         // Apply BPF on the metallic noise.
-        float cutoff = 150.0f / sample_rate_ * SemitonesToRatio(tone_ * 72.0f);
-
-        cutoff = fclamp(cutoff, 0.0f, 16000.0f / sample_rate_);
-
-
-        noise_coloration_svf_.SetFreq(cutoff * sample_rate_);
-        noise_coloration_svf_.SetRes(resonance ? 3.0f + 6.0f * tone_ : 1.0f);
-
         noise_coloration_svf_.Process(out);
         out = noise_coloration_svf_.Band();
 
         // This is not at all part of the 808 circuit! But to add more variety, we
         // add a variable amount of clocked noise to the output of the 6 schmitt
         // trigger oscillators.
-        float noise_f = f0_ * (16.0f + 16.0f * (1.0f - noisiness_));
-        noise_f       = fclamp(noise_f, 0.0f, 0.5f);
-
-        noise_clock_ += noise_f;
+        noise_clock_ += noise_f_;
         if(noise_clock_ >= 1.0f)
         {
             noise_clock_ -= 1.0f;
-            noise_sample_ = rand() * kRandFrac - 0.5f;
+            noise_sample_ = FastRand() /* modsynth */ * kRandFrac - 0.5f;
         }
         out += noisiness_ * (noise_sample_ - out);
 
         // Apply VCA.
         sustain_gain_ = accent_ * decay_;
         VCA vca;
-        envelope_ *= envelope_ > 0.5f ? envelope_decay : cut_decay;
+        envelope_ *= envelope_ > 0.5f ? envelope_decay_ : cut_decay_;
         out = vca(out, sustain_ ? sustain_gain_ : envelope_);
 
-        hpf_.SetFreq(cutoff * sample_rate_);
-        hpf_.SetRes(.5f);
         hpf_.Process(out);
         out = hpf_.High();
 
@@ -226,22 +218,31 @@ class HiHat
     void SetFreq(float f0)
     {
         f0 /= sample_rate_;
-        f0_ = fclamp(f0, 0.f, 1.f);
+        const float v = fclamp(f0, 0.f, 1.f);
+        dirty_        = dirty_ || v != f0_; // modsynth
+        f0_           = v;
     }
 
     /** Set the overall brightness / darkness of the hihat.
         \param tone Works from 0-1.
     */
-    void SetTone(float tone) { tone_ = fclamp(tone, 0.f, 1.f); }
+    void SetTone(float tone)
+    {
+        const float v = fclamp(tone, 0.f, 1.f);
+        dirty_        = dirty_ || v != tone_; // modsynth
+        tone_         = v;
+    }
 
     /** Set the length of the hihat decay
         \param decay Works > 0. Tuned for 0-1.
     */
     void SetDecay(float decay)
     {
-        decay_ = fmax(decay, 0.f);
-        decay_ *= 1.7;
-        decay_ -= 1.2;
+        float v = fmax(decay, 0.f);
+        v *= 1.7;
+        v -= 1.2;
+        dirty_ = dirty_ || v != decay_; // modsynth
+        decay_ = v;
     }
 
     /** Sets the mix between tone and noise
@@ -249,8 +250,10 @@ class HiHat
     */
     void SetNoisiness(float noisiness)
     {
-        noisiness_ = fclamp(noisiness, 0.f, 1.f);
-        noisiness_ *= noisiness_;
+        float v = fclamp(noisiness, 0.f, 1.f);
+        v *= v;
+        dirty_     = dirty_ || v != noisiness_; // modsynth
+        noisiness_ = v;
     }
 
 
@@ -262,6 +265,27 @@ class HiHat
     bool  trig_;
 
     float SemitonesToRatio(float in) { return powf(2.f, in * kOneTwelfth); }
+
+    // modsynth: the coefficient half of the old Process(), same expressions in the same order.
+    void UpdateCoefs()
+    {
+        dirty_          = false;
+        envelope_decay_ = 1.0f - 0.003f * SemitonesToRatio(-decay_ * 84.0f);
+        cut_decay_      = 1.0f - 0.0025f * SemitonesToRatio(-decay_ * 36.0f);
+
+        float cutoff = 150.0f / sample_rate_ * SemitonesToRatio(tone_ * 72.0f);
+        cutoff       = fclamp(cutoff, 0.0f, 16000.0f / sample_rate_);
+        noise_coloration_svf_.SetFreq(cutoff * sample_rate_);
+        noise_coloration_svf_.SetRes(resonance ? 3.0f + 6.0f * tone_ : 1.0f);
+
+        float noise_f = f0_ * (16.0f + 16.0f * (1.0f - noisiness_));
+        noise_f_      = fclamp(noise_f, 0.0f, 0.5f);
+
+        hpf_.SetFreq(cutoff * sample_rate_);
+        hpf_.SetRes(.5f);
+    }
+    bool  dirty_ = true;
+    float envelope_decay_, cut_decay_, noise_f_;
 
     float envelope_;
     float noise_clock_;

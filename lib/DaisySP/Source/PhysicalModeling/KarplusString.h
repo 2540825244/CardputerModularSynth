@@ -104,6 +104,15 @@ class String
     // do not fit the delay line. Rarely used.
     float src_phase_;
     float out_sample_[2];
+
+    // modsynth: everything ProcessInternal() derived from frequency, non-linearity, brightness
+    // and damping each sample (two powf, an atanf, a tanf, four divides), computed again only
+    // after a setter changes one of them.
+    void  UpdateCoefs();
+    bool  dirty_;
+    bool  src_full_;
+    float delay_, src_ratio_, damping_compensation_, stretch_point_, stretch_correction_;
+    float noise_amount_, noise_filter_, bridge_curving_, ap_gain_;
 };
 } // namespace daisysp
 #endif

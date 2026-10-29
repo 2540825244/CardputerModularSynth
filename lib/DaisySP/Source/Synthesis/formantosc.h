@@ -73,6 +73,7 @@ class FormantOscillator
     float ps_inc_;
 
     float sample_rate_;
+    float sr_recip_; // modsynth: 1 / sample_rate_ (setters run per sample)
 
     //DISALLOW_COPY_AND_ASSIGN(FormantOscillator);
 };

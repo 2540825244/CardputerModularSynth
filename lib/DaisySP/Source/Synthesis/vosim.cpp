@@ -1,12 +1,14 @@
 #include "dsp.h"
 #include "vosim.h"
 #include <math.h>
+#include "modsynth_fast.h"
 
 using namespace daisysp;
 
 void VosimOscillator::Init(float sample_rate)
 {
     sample_rate_ = sample_rate;
+    sr_recip_    = 1.f / sample_rate; // modsynth
 
     carrier_phase_   = 0.0f;
     formant_1_phase_ = 0.0f;
@@ -52,20 +54,20 @@ float VosimOscillator::Process()
 
 void VosimOscillator::SetFreq(float freq)
 {
-    carrier_frequency_ = freq / sample_rate_;
+    carrier_frequency_ = freq * sr_recip_ /* modsynth: no divide */;
     carrier_frequency_ = carrier_frequency_ > .25f ? .25f : carrier_frequency_;
 }
 
 void VosimOscillator::SetForm1Freq(float freq)
 {
-    formant_1_frequency_ = freq / sample_rate_;
+    formant_1_frequency_ = freq * sr_recip_ /* modsynth: no divide */;
     formant_1_frequency_
         = formant_1_frequency_ > .25f ? .25f : formant_1_frequency_;
 }
 
 void VosimOscillator::SetForm2Freq(float freq)
 {
-    formant_2_frequency_ = freq / sample_rate_;
+    formant_2_frequency_ = freq * sr_recip_ /* modsynth: no divide */;
     formant_2_frequency_
         = formant_2_frequency_ > .25f ? .25f : formant_2_frequency_;
 }
@@ -77,5 +79,5 @@ void VosimOscillator::SetShape(float shape)
 
 float VosimOscillator::Sine(float phase)
 {
-    return sinf(TWOPI_F * phase);
+    return FastSin2Pi(phase); // modsynth: sinf costs ~260 cycles
 }
