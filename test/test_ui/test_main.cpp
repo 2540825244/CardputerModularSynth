@@ -2057,15 +2057,18 @@ void test_kit_bypassed_ignores_play() {
 // Review I3: a step stacked onto a busy one can overload the worst step: say so.
 void test_kit_step_overload_warns() {
     Fx f;
-    uint16_t kit = 0, a = 0, b = 0, out = 0;
+    uint16_t kit = 0, a = 0, b = 0, h = 0, out = 0;
     gPatch.addModule(kKitType, 0, 0, &kit);
     gPatch.addModule(*findType("grd"), 0, 1, &a);
     gPatch.addModule(*findType("mdl"), 0, 2, &b);
+    gPatch.addModule(*findType("hat"), 0, 4, &h);
     gPatch.addModule(kOutType, 0, 3, &out);
     gPatch.addCable(kit, 0, a, 1);  // T1 -> GRD trig
     gPatch.addCable(kit, 1, b, 0);  // T2 -> MDL trig
+    gPatch.addCable(kit, 2, h, 0);  // T3 -> HAT trig (step 3 by default)
     gPatch.addCable(a, 0, out, 0);
     gPatch.addCable(b, 0, out, 0);
+    gPatch.addCable(h, 0, out, 0);
     f.eng.apply(gPatch);
     TEST_ASSERT_TRUE(f.eng.patchCycles(gPatch) <= kCpuBudget);
     f.tap(0, 0);
@@ -2073,10 +2076,36 @@ void test_kit_step_overload_warns() {
     f.tap(0, 2);          // T2 on step 1 too: GRD + MDL at once
     TEST_ASSERT_TRUE(f.eng.patchCycles(gPatch) > kCpuBudget);
     TEST_ASSERT_EQUAL_STRING("CPU FULL", f.ui.state().toast);
-    // final review M3: still over budget, a further edit does not re-arm the showing toast
+    // final review M3: an edit that raises it further does not re-arm the showing toast
     const uint32_t until = f.ui.state().toastUntilMs;
-    f.tap(1, 2);
+    const uint32_t over = f.eng.patchCycles(gPatch);
+    f.tap(0, 3);  // T3 on step 1: GRD + MDL + HAT
+    TEST_ASSERT_TRUE(f.eng.patchCycles(gPatch) > over);
     TEST_ASSERT_EQUAL_UINT32(until, f.ui.state().toastUntilMs);
+    f.tap(0, 3);  // T3 off step 1 again
+    f.tap(1, 2);  // T2 off step 2 (its default)
+    // owner, 2026-10-29: an edit that adds no CPU (GAP) says nothing, even over budget
+    f.t += 10000;
+    f.ui.tick(f.t);
+    TEST_ASSERT_EQUAL_STRING("", f.ui.state().toast);
+    for (int i = 0; i < 3; i++) f.side(Side::Tab);
+    TEST_ASSERT_EQUAL_STRING("SET", modulePageName(kKitType, f.ui.state().modPage));
+    const float gap = gPatch.find(kit)->params[kit::kGap];
+    f.tap(1, 1);           // GAP
+    f.side(Side::Space);   // fine up
+    TEST_ASSERT_TRUE(gPatch.find(kit)->params[kit::kGap] > gap);
+    TEST_ASSERT_EQUAL_STRING("", f.ui.state().toast);
+    // an edit that raises the worst step past the budget still warns; a second step as heavy
+    // as the worst one adds nothing
+    f.side(Side::Tab);  // T1-3 (step 1: T1 + T2; step 2: off, the tap above cleared T2's default)
+    f.tap(1, 1);        // T1 on step 2: lighter than step 1
+    f.tap(1, 2);        // T2 on step 2: as heavy as step 1, the worst step stays
+    TEST_ASSERT_EQUAL_STRING("", f.ui.state().toast);
+    f.tap(0, 2);        // T2 off step 1
+    f.tap(1, 2);        // and off step 2: back under the budget
+    TEST_ASSERT_TRUE(f.eng.patchCycles(gPatch) <= kCpuBudget);
+    f.tap(0, 2);        // T2 back on step 1
+    TEST_ASSERT_EQUAL_STRING("CPU FULL", f.ui.state().toast);
 }
 
 void test_kit_enter_starts_pass() {

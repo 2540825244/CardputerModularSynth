@@ -147,7 +147,8 @@ void sideKey(UiController& ui, const KeyEvent& e) {
             if (ui.fnHeld()) {  // fn+del: bypass / enable (not CPU-gated: CPU FULL warns)
                 BypassEdit b{m->id, !m->bypass};
                 ui.edit(doBypass, &b);
-                ui.toast(b.on ? "BYPASSED" : "ENABLED", ui.now());
+                if (strcmp(ui.state().toast, "CPU FULL") != 0)  // the edit's warning wins
+                    ui.toast(b.on ? "BYPASSED" : "ENABLED", ui.now());
                 break;
             }
             Cell c{m->id, 0, 0};

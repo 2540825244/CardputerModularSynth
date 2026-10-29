@@ -33,5 +33,7 @@ Real costs put 5 presets over budget: DRUMS 23750, TURING 12950, GRIND 5500, PLU
   patch save needs and the 32 KB create reserve that covers it (review 5b).
 - canAddLive charges a second DLY/REV 96 KB even when the first is missing (never created, static
   slot free). Conservative, rare (review 5b M3).
+- CPU FULL on edit (KIT patches) is not said after undo/redo or a load that lands over the
+  estimate; only edits that raise it warn (review of the GAP fix, 2026-10-29). Old behaviour too.
 - USB MIDI host.
 - Task 14: final whole-branch review, then finish `feat/v1-firmware`.

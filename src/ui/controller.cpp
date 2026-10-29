@@ -387,6 +387,7 @@ void UiController::tilt(float degrees) {
 }
 
 bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {
+    const uint32_t before = kitCycles();
     undo_.push(patch_, coalesceKey);
     fn(patch_, ctx);
     engine_.apply(patch_);
@@ -394,25 +395,33 @@ bool UiController::edit(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceK
     s_.dirty = true;
     s_.lastEditMs = now_;
     if (coalesceKey) coalescedEdit_ = true;
-    warnKitCpu();
+    warnKitCpu(before);
     return true;
 }
 
+uint32_t UiController::kitCycles() const {
+    return patch_.countOfType(kKitType) ? engine_.patchCycles(patch_) : 0;
+}
+
 // With a KIT, a cable or a step can raise the worst step past the budget; one overloaded step is
-// too short for the measured-load warning, so say it at the edit.
-void UiController::warnKitCpu() {
+// too short for the measured-load warning, so say it at the edit. Only an edit that raised the
+// estimate says it: the estimate over-counts, and a patch already over it that plays fine should
+// not warn at every GAP nudge (owner, 2026-10-29).
+void UiController::warnKitCpu(uint32_t before) {
     const bool showing = !strcmp(s_.toast, "CPU FULL") && (int32_t)(now_ - s_.toastUntilMs) < 0;
-    if (!showing && patch_.countOfType(kKitType) && engine_.patchCycles(patch_) > kCpuBudget)
+    const uint32_t after = kitCycles();
+    if (!showing && after > before && after > kCpuBudget)
         toast("CPU FULL", now_);  // not re-armed while it shows (a tilt sweep edits at 50 Hz)
 }
 
 bool UiController::editValue(void (*fn)(Patch&, void*), void* ctx, uint32_t coalesceKey) {
+    const uint32_t before = kitCycles();
     undo_.push(patch_, coalesceKey);
     fn(patch_, ctx);
     s_.dirty = true;
     s_.lastEditMs = now_;
     coalescedEdit_ = true;
-    warnKitCpu();
+    warnKitCpu(before);
     return true;
 }
 
