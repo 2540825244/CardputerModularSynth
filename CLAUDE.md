@@ -35,5 +35,5 @@ The third-party PDFs in `docs/reference/` are git-ignored; history was rewritten
 - DaisySP (MIT core only, not DaisySP-LGPL). Plaits (MIT) is vendored in `lib/plaits`, built with `-DTEST`.
 - New presets: edit `tools/presets.py` / `tools/presets_more.py`, then run `python3 tools/presets.py`;
   `python3 tools/preset_levels.py` sets their OUT gain (-3 dBFS) from the native bench (test_presets).
-- Git is on `main` with no remote yet. The owner will push to a private GitHub repo later;
-  `gh` is logged in.
+- GitHub: `origin` = github.com/2540825244/CardputerModularSynth (private). Keep `main` in step with
+  `feat/v1-firmware`; push only when the owner asks.
