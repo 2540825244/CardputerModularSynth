@@ -70,6 +70,7 @@ struct SeqClock {
     bool started = false;  // this tick saw a transport start (not RST)
     float pos = 0.f, len = 6000.f;  // samples into the step, the step's length
     int since = 0;
+    uint32_t count = 0, cur = 0;  // steps since the restart; cur = this step's index (swing parity)
     bool tick(const float* c, const float* r, int i, bool* restart);
     bool high() const { return running && pos < len * 0.5f; }  // CLK out: the step's first half
 };
@@ -89,7 +90,7 @@ class RollModule : public Module {
     std::atomic<uint32_t> audCount_{0};
     uint32_t audSeen_ = 0;
     int step_ = -1, eoc_ = 0, gap_ = 0;
-    bool note_ = false, last_ = true;
+    bool note_ = false, last_ = true, prevGate_ = false, prevClk_ = false;
     float semis_ = 0.f, pitch_ = 0.f;
 };
 
@@ -110,7 +111,7 @@ class EvoModule : public Module {
     std::atomic<uint32_t> gen_{0};
     uint32_t seed_ = 0xFFFFFFFFu;
     int step_ = -1;
-    bool note_ = false, last_ = true, acc_ = false;
+    bool note_ = false, last_ = true, acc_ = false, prevGate_ = false, prevClk_ = false;
     int deg_ = 0;
     float pitch_ = 0.f, mutCv_ = 0.f;
 };

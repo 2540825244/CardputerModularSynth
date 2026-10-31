@@ -254,7 +254,7 @@ void drawRollPage(Gfx& g, const ModuleRec& m, const Module* inst, const UiState&
     k.cursor = cur;
     k.curLen = rollLenSteps(s.rollLen);
     k.play = inst && transport::running() ? (int)inst->monitor(0) : -1;
-    k.guide = s.keysHeld != 0;
+    k.guide = s.rollHeld != 0;
     k.guideSemis = s.rollSemis;
     drawRoll(g, m, Box{x + 1, y1 + 8, w - 2, y + h - y1 - 9}, k, false);
 }

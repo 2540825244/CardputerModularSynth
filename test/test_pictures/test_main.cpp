@@ -348,7 +348,7 @@ void test_roll_page() {
     UiState s{};
     s.rollCursor = 8;
     s.rollLen = 3;
-    s.keysHeld = 1;
+    s.rollHeld = 1;
     s.rollSemis = 10;
     for (int variant = 0; variant < 3; variant++) {
         if (variant == 1) {

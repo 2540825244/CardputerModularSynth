@@ -308,6 +308,77 @@ void test_seq_restarts_with_the_transport() {
     delete seq;
 }
 
+// ---- review fixes ----
+void test_seq_restart_keeps_separate_gates() {  // a stop / play must not stretch step 1 into step 2
+    Module* clk = kClkType.create();
+    Module* seq = kSeqType.create();
+    for (int p = 0; p < kSeqType.numParams; p++) seq->setParam(p, kSeqType.params[p].def);
+    clk->setParam(0, 120.f);
+    static const bool none[2] = {};
+    const float* nul[2] = {};
+    const float* ins[2] = {clk->out(0), nullptr};
+    const bool conn[2] = {true, false};
+    for (int b = 0; b < 1000; b++) {
+        clk->process(nul, none);
+        seq->process(ins, conn);
+    }
+    transport::stop();
+    for (int b = 0; b < 3000; b++) {  // 2 s stopped
+        clk->process(nul, none);
+        seq->process(ins, conn);
+    }
+    transport::play();
+    int rises = 0;
+    bool was = false;
+    for (int b = 0; b < 24000 / kBlock + 10; b++) {  // a beat is 24000 samples: steps 1 and 2
+        clk->process(nul, none);
+        seq->process(ins, conn);
+        for (int i = 0; i < kBlock; i++) {
+            const bool on = seq->out(1)[i] > 2.5f;
+            rises += on && !was;
+            was = on;
+        }
+    }
+    TEST_ASSERT_EQUAL(2, rises);
+    delete clk;
+    delete seq;
+}
+
+void test_rol_restart_while_running_is_a_fresh_edge() {
+    RollModule m;
+    setAll(m, kRolType);
+    run(m, 50);  // inside step 0 (1600 of 6000 samples): its gate and CLK out are high
+    TEST_ASSERT_TRUE(m.out(1)[kBlock - 1] > 2.5f);
+    TEST_ASSERT_TRUE(m.out(2)[kBlock - 1] > 2.5f);
+    transport::play();
+    const Run r = run(m, 1);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, r.gate[0]);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, r.o2[0]);
+    TEST_ASSERT_TRUE(r.gate[1] > 2.5f && r.o2[1] > 2.5f);
+}
+
+void test_rol_swing_odd_len_keeps_tempo() {
+    RollModule m;
+    setAll(m, kRolType);
+    m.setParam(roll::kLen, 3.f);
+    m.setParam(roll::kSwing, 0.5f);
+    const Run r = run(m, 30 * 6000 / kBlock + 4);
+    int clocks = 0;
+    for (size_t i = 0; i < r.o2.size(); i++) clocks += r.o2[i] > 2.5f && (i == 0 || r.o2[i - 1] < 2.5f);
+    TEST_ASSERT_EQUAL(31, clocks);  // 30 steps' time holds 30 (+1 starting) steps: no drift
+}
+
+void test_rol_tempo_change_takes_the_step_playing() {
+    RollModule m;
+    setAll(m, kRolType);
+    m.setParam(roll::kRes, 0.f);  // quarters: a step is 24000 samples
+    m.setParam(roll::kBpm, 20.f); // ... 144000 at 20 BPM
+    run(m, 10);
+    m.setParam(roll::kBpm, 120.f);
+    run(m, 24000 / kBlock + 2);
+    TEST_ASSERT_EQUAL_FLOAT(1.f, m.monitor(0));  // step 2 came at the new tempo
+}
+
 int main() {
     (void)words0;
     UNITY_BEGIN();
@@ -328,5 +399,9 @@ int main() {
     RUN_TEST(test_seq_root_and_octave);
     RUN_TEST(test_clk_follows_transport);
     RUN_TEST(test_seq_restarts_with_the_transport);
+    RUN_TEST(test_seq_restart_keeps_separate_gates);
+    RUN_TEST(test_rol_restart_while_running_is_a_fresh_edge);
+    RUN_TEST(test_rol_swing_odd_len_keeps_tempo);
+    RUN_TEST(test_rol_tempo_change_takes_the_step_playing);
     return UNITY_END();
 }

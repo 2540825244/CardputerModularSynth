@@ -2434,11 +2434,27 @@ void test_roll_page_preview_does_not_write() {
     memcpy(before, m->params, sizeof before);
     f.sideDown(Side::Fn);
     f.down(5, 1);
-    TEST_ASSERT_TRUE(f.ui.state().keysHeld != 0);
+    TEST_ASSERT_TRUE(f.ui.state().rollHeld != 0);
     f.up(5, 1);
     f.sideUp(Side::Fn);
     TEST_ASSERT_EQUAL_MEMORY(before, gPatch.findAt(0, 12)->params, sizeof before);
-    TEST_ASSERT_EQUAL(0, (int)f.ui.state().keysHeld);
+    TEST_ASSERT_EQUAL(0, (int)f.ui.state().rollHeld);
+}
+
+void test_roll_audition_ends_with_a_keys_latch() {  // review: KEYS' latch lives in keysHeld
+    Fx f;
+    transport::play();
+    f.place(TKeys, 1, 1);
+    placeRol(f);
+    f.tap(0, 1);
+    f.side(Side::Enter);
+    f.ui.mut().keysHeld = 1;  // a latched KEYS note elsewhere
+    f.ui.mut().latchedBit = 0;
+    f.tap(0, 2);
+    TEST_ASSERT_EQUAL(0, (int)f.ui.state().rollHeld);
+    TEST_ASSERT_EQUAL(1, (int)f.ui.state().keysHeld);  // untouched
+    f.side(Side::Esc);
+    TEST_ASSERT_EQUAL(1, (int)f.ui.state().keysHeld);
 }
 
 int main() {
@@ -2540,6 +2556,7 @@ int main() {
     RUN_TEST(test_space_plays_and_stops_with_a_rol);
     RUN_TEST(test_roll_page_writes_notes);
     RUN_TEST(test_roll_page_preview_does_not_write);
+    RUN_TEST(test_roll_audition_ends_with_a_keys_latch);
     RUN_TEST(test_auto_pages_overflow);
     RUN_TEST(test_drawing_page0_width5);
     RUN_TEST(test_drawing_page0_fits_seven_params);

@@ -195,16 +195,20 @@ class Seq : public Module {
         const float base = (param(kRoot) + 12.f * param(kOct)) / 12.f;
         for (int i = 0; i < kBlock; i++) {
             const bool rose = clk_.step(ck, rs, i);
-            if (clk_.reset) step_ = -1;  // the next clock plays step 1
+            if (clk_.reset) {  // the next clock plays step 1; the time before it is no clock period
+                step_ = -1;
+                fresh_ = true;
+            }
             if (rose) {
                 step_ = (step_ + 1) % (len < 1 ? 1 : len);
                 if (step_ == 0) eoc_ = 48;
-                period_ = since_ > 0 ? since_ : period_;
+                if (!fresh_ && since_ > 0) period_ = since_;
+                fresh_ = false;
                 since_ = 0;
                 on_ = (gates >> step_) & 1u;
                 if (on_) pitch_ = base + quantize(param(kS0 + step_) / 12.f, scale, 0);
             }
-            since_++;
+            if (clk_.running) since_++;  // stopped time is no clock period either
             const bool gate = on_ && (ck ? (float)since_ < param(kGateLen) * (float)period_ : false);
             out(0)[i] = pitch_;
             out(1)[i] = gate ? kHigh : 0.f;
@@ -216,7 +220,7 @@ class Seq : public Module {
    private:
     ClockIn clk_;
     int step_ = -1, since_ = 0, period_ = 12000, eoc_ = 0;
-    bool on_ = false;
+    bool on_ = false, fresh_ = true;
     float pitch_ = 0.f;
 };
 Module* create() { return new Seq(); }

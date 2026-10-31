@@ -93,7 +93,7 @@ void rollKey(UiController& ui, const KeyEvent& e) {
         const int semis = rollKeySemis(*m, e.row, e.col);
         const uint64_t bit = 1ull << (e.row * kGridCols + e.col);
         if (e.type == KeyEvent::Down) {
-            s.keysHeld |= bit;
+            s.rollHeld |= bit;
             s.rollSemis = (int8_t)semis;
             if (r) r->audition(semis);
             if (!ui.fnHeld()) {  // fn+key only previews
@@ -102,9 +102,9 @@ void rollKey(UiController& ui, const KeyEvent& e) {
                 s.rollCursor = (uint8_t)((cur + n) % len);
             }
         } else {
-            if (!(s.keysHeld & bit)) return;  // pressed before this page opened
-            s.keysHeld &= ~bit;
-            if (!s.keysHeld && r) r->auditionOff();
+            if (!(s.rollHeld & bit)) return;  // pressed before this page opened
+            s.rollHeld &= ~bit;
+            if (!s.rollHeld && r) r->auditionOff();
         }
         return;
     }
@@ -158,7 +158,7 @@ int rollKeySemis(const ModuleRec& m, int row, int col) {
 
 void rollLeavePage(UiController& ui) {
     UiState& s = ui.mut();
-    s.keysHeld = 0;
+    s.rollHeld = 0;
     if (const ModuleRec* m = ui.patch().find(s.openId))
         if (RollModule* r = instanceOf(ui, *m)) r->auditionOff();
 }

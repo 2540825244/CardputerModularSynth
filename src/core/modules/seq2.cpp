@@ -12,11 +12,18 @@ const char* const kOffOn[] = {"OFF", "ON"};
 const char* const kResNames[] = {"1/4", "1/8", "1/16", "1/32", "8T", "16T"};
 
 // One step of a clock at bpm and res; swing (0..1) lengthens the even steps and shortens the odd
-// ones by the same amount, so a pair keeps its length (1 = 3:1).
+// ones by the same amount, so a pair keeps its length (1 = 3:1). step = the steps since the
+// restart (not the pattern step: an odd LEN would put two long steps together).
 float stepSamples(float bpm, int res, float swing, int step) {
     const float s = 60.f / clampf(bpm, 20.f, 300.f) * kSampleRate / (float)roll::stepsPerBeat(res);
     const float d = 0.5f * clampf(swing, 0.f, 1.f);
     return s * (step % 2 == 0 ? 1.f + d : 1.f - d);
+}
+// A BPM / RES / SWG change takes the step playing along at once: the same part of it, at the new length.
+void followTempo(SeqClock& c, float len) {
+    if (len == c.len || c.len <= 0.f) return;
+    c.pos *= len / c.len;
+    c.len = len;
 }
 // Exponential glide over `ms` (0 = jump).
 inline float glideK(float ms) { return ms < 0.5f ? 1.f : 1.f - expf(-1.f / (ms * 0.001f * kSampleRate)); }
@@ -37,6 +44,7 @@ bool SeqClock::tick(const float* c, const float* r, int i, bool* restart) {
     if (*restart) {
         fresh = true;
         pos = 0.f;
+        count = 0;
     }
     if (c) {
         clk.process(c[i]);
@@ -47,6 +55,7 @@ bool SeqClock::tick(const float* c, const float* r, int i, bool* restart) {
             fresh = false;
             since = 0;
             pos = 0.f;
+            cur = count++;
             return true;
         }
         pos += 1.f;
@@ -60,11 +69,13 @@ bool SeqClock::tick(const float* c, const float* r, int i, bool* restart) {
     if (fresh) {
         fresh = false;
         pos = 0.f;
+        cur = count++;
         return true;
     }
     pos += 1.f;
     if (pos >= len) {
         pos -= len;
+        cur = count++;
         return true;
     }
     return false;
@@ -231,7 +242,7 @@ void RollModule::advance(const float* words, int len, bool external) {
     using namespace roll;
     step_ = (step_ + 1) % len;
     if (step_ == 0) eoc_ = 48;  // 1 ms
-    if (!external) clk_.len = stepSamples(param(kBpm), (int)param(kRes), param(kSwing), step_);
+    if (!external) clk_.len = stepSamples(param(kBpm), (int)param(kRes), param(kSwing), (int)clk_.cur);
     const int c = code(words, step_);
     if (isNote(c)) {
         note_ = true;
@@ -264,6 +275,7 @@ void RollModule::process(const float* const* ins, const bool* c) {
     const float audPitch = base + quantize((float)audSemis_.load(std::memory_order_relaxed) / 12.f, scale, 0);
     if (step_ >= len) step_ = len - 1;  // LEN shrank under the playhead: wrap at the next step
     float target = base + quantize(semis_ / 12.f, scale, 0);
+    if (!ck && step_ >= 0) followTempo(clk_, stepSamples(param(kBpm), (int)param(kRes), param(kSwing), (int)clk_.cur));
     for (int i = 0; i < kBlock; i++) {
         bool restart;
         const bool tick = clk_.tick(ck, rs, i, &restart);
@@ -286,10 +298,14 @@ void RollModule::process(const float* const* ins, const bool* c) {
             gap_--;
             gate = false;
         }
+        bool ckOut = playing && clk_.high();
+        if (restart && (prevGate_ || prevClk_)) gate = ckOut = false;  // a restart is a fresh edge
+        prevGate_ = gate;
+        prevClk_ = ckOut;
         pitch_ += k * (p - pitch_);
         out(kOutPitch)[i] = pitch_ + at(trs, i);
         out(kOutGate)[i] = gate ? kHigh : 0.f;
-        out(kOutClk)[i] = playing && clk_.high() ? kHigh : 0.f;
+        out(kOutClk)[i] = ckOut ? kHigh : 0.f;
         out(kOutEoc)[i] = eoc_ > 0 ? (eoc_--, kHigh) : 0.f;
     }
     setMonitor(0, (float)step_);
@@ -418,7 +434,7 @@ void EvoModule::advance(int len, bool external) {
         evolve(line_, len, mut, param(kDens), (int)param(kRange), param(kGrav), rng_);
         gen_.fetch_add(1, std::memory_order_relaxed);
     }
-    if (!external) clk_.len = stepSamples(param(kBpm), (int)param(kRes), param(kSwing), step_);
+    if (!external) clk_.len = stepSamples(param(kBpm), (int)param(kRes), param(kSwing), (int)clk_.cur);
     const uint8_t f = line_.flags[step_];
     if (f & kOn) {
         if (!((f & kTieF) && note_)) {  // a tie keeps the note before sounding
@@ -453,6 +469,7 @@ void EvoModule::process(const float* const* ins, const bool* c) {
         return base + (float)scaleDegree(scale, d) / 12.f;
     };
     float target = pitchOf(deg_);
+    if (!ck && step_ >= 0) followTempo(clk_, stepSamples(param(kBpm), (int)param(kRes), param(kSwing), (int)clk_.cur));
     for (int i = 0; i < kBlock; i++) {
         bool restart;
         const bool tick = clk_.tick(ck, rs, i, &restart);
@@ -466,12 +483,16 @@ void EvoModule::process(const float* const* ins, const bool* c) {
             target = pitchOf(deg_);
         }
         const bool playing = clk_.running && step_ >= 0;
-        const bool gate = playing && run && note_ && (!last_ || clk_.pos < gl * clk_.len);
+        bool gate = playing && run && note_ && (!last_ || clk_.pos < gl * clk_.len);
+        bool ckOut = playing && clk_.high();
+        if (restart && (prevGate_ || prevClk_)) gate = ckOut = false;  // a restart is a fresh edge
+        prevGate_ = gate;
+        prevClk_ = ckOut;
         pitch_ += k * (target - pitch_);
         out(kOutPitch)[i] = pitch_ + at(trs, i);
         out(kOutGate)[i] = gate ? kHigh : 0.f;
         out(kOutAcc)[i] = gate && acc_ ? kHigh : 0.f;
-        out(kOutClk)[i] = playing && clk_.high() ? kHigh : 0.f;
+        out(kOutClk)[i] = ckOut ? kHigh : 0.f;
     }
     setMonitor(0, (float)step_);
     setMonitor(1, (float)gen_.load(std::memory_order_relaxed));
