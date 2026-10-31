@@ -13,7 +13,7 @@ const Entry* find(const char* id) {
         const Entry* e;
         const int* n;
     } kTables[] = {{kSourcePics, &kNumSourcePics}, {kModPics, &kNumModPics}, {kProcPics, &kNumProcPics},
-                   {kSeqPics, &kNumSeqPics}};
+                   {kSeqPics, &kNumSeqPics}, {kRollPics, &kNumRollPics}};
     for (const auto& t : kTables)
         for (int i = 0; i < *t.n; i++)
             if (!strcmp(t.e[i].id, id)) return &t.e[i];

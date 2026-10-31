@@ -5,6 +5,7 @@
 #include "render_internal.h"
 #include "ui/anim.h"
 #include "core/scales.h"
+#include "core/modules/seq2.h"
 #include "ui/keys_layout.h"
 #include "ui/layout.h"
 #include "ui/views.h"
@@ -285,7 +286,8 @@ void drawModuleView(const UiState& s, const Patch& p, Engine& e) {
     if (!m) return;
     const ModuleTypeInfo& t = *m->type;
     if (modulePageKind(t, s.modPage) == PageKind::Play) {
-        drawKeysPlay(s, p);
+        if (&t == &kRolType) drawRollPage(canvasGfx(), *m, e.instance(m->id), s, kGridX, 0, kGridW, kH);
+        else drawKeysPlay(s, p);
         return;
     }
     if (s.carry.active) drawBanner(s, p);

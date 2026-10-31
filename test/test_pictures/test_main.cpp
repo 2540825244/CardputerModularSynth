@@ -12,6 +12,7 @@
 #include "render/palette.h"
 #include "ui/layout.h"
 #include "ui/pictures.h"
+#include "core/modules/seq2.h"
 
 // ---- TomThumb from M5GFX (BSD), for real glyphs in the PNGs ----
 #if __has_include("../../.pio/libdeps/cardputer/M5GFX/src/lgfx/Fonts/GFXFF/TomThumb.h")
@@ -339,6 +340,35 @@ void test_dump_pictures() {
     TEST_PASS();
 }
 
+// v1.5: ROL's ROLL page over the whole grid (16..224 x 0..135), in the box, plus a PNG of it with a
+// cursor on the long note and a held pitch key, and of an empty pattern.
+void test_roll_page() {
+    FbGfx f;
+    ModuleRec m = defaultRecord(kRolType);
+    UiState s{};
+    s.rollCursor = 8;
+    s.rollLen = 3;
+    s.keysHeld = 1;
+    s.rollSemis = 10;
+    for (int variant = 0; variant < 3; variant++) {
+        if (variant == 1) {
+            m.params[roll::kLen] = 32;
+            m.params[roll::kRes] = 4;
+        }
+        if (variant == 2) for (int w = 0; w < roll::kWords; w++) m.params[w] = 0.f;
+        f.clear(PBg);
+        f.box(16, 0, 208, 135);
+        pic::gNonFinite = 0;
+        drawRollPage(f, m, nullptr, s, 16, 0, 208, 135);
+        TEST_ASSERT_EQUAL(0, f.outside);
+        TEST_ASSERT_EQUAL(0, (int)pic::gNonFinite);
+        char path[64];
+        snprintf(path, sizeof path, ".pio/pictures/rol-page%d.png", variant);
+        f.box(0, 0, kW, kH);
+        writePng(path, f, 0, 0, kW, kH, 3, 0);
+    }
+}
+
 void test_grd_knob_labels_follow_the_engine() {
     const ModuleTypeInfo* grd = findType("grd");
     ModuleRec m = defaultRecord(*grd);
@@ -370,5 +400,6 @@ int main() {
     RUN_TEST(test_basic_waves);
     RUN_TEST(test_grd_knob_labels_follow_the_engine);
     RUN_TEST(test_dump_pictures);
+    RUN_TEST(test_roll_page);
     return UNITY_END();
 }

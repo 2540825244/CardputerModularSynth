@@ -2,6 +2,7 @@
 #include "core/module.h"
 #include "core/patch.h"
 #include "gfx.h"
+#include "ui_state.h"
 
 // Module pictures (v1.4): one painter per type, drawn over the Drawing cells of a page whose
 // drawing is Drawing::Picture, as a place-menu thumbnail, and (some types) as the patch-tile glyph.
@@ -26,6 +27,9 @@ bool drawTileGlyph(Gfx& g, const ModuleRec& m, int x, int y, int w, int h, uint8
 // / MOR take the engine's own names; everything else is its ParamSpec (label, key upper-cased).
 const char* paramLabel(const ModuleRec& m, int idx);
 const char* paramName(const ModuleRec& m, int idx, char* buf, int len);
+// v1.5: ROL's ROLL page over the whole grid box: the number row's functions, then the roll with
+// the cursor (UiState::rollCursor / rollLen) and the playing step (inst's monitor 0).
+void drawRollPage(Gfx& g, const ModuleRec& m, const Module* inst, const UiState& s, int x, int y, int w, int h);
 // A record of type t with every param at its default (thumbnails).
 ModuleRec defaultRecord(const ModuleTypeInfo& t);
 

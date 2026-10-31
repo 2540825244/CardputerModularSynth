@@ -1,6 +1,7 @@
 #include "mod.h"
 #include <cmath>
 #include "../scales.h"
+#include "../transport.h"
 #include "Control/adenv.h"
 #include "common.h"
 
@@ -16,19 +17,27 @@ const char* const kClkRstLbl[] = {"CLK", "RST"};
 constexpr float kHigh = kGateHighVolts;
 
 // Clock + reset edges, shared by the sequencers. step() returns true on a clock rising edge.
+// v1.5: they follow the transport: stopped, no clock counts; a start resets them (step 1 next).
 struct ClockIn {
     GateDetector clk, rst;
-    bool high = false, reset = false;
+    bool high = false, reset = false, running = true;
+    uint32_t epoch = transport::epoch();
     bool step(const float* c, const float* r, int i) {
         reset = false;
+        if (i == 0) {
+            running = transport::running();
+            const uint32_t e = transport::epoch();
+            reset = e != epoch;
+            epoch = e;
+        }
         if (r) {
             rst.process(r[i]);
-            reset = rst.rose;
+            reset = reset || rst.rose;
         }
         if (!c) return false;
         clk.process(c[i]);
-        high = clk.high;
-        return clk.rose;
+        high = clk.high && running;
+        return clk.rose && running;
     }
 };
 }  // namespace
@@ -142,10 +151,11 @@ const ModuleTypeInfo kRndType = {
 
 // ---------------------------------------------------------------- SEQ
 // 12-step pitch sequencer. Page STEP: row 1 = step pitches, row 2 = step gates (bits of GATES),
-// row 3 = pins. Page SET: length, gate length, scale. A step with its gate off holds the pitch
-// and sends no gate. EOC pulses when the sequence wraps.
+// row 3 = pins. Page SET: length, gate length, scale, root, octave (v1.5: the steps are semitones
+// above ROOT, snapped to SCL). A step with its gate off holds the pitch and sends no gate. EOC
+// pulses when the sequence wraps.
 namespace seq {
-enum { kS0 = 0, kGates = 12, kLen = 13, kGateLen = 14, kScale = 15 };
+enum { kS0 = 0, kGates = 12, kLen = 13, kGateLen = 14, kScale = 15, kRoot = 16, kOct = 17 };
 #define STEP(n) {"s" #n, #n, -24.f, 24.f, 0.f, Curve::Stepped, Unit::Semi, nullptr}
 const ParamSpec kParams[] = {
     STEP(1), STEP(2), STEP(3), STEP(4), STEP(5), STEP(6), STEP(7), STEP(8), STEP(9), STEP(10), STEP(11), STEP(12),
@@ -153,6 +163,8 @@ const ParamSpec kParams[] = {
     {"len", "LEN", 1.f, 12.f, 8.f, Curve::Stepped, Unit::Int, nullptr},
     {"gatelen", "GLN", 0.05f, 1.f, 0.5f, Curve::Lin, Unit::Percent, nullptr},
     {"scale", "SCL", 0.f, 12.f, 0.f, Curve::Stepped, Unit::Enum, kScaleNames},
+    {"root", "ROT", 0.f, 11.f, 0.f, Curve::Stepped, Unit::Enum, kNoteNames},
+    {"oct", "OCT", -3.f, 3.f, 0.f, Curve::Stepped, Unit::Oct, nullptr},
 };
 #undef STEP
 const char* const kOutKeys[] = {"pitch", "gate", "eoc"};
@@ -163,7 +175,7 @@ const CellRef kStepCells[36] = {
     cI(0), cI(1), c_, cO(0), cO(1), cO(2), c_, c_, c_, c_, c_, c_,
 };
 const CellRef kSetCells[36] = {
-    cP(13), cP(14), cP(15), c_, c_, cD, cD, cD, cD, cD, cD, cD,
+    cP(13), cP(14), cP(15), cP(16), cP(17), cD, cD, cD, cD, cD, cD, cD,
     c_, c_, c_, c_, c_, cD, cD, cD, cD, cD, cD, cD,
     c_, c_, c_, c_, c_, cD, cD, cD, cD, cD, cD, cD,
 };
@@ -180,6 +192,7 @@ class Seq : public Module {
         const int len = (int)param(kLen);
         const uint32_t gates = (uint32_t)param(kGates);
         const int scale = (int)param(kScale);
+        const float base = (param(kRoot) + 12.f * param(kOct)) / 12.f;
         for (int i = 0; i < kBlock; i++) {
             const bool rose = clk_.step(ck, rs, i);
             if (clk_.reset) step_ = -1;  // the next clock plays step 1
@@ -189,7 +202,7 @@ class Seq : public Module {
                 period_ = since_ > 0 ? since_ : period_;
                 since_ = 0;
                 on_ = (gates >> step_) & 1u;
-                if (on_) pitch_ = quantize(param(kS0 + step_) / 12.f, scale, 0);
+                if (on_) pitch_ = base + quantize(param(kS0 + step_) / 12.f, scale, 0);
             }
             since_++;
             const bool gate = on_ && (ck ? (float)since_ < param(kGateLen) * (float)period_ : false);
@@ -211,7 +224,7 @@ Module* create() { return new Seq(); }
 
 const ModuleTypeInfo kSeqType = {
     "seq", "SEQ", "12-step pitch sequencer", Category::Modulator, Icon::Seq, Drawing::None,
-    16, seq::kParams, 2, kClkRst, kClkRstLbl, 3, seq::kOutKeys, seq::kOutLabels,
+    18, seq::kParams, 2, kClkRst, kClkRstLbl, 3, seq::kOutKeys, seq::kOutLabels,
     260, sizeof(seq::Seq) + 3 * kBlock * sizeof(float), 0, seq::create, seq::kPages, 2};
 
 // ---------------------------------------------------------------- TRG
@@ -300,11 +313,12 @@ class Euc : public Module {
         const float* rs = inOrNull(ins, c, 1);
         const int steps = (int)param(kSteps), fills = (int)param(kFills), rot = (int)param(kRot);
         for (int i = 0; i < kBlock; i++) {
-            if (clk_.step(ck, rs, i)) {
+            const bool tick = clk_.step(ck, rs, i);
+            if (clk_.reset) step_ = -1;  // before the tick: a reset and a clock together play step 1
+            if (tick) {
                 step_ = (step_ + 1) % (steps < 1 ? 1 : steps);
                 hit_ = euclidHit(steps, fills, rot, step_);
             }
-            if (clk_.reset) step_ = -1;
             out(0)[i] = clk_.high && hit_ ? kHigh : 0.f;
             out(1)[i] = clk_.high && !hit_ ? kHigh : 0.f;
         }

@@ -1,5 +1,6 @@
 #include "clk.h"
 #include "../dsp_util.h"
+#include "../transport.h"
 
 namespace {
 
@@ -21,6 +22,7 @@ const char* const kOutLabels[] = {"OUT", "DIV"};
 
 // One pulse per beat (high for the first half). A patched CLK replaces the internal clock and
 // OUT mirrors it. DIV goes high on every Nth base pulse and falls with it. RST restarts both.
+// v1.5: follows the transport: stopped, both stay low; a start restarts them like RST.
 class Clk : public Module {
    public:
     Clk() : Module(kClkType) {}
@@ -36,6 +38,18 @@ class Clk : public Module {
         const float* rst = connected[kInRst] ? ins[kInRst] : nullptr;
         float* o = out(0);
         float* od = out(1);
+        const uint32_t ep = transport::epoch();
+        bool restart = ep != epoch_;
+        epoch_ = ep;
+        if (!transport::running()) {
+            for (int i = 0; i < kBlock; i++) o[i] = od[i] = 0.f;
+            if (clk) for (int i = 0; i < kBlock; i++) extGate_.process(clk[i]);
+            phase_ = 0;
+            count_ = 0;
+            prevHigh_ = divHigh_ = false;
+            setMonitor(0, 0.f);
+            return;
+        }
         for (int i = 0; i < kBlock; i++) {
             bool high;
             if (clk) {
@@ -44,23 +58,26 @@ class Clk : public Module {
                 high = phase_ < 0x80000000u;
                 phase_ += inc;
             }
+            bool rose = restart;
+            restart = false;
             if (rst) {
                 rstGate_.process(rst[i]);
-                if (rstGate_.rose) {
-                    count_ = 0;
-                    if (!clk) {
-                        // Restart the beat. If OUT is high, dip for one sample so the restart
-                        // is a fresh rising edge (an envelope on OUT retriggers).
-                        if (prevHigh_) {
-                            phase_ = 0;
-                            high = false;
-                        } else {
-                            phase_ = inc;
-                            high = true;
-                        }
+                rose = rose || rstGate_.rose;
+            }
+            if (rose) {
+                count_ = 0;
+                if (!clk) {
+                    // Restart the beat. If OUT is high, dip for one sample so the restart
+                    // is a fresh rising edge (an envelope on OUT retriggers).
+                    if (prevHigh_) {
+                        phase_ = 0;
+                        high = false;
+                    } else {
+                        phase_ = inc;
+                        high = true;
                     }
-                    prevHigh_ = false;
                 }
+                prevHigh_ = false;
             }
             if (high && !prevHigh_) {
                 divHigh_ = count_ % n == 0;
@@ -76,7 +93,7 @@ class Clk : public Module {
 
    private:
     GateDetector extGate_, rstGate_;
-    uint32_t phase_ = 0, count_ = 0;
+    uint32_t phase_ = 0, count_ = 0, epoch_ = transport::epoch();
     bool prevHigh_ = false, divHigh_ = false;
 };
 

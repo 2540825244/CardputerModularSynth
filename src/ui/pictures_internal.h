@@ -141,5 +141,7 @@ extern const Entry kProcPics[];
 extern const int kNumProcPics;
 extern const Entry kSeqPics[];
 extern const int kNumSeqPics;
+extern const Entry kRollPics[];  // v1.5 ROL / EVO (ui/pic_roll.cpp)
+extern const int kNumRollPics;
 
 }  // namespace pic

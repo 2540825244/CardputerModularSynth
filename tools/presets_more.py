@@ -406,6 +406,49 @@ lay("RIMSHT", [
 ], [("t", "t1", "r", "trig"), ("t", "t2", "c", "trig"), ("r", "out", "m", "in1"), ("c", "out", "m", "in2"),
     ("m", "out", "d", "in"), ("d", "out", "x", "in")])
 
+# ---------------------------------------------------------------- v1.5: ROL / EVO
+def roll(notes, **params):
+    """ROL params from notes [(step, length, semitones above ROOT)]: 7-bit step codes, 3 a word."""
+    codes = [0] * 32
+    for st, ln, se in notes:
+        codes[st] = se + 62
+        for k in range(st + 1, min(st + ln, 32)): codes[k] = 1
+    words = {"n%d" % w: sum(codes[w * 3 + k] << (7 * k) for k in range(3) if w * 3 + k < 32) for w in range(11)}
+    words.update(params)
+    return words
+
+BASS = [(0, 2, 0), (3, 1, 0), (4, 2, 3), (6, 1, 7), (7, 1, 10), (8, 3, 12), (11, 1, 7), (12, 2, 5), (14, 1, 3),
+        (15, 1, 2), (16, 3, 0), (19, 1, 0), (20, 2, 7), (22, 2, 5), (24, 4, 3), (28, 2, 2), (30, 2, -2)]
+
+lay("ROLL", [
+    ("r", "rol", roll(BASS, oct=-2, len=32, gatelen=0.6, glide=20)), ("o", "osc", {"wave": 2}),
+    ("f", "lad", {"cutoff": 350, "res": 0.6, "drive": 0.3}), ("e", "env", {"a": 2, "d": 220, "s": 0.3, "r": 80}),
+    ("v", "vca", {}), ("t", "trg", {"lane1": 0b00000001, "lane2": 0b00010000, "len": 8}),
+    ("k", "kck", {"freq": 48, "decay": 0.45}), ("p", "clp", {"decay": 160}), ("m", "mix", {"lvl2": 0.5, "lvl3": 0.6}),
+    ("d", "dly", {"time": 375, "fdbk": 0.3, "mix": 0.2}), ("x", "out", {}),
+], [("r", "pitch", "o", "pitch"), ("o", "out", "f", "in"), ("r", "gate", "e", "gate"), ("e", "out", "f", "cut", 0.5),
+    ("f", "out", "v", "in"), ("e", "out", "v", "cv"), ("r", "clk", "t", "clk"), ("t", "t1", "k", "trig"),
+    ("t", "t2", "p", "trig"), ("v", "out", "m", "in1"), ("p", "out", "m", "in2"), ("k", "out", "m", "in3"),
+    ("m", "out", "d", "in"), ("d", "out", "x", "in")])
+
+lay("EVOLVE", [
+    ("e", "evo", {"mut": 0.25, "dens": 0.55, "range": 8, "seed": 7}),
+    ("g", "grd", {"eng": 12, "harm": 0.35, "timb": 0.55, "morph": 0.4, "cut": 4000, "res": 0.1, "feg": 0.2,
+                  "dcy": 600, "sus": 0.0}),
+    ("d", "dly", {"time": 375, "fdbk": 0.5, "mix": 0.35, "tone": 0.6}), ("x", "out", {}),
+], [("e", "pitch", "g", "pitch"), ("e", "gate", "g", "trig"), ("g", "out", "d", "in"), ("d", "out", "x", "in")])
+
+lay("DUET", [
+    ("r", "rol", roll(BASS, oct=-2, len=32, gatelen=0.5)), ("o", "osc", {"wave": 3}),
+    ("f", "lad", {"cutoff": 500, "res": 0.5}), ("e", "env", {"a": 2, "d": 180, "s": 0.4, "r": 60}), ("v", "vca", {}),
+    ("l", "evo", {"oct": 1, "res": 1, "len": 8, "mut": 0.3, "dens": 0.7, "seed": 3, "scale": 2, "gatelen": 0.4}),
+    ("p", "osc", {"wave": 1}), ("a", "ad", {"atk": 2, "dec": 260}), ("w", "vca", {}),
+    ("m", "mix", {"lvl2": 0.6}), ("d", "dly", {"time": 375, "fdbk": 0.45, "mix": 0.3}), ("x", "out", {}),
+], [("r", "pitch", "o", "pitch"), ("o", "out", "f", "in"), ("r", "gate", "e", "gate"), ("e", "out", "f", "cut", 0.4),
+    ("f", "out", "v", "in"), ("e", "out", "v", "cv"), ("r", "clk", "l", "clk"), ("l", "pitch", "p", "pitch"),
+    ("l", "gate", "a", "trig"), ("p", "out", "w", "in"), ("a", "out", "w", "cv"), ("v", "out", "m", "in1"),
+    ("w", "out", "m", "in2"), ("m", "out", "d", "in"), ("d", "out", "x", "in")])
+
 # OUT gain (dB) per preset for about -3 dBFS peak at the line volume: written by tools/preset_levels.py
 GAIN.update({
     "808KIT": 2.1,
@@ -424,8 +467,10 @@ GAIN.update({
     "COWBEL": 4.9,
     "DRONE": 3.1,
     "DRUMS": -6.9,
+    "DUET": 0.8,
     "ECHO": 1.9,
     "EQBASS": 7.6,
+    "EVOLVE": 6.5,
     "FMBELL": 7.2,
     "GLASS": 1.3,
     "GRDBAS": 11.4,
@@ -443,6 +488,7 @@ GAIN.update({
     "REESE": 1.3,
     "RIMSHT": 1.2,
     "RISER": -1.6,
+    "ROLL": 1.1,
     "RUBBER": -1.7,
     "SQRLD": -5.6,
     "STACK": -14.1,

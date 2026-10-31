@@ -11,16 +11,14 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 
-## Next step (as of 2026-10-29, session 8)
-v1.4 plan `docs/superpowers/plans/2026-10-29-v1.4-pictures-modules-presets.md` is built and reviewed
-(ledger `.superpowers/sdd/2026-10-29-v1.4-pictures-modules-presets/progress.md`; trust it and git log).
-v1.4 = a picture for every module (`ui/pictures*`, `ui/pic_*.cpp`, drawn through `ui/gfx.h`), ARP CLP
-PRC VOW EQ3, PRESETS 2 page; also the keyboard-freeze and false CPU FULL fixes. Handed to the owner:
-`dist/modsynth-v1.4-test1.bin` (406235c, 981 KB of the 1 MB slot: ~67 KB left) + `dist/test-7-script.md`,
-made without the device; v1.3's test 6 results never came back. Next: the owner's device results,
-then the deferred items in both ledgers (v1.3 Task 9 perf needs the device bench; v1.4 costs are
-estimates). Pictures are checked natively: `pio test -e native -f test_pictures` writes
-`.pio/pictures/*.png` and `_sheet.png`, look at them after a painter change.
+## Next step (as of 2026-10-31, session 9)
+v1.5 = sequencers for the owner's demo video: plan `docs/superpowers/plans/2026-10-31-v1.5-sequencers.md`,
+spec section 16. ROL (piano roll, `core/modules/seq2.*`, `ui/roll_view.cpp`, `ui/pic_roll.cpp`), EVO
+(evolving line), a global transport (`core/transport.*`: Space plays / stops), SEQ ROOT/OCT; presets
+ROLL EVOLVE DUET. Tests: `test/test_seq2`, plus test_ui / test_pictures (`.pio/pictures/rol-page*.png`).
+Not on the device yet; v1.4's test-7 results (`dist/test-7-script.md`) never came back either.
+Firmware ~1000 KB of the 1 MB slot (~48 KB left). Deferred items: both earlier ledgers, `docs/todo.md`.
+Pictures are checked natively: `pio test -e native -f test_pictures` writes `.pio/pictures/*.png`.
 Execution: Claude implements inline, one Opus reviewer subagent.
 The device is on USB only when the owner says so: only ever write the Launcher's `modsyn` slot
 (0x650000, image <= 1 MB) via `tools/dev/flash_slot.sh`; full flash backup in `dist/`.

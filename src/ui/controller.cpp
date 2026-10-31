@@ -1,4 +1,5 @@
 #include "controller.h"
+#include "core/transport.h"
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -238,6 +239,7 @@ bool UiController::loadJson(const std::string& text, bool keepUndo, char* msg, s
     if (keepUndo) undo_.push(patch_, 0);
     patch_ = *loaded;
     engine_.apply(patch_);
+    transport::play();  // a loaded patch plays from step 1
     // Ids may now name different modules: drop every id-bound or position-bound UI reference.
     s_.carry.active = false;
     s_.view = View::Patch;
@@ -286,6 +288,7 @@ void doClear(Patch& p, void*) {
 
 void UiController::newPatch() {
     edit(doClear, nullptr);
+    transport::play();
     s_.selCell = -1;
     s_.moveFromId = -1;
     s_.carry.active = false;

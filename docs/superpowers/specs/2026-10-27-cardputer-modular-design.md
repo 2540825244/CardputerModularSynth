@@ -554,3 +554,38 @@ approved ("good to go"); "more modules and presets as you see fit".
   on it for the new modules, at -3 dBFS from the bench.
 - Found, not changed: DaisySP's Fm2 adds the modulator into the carrier's phase for good (an FM,
   not a PM), so FMO's index is very strong (~40 cycles of deviation at 30 %); FMO's picture shows it.
+
+## 16. v1.5: piano roll, evolving line, transport (session 9, 2026-10-31)
+Plan `docs/superpowers/plans/2026-10-31-v1.5-sequencers.md` (its "calls made" table lists Claude's
+calls). Owner: "a more intuitive piano roll one that also has a built in clock and a button to switch
+on/off as well as hooked to the global play button and can do notes of different length (and 16th
+notes etc)? And maybe one that can organically evolve the line. Like the current sequencer you can't
+even change the root note."
+- **Transport** (`core/transport.*`): a global play / stop. Space in the patch view plays a stopped
+  transport, and stops it when the patch has a ROL or EVO (else Space keeps auditioning KEYS / running
+  KIT). fn+enter on the ROLL page does the same. Stopped: CLK, ROL and EVO send no clock or gates and
+  SEQ TRG EUC TUR ignore clocks; a start puts them all back on step 1 together. Loads and NEW play.
+  The side icon reads PLAY / STOP.
+- **SEQ** gets ROOT and OCT on its SET page: the steps are semitones above ROOT, snapped to SCL.
+- **ROL** (piano roll, MOD page): 32 steps, one mono note per step plus ties, so a note lasts 1..32
+  steps. RES 1/4 1/8 1/16 1/32 8T 16T; its own clock (BPM, SWG) or a step per CLK rise; RUN mutes the
+  gates but keeps time; ROOT / SCL / OCT transpose the stored notes (stored as semitones above ROOT,
+  snapped to SCL as they play); GLN (of a note's last step), GLD glide. Ins CLK RST TRS (1 V/oct
+  added), outs PIT GAT CLK (the step clock, for TRG / EUC / EVO) EOC. The notes are 11 params of three
+  7-bit step codes, so save, load, undo and presets need nothing new. Pages ROLL (play), SET, PINS.
+- **ROLL page** (raw keys, like KEYS' PLAY): the number row picks the note length (1/16 ... 1 bar at
+  1/16, shown as fractions of the RES and as bars), REST, TIE (the note before lasts longer), OCT-/+
+  (the keyboard). Rows 2-4 are the scale from ROOT (the middle row starts on ROOT, the bottom an
+  octave lower): a key writes a note of the chosen length at the cursor, plays it while held, and
+  moves the cursor past it. fn+key only plays; fn+length resizes the note under the cursor.
+  ctrl / space move the cursor a step (fn: a beat); del erases the note under it (fn: clears the
+  pattern); enter = RUN; `\` undo. The page draws the roll (beats, bars, ROOT rows named), the cursor
+  as wide as the chosen length, the playing note in the accent, and a status line.
+- **EVO** (evolving line, MOD page): a 2..16 step line grown from SEED as a random walk in the scale
+  (ROOT, SCL, RNG degrees, DNS notes vs rests, ties, accents). Every pass end each step mutates with
+  MUT (+ the MUT input, 5 V = 100 %): the pitch walks a degree or two (GRV pulls it home), a note comes
+  or goes, a tie flips, the step copies the one half a pass away (motifs echo), or the accent flips.
+  A transport start replays the seed (each take the same); RST only rewinds. MUT 0 freezes it. Outs
+  PIT GAT ACC CLK. Its picture draws the line now, the playing step and the generation.
+- **Presets** (PRESETS 2): ROLL (a 2-bar ROL bass with kick / clap from its CLK out), EVOLVE (EVO
+  into GRD's modal engine), DUET (ROL bass + an EVO lead on the ROL's clock).

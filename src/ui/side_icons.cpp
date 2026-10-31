@@ -3,6 +3,8 @@
 #include <cstring>
 #include "core/modules/keys.h"
 #include "core/modules/kit.h"
+#include "core/modules/seq2.h"
+#include "core/transport.h"
 #include "key_input.h"
 #include "layout.h"
 
@@ -46,9 +48,14 @@ void patchView(SideIcons& r, const UiState& s, const Patch& p, bool fnHeld) {
     }
     undo(r, fnHeld);
     if (s.selCell >= 0 && !moving) set(r, Side::Enter, sel ? Ic::Open : Ic::Plus, sel ? "OPEN" : "PLACE");
-    for (int i = 0; i < p.moduleCount(); i++)
-        if (p.moduleAt(i).type == &kKeysType || (p.moduleAt(i).type == &kKitType && !p.moduleAt(i).bypass))
-            set(r, Side::Space, Ic::Play, "PLAY");
+    bool owner = false;  // v1.5: a ROL / EVO: Space plays and stops the transport
+    for (int i = 0; i < p.moduleCount(); i++) {
+        const ModuleRec& m = p.moduleAt(i);
+        if ((m.type == &kRolType || m.type == &kEvoType) && !m.bypass) owner = true;
+        if (m.type == &kKeysType || (m.type == &kKitType && !m.bypass)) set(r, Side::Space, Ic::Play, "PLAY");
+    }
+    if (!transport::running()) set(r, Side::Space, Ic::Play, "PLAY");
+    else if (owner) set(r, Side::Space, Ic::Stop, "STOP", true);
 }
 
 void modulePage(SideIcons& r, const UiState& s, const ModuleRec& m, bool fnHeld) {
@@ -56,6 +63,15 @@ void modulePage(SideIcons& r, const UiState& s, const ModuleRec& m, bool fnHeld)
     set(r, Side::Esc, Ic::Back, "BACK");
     pageText(r, s.modPage, modulePageCount(t));
     undo(r, fnHeld);
+    if (modulePageKind(t, s.modPage) == PageKind::Play && &t == &kRolType) {  // v1.5 roll page
+        set(r, Side::Ctrl, Ic::Minus, fnHeld ? "<BEAT" : "<STEP");
+        set(r, Side::Space, Ic::Plus, fnHeld ? "BEAT>" : "STEP>");
+        if (fnHeld) set(r, Side::Enter, transport::running() ? Ic::Stop : Ic::Play, transport::running() ? "STOP" : "PLAY");
+        else set(r, Side::Enter, Ic::Play, "RUN", m.params[roll::kRun] >= 0.5f);
+        set(r, Side::Del, Ic::Trash, fnHeld ? "CLEAR" : "ERASE");
+        set(r, Side::Fn, Ic::Shift, "SHIFT");  // fn+pitch previews, fn+length resizes
+        return;
+    }
     if (modulePageKind(t, s.modPage) == PageKind::Play) {  // KEYS play page
         set(r, Side::Ctrl, Ic::Minus, "OCT-");
         set(r, Side::Space, Ic::Plus, "OCT+");

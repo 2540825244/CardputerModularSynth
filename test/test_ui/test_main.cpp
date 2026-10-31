@@ -16,6 +16,8 @@
 #include "ui/keys_layout.h"
 #include "core/scales.h"
 #include "core/modules/mod.h"
+#include "core/modules/seq2.h"
+#include "core/transport.h"
 #include "core/presets.h"
 #include "ui/anim.h"
 #include "ui/side_icons.h"
@@ -1358,7 +1360,7 @@ void test_every_param_reachable() {
             for (int pg = 0; pg < t[i]->numPages; pg++)  // numPages counts every PageDef
                 TEST_ASSERT_TRUE_MESSAGE(t[i]->pages[pg].name != nullptr, t[i]->id);
         for (int p = 0; p < t[i]->numParams; p++) {
-            bool found = false;
+            bool found = t[i] == &kRolType && p < roll::kWords;  // ROL's notes: its ROLL page edits them
             for (int pg = 0; pg < modulePageCount(*t[i]) && !found; pg++)
                 for (int r = 1; r <= 3 && !found; r++)
                     for (int c = 0; c < kGridCols && !found; c++) {
@@ -2361,6 +2363,84 @@ void test_redraw_only_on_change() {
     TEST_ASSERT_TRUE(drawn <= 2);
 }
 
+
+// ---- v1.5: ROL roll page, Space = transport ----
+static const ModuleRec* placeRol(Fx& f) {
+    f.place(registryIndex(kRolType), 0, 1);
+    const ModuleRec* m = gPatch.findAt(0, 12);
+    TEST_ASSERT_NOT_NULL(m);
+    TEST_ASSERT_TRUE(m->type == &kRolType);
+    return m;
+}
+
+void test_space_plays_and_stops_with_a_rol() {
+    Fx f;
+    transport::play();
+    placeRol(f);
+    f.side(Side::Space);
+    TEST_ASSERT_FALSE(transport::running());
+    TEST_ASSERT_EQUAL_STRING("STOP", f.ui.state().toast);
+    f.side(Side::Space);
+    TEST_ASSERT_TRUE(transport::running());
+    f.side(Side::Space);
+    char msg[24];
+    TEST_ASSERT_TRUE(f.ui.loadPreset(0, true, msg, sizeof msg));  // a load plays
+    TEST_ASSERT_TRUE(transport::running());
+}
+
+void test_roll_page_writes_notes() {
+    Fx f;
+    transport::play();
+    const ModuleRec* m = placeRol(f);
+    f.side(Side::Enter);  // open: the ROLL page
+    TEST_ASSERT_EQUAL(View::Module, f.ui.state().view);
+    TEST_ASSERT_TRUE(f.ui.onPlayPage());
+    f.side(Side::Del);
+    f.sideDown(Side::Fn);
+    f.side(Side::Del);  // fn+del: clear all
+    f.sideUp(Side::Fn);
+    for (int s = 0; s < roll::kSteps; s++) TEST_ASSERT_EQUAL(roll::kRest, roll::code(m->params, s));
+    f.tap(3, 0);  // length key 4: a quarter (4 steps at 1/16)
+    TEST_ASSERT_EQUAL(3, f.ui.state().rollLen);
+    f.tap(0, 2);  // middle row, col 0: the root
+    TEST_ASSERT_EQUAL(roll::noteCode(0), roll::code(m->params, 0));
+    TEST_ASSERT_EQUAL(4, roll::noteLength(m->params, 0, 16));
+    TEST_ASSERT_EQUAL(4, f.ui.state().rollCursor);  // past the note
+    f.tap(0, 0);       // length 1
+    f.tap(2, 3);       // bottom row col 2: two scale degrees up, an octave down (C minor: Eb2 = 3 - 12)
+    TEST_ASSERT_EQUAL(roll::noteCode(3 - 12), roll::code(m->params, 4));
+    f.tap(8, 0);  // REST
+    TEST_ASSERT_EQUAL(6, f.ui.state().rollCursor);
+    f.side(Side::Ctrl);  // cursor back over the rest, onto the Eb
+    f.side(Side::Ctrl);
+    f.sideDown(Side::Fn);
+    f.tap(1, 0);  // fn+length: the note under the cursor becomes 2 steps
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(2, roll::noteLength(m->params, 4, 16));
+    f.side(Side::Backslash);  // undo the resize
+    TEST_ASSERT_EQUAL(1, roll::noteLength(gPatch.findAt(0, 12)->params, 4, 16));
+    f.side(Side::Enter);  // RUN off
+    TEST_ASSERT_EQUAL_FLOAT(0.f, gPatch.findAt(0, 12)->params[roll::kRun]);
+    f.side(Side::Tab);  // SET page: a normal cell page
+    TEST_ASSERT_FALSE(f.ui.onPlayPage());
+}
+
+void test_roll_page_preview_does_not_write() {
+    Fx f;
+    transport::play();
+    const ModuleRec* m = placeRol(f);
+    f.side(Side::Enter);
+    float before[roll::kWords];
+    memcpy(before, m->params, sizeof before);
+    f.sideDown(Side::Fn);
+    f.down(5, 1);
+    TEST_ASSERT_TRUE(f.ui.state().keysHeld != 0);
+    f.up(5, 1);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL_MEMORY(before, gPatch.findAt(0, 12)->params, sizeof before);
+    TEST_ASSERT_EQUAL(0, (int)f.ui.state().keysHeld);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -2457,6 +2537,9 @@ int main() {
     RUN_TEST(test_input_amount_edit);
     RUN_TEST(test_strip_span_bipolar);
     RUN_TEST(test_every_param_reachable);
+    RUN_TEST(test_space_plays_and_stops_with_a_rol);
+    RUN_TEST(test_roll_page_writes_notes);
+    RUN_TEST(test_roll_page_preview_does_not_write);
     RUN_TEST(test_auto_pages_overflow);
     RUN_TEST(test_drawing_page0_width5);
     RUN_TEST(test_drawing_page0_fits_seven_params);

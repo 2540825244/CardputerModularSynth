@@ -1,4 +1,5 @@
 #include "core/modules/keys.h"
+#include "core/transport.h"
 #include "views.h"
 
 namespace {
@@ -122,9 +123,15 @@ void sideKey(UiController& ui, const KeyEvent& e) {
     UiState& s = ui.mut();
     const bool down = e.type == KeyEvent::Down;
     if (e.side == Side::Space) {
-        // The release is handled by UiController::handle, whatever view is active by then. KEYS
-        // auditions; without one, a KIT runs a pass.
+        // The release is handled by UiController::handle, whatever view is active by then.
+        // v1.5: a stopped transport starts; with a ROL or EVO in the patch Space stops it. Else
+        // KEYS auditions; without one, a KIT runs a pass.
         if (!down) return;
+        if (!transport::running() || transportOwner(ui.patch())) {
+            transport::toggle();
+            ui.toast(transport::running() ? "PLAY" : "STOP", ui.now());
+            return;
+        }
         KeysModule* k = ui.keysInstance();
         if (k && s.latchedBit < 0) {  // a latched drone keeps playing: no audition over it
             k->noteOn(ui.lastNote);

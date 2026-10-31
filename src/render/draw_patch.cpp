@@ -35,7 +35,9 @@ void stepTick(const ModuleRec& m, const Module& inst, int col, int row) {
         return;
     }
     const char* lenKey = !strcmp(id, "euc") ? "steps" : "len";
-    if (strcmp(id, "seq") && strcmp(id, "trg") && strcmp(id, "euc") && strcmp(id, "kit")) return;
+    if (strcmp(id, "seq") && strcmp(id, "trg") && strcmp(id, "euc") && strcmp(id, "kit") && strcmp(id, "rol") &&
+        strcmp(id, "evo"))
+        return;
     const int step = (int)inst.monitor(0);
     if (step < 0) return;  // KIT between passes
     int len = 12;

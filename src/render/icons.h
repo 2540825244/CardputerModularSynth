@@ -3,7 +3,7 @@
 
 // 12x12 1-bit icons, one uint16_t per row, bit 11 = leftmost pixel. Hand-drawn from the SVGs in
 // docs/design/mockups.html.
-enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Tilt, Mix, Atn, Snh, Clk, Mux, Dmx, Cancel, Copy, Redo, Open, Latch, Layout, Help, MRev, MFx, MPsh, MFold, MDrive, MCrush, MRing, MNoise, MDrum, MHat, MString, MBell, MSeq, MSteps, MEuclid, MQuant, MLogic, MDice, MChaos, MKnob, MScope, MGrind, MSlew, MLpg, MFm, MSaw, MKit, Shift, Bypass, Count };
+enum class Ic : uint8_t { Keys, Osc, Vcf, Vca, Env, Lfo, Dly, Out, File, Plus, Move, Trash, Undo, Enter, Play, Back, Toggle, Next, Cable, Minus, Tilt, Mix, Atn, Snh, Clk, Mux, Dmx, Cancel, Copy, Redo, Open, Latch, Layout, Help, MRev, MFx, MPsh, MFold, MDrive, MCrush, MRing, MNoise, MDrum, MHat, MString, MBell, MSeq, MSteps, MEuclid, MQuant, MLogic, MDice, MChaos, MKnob, MScope, MGrind, MSlew, MLpg, MFm, MSaw, MKit, Shift, Bypass, Stop, Count };
 
 constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Keys
@@ -195,4 +195,7 @@ constexpr uint16_t kIcons[(int)Ic::Count][12] = {
     {// Bypass (a slashed circle: fn+del bypasses / enables the selected module)
      0b000011110000, 0b001100001100, 0b010000000110, 0b010000001010, 0b100000010001, 0b100000100001,
      0b100001000001, 0b100010000001, 0b010100000010, 0b011000000010, 0b001100001100, 0b000011110000},
+    {// Stop (a filled square: space stops the transport, v1.5)
+     0b000000000000, 0b000000000000, 0b001111111100, 0b001111111100, 0b001111111100, 0b001111111100,
+     0b001111111100, 0b001111111100, 0b001111111100, 0b001111111100, 0b000000000000, 0b000000000000},
 };

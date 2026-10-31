@@ -41,6 +41,11 @@ struct UiState {
     uint32_t lastEditMs;
     uint64_t keysHeld;  // KEYS play page: bit (3-row)*12+col per held note key
     int8_t latchedBit = -1;  // KEYS latch: the held note's grid bit, -1 = none
+    // ROL roll page (v1.5): the cursor step, the note length key (0..7), the last pitch key's
+    // semitones (drawn as a guide while a pitch key is held: keysHeld).
+    uint8_t rollCursor;
+    uint8_t rollLen;
+    int8_t rollSemis;
     // Key feedback for the renderer.
     uint8_t sideHeld;          // bit (int)Side per side key held now
     uint32_t sideDownMs[8];    // last Down of each side key

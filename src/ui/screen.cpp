@@ -1,5 +1,6 @@
 #include "screen.h"
 #include "side_icons.h"
+#include "core/transport.h"
 
 uint32_t sleepAfterMs(uint8_t setting) {
     static const uint32_t kMin[] = {0, 1, 2, 5, 10};
@@ -32,6 +33,7 @@ FrameKeys frameKeys(const UiState& s, const Patch& p, Engine& e, uint32_t now, b
     for (int i = 0; i < p.moduleCount(); i++) f.add(p.moduleAt(i));
     for (int i = 0; i < p.cableCount(); i++) f.add(p.cableAt(i));
     f.add(fnHeld);
+    f.add(transport::running());
     f.add((bool)(s.toast[0] && (int32_t)(now - s.toastUntilMs) < 0));
     f.add(helpVisible(s, now));
     for (int i = 0; i < 8; i++) f.add(sidePressed(s, i, now));
