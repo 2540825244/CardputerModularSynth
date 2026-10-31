@@ -44,6 +44,7 @@ Needs PlatformIO (the Arduino core on ESP-IDF, pinned to `espressif32@6.11.0`).
 pio run -e cardputer          # firmware: .pio/build/cardputer/firmware.bin
 pio test -e native            # host-side tests (DSP, patching, UI, presets)
 pio test -e native -f test_pictures   # renders every module's screen to .pio/pictures/*.png
+tools/release.sh v1.5         # dist/: a full image for M5Burner (0x0) and the app alone for the Launcher
 ```
 
 Presets are generated: edit `tools/presets.py` / `tools/presets_more.py`, then run

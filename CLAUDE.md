@@ -12,18 +12,21 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 
-## Next step (as of 2026-10-31, session 9)
-v1.5 = sequencers for the owner's demo video: plan `docs/superpowers/plans/2026-10-31-v1.5-sequencers.md`,
-spec section 16. ROL (piano roll, `core/modules/seq2.*`, `ui/roll_view.cpp`, `ui/pic_roll.cpp`), EVO
-(evolving line), a global transport (`core/transport.*`: Space plays / stops), SEQ ROOT/OCT; presets
-ROLL EVOLVE DUET. Tests: `test/test_seq2`, plus test_ui / test_pictures (`.pio/pictures/rol-page*.png`).
-Not on the device yet; v1.4's test-7 results (`dist/test-7-script.md`) never came back either.
-Firmware ~1000 KB of the 1 MB slot (~48 KB left). Deferred items: both earlier ledgers, `docs/todo.md`.
+## Next step (as of 2026-10-31, session 10)
+Release v1.5 on M5Burner. The owner has played v1.5 on the device and is satisfied. The repo is on
+GitHub (private, `origin`; `main` = `feat/v1-firmware`), MIT, with README + `docs/overview.md`.
+`tools/release.sh v1.5` writes `dist/modsynth-v1.5-m5burner.bin` (full image at 0x0) and
+`-launcher.bin` (the app). Waiting on the owner to flash the full image themselves (it replaces the
+Launcher; restore from `dist/`). Then: the M5Burner listing (description with the AI-made /
+proof-of-concept / as-is notes and the third-party notices, a cover image) and whether the repo goes public.
+v1.5 itself: plan `docs/superpowers/plans/2026-10-31-v1.5-sequencers.md`, spec section 16.
+Firmware ~1000 KB of the 1 MB slot (~48 KB left). Backlog: `docs/todo.md`.
 Pictures are checked natively: `pio test -e native -f test_pictures` writes `.pio/pictures/*.png`.
 Execution: Claude implements inline, one Opus reviewer subagent.
 The device is on USB only when the owner says so: only ever write the Launcher's `modsyn` slot
 (0x650000, image <= 1 MB) via `tools/dev/flash_slot.sh`; full flash backup in `dist/`.
-Backlog not in the plan: `docs/todo.md`.
+The third-party PDFs in `docs/reference/` are git-ignored; history was rewritten to drop them
+(pre-rewrite bundle in `dist/`).
 
 ## Constraints to remember
 - PlatformIO + Arduino core. `pio` isn't on PATH: use `~/.platformio/penv/bin/pio`.
