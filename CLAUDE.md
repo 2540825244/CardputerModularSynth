@@ -7,7 +7,8 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 - `docs/superpowers/specs/2026-10-27-cardputer-modular-design.md`: the design. Tags show who
   decided what: [owner] / [proposed] / [Claude's call] / [open].
 - `docs/hardware-spec.md`: hardware facts from the official schematics (pins, audio path, USB, memory).
-- `docs/reference/`: offline schematics and datasheets (index in its README).
+- `docs/reference/`: offline schematics and datasheets (index in its README). The PDFs are
+  git-ignored (third-party, not redistributed); fetch them from the README links.
 - `docs/design/`: what it should look like. Style B (grey LCD) is the default.
   Screenshots `01`–`05` plus `mockups.html`.
 

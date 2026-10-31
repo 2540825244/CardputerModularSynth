@@ -3,3 +3,7 @@
 .DS_Store
 .pio/
 dist/*.bin
+# Third-party datasheets/schematics: kept locally, not redistributed (sources in docs/reference/README.md)
+docs/reference/*.pdf
+dist/*.bundle
+dist/reference-pdfs-backup/

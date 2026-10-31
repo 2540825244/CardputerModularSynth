@@ -2,6 +2,9 @@
 
 Offline copies of the official documents behind `docs/hardware-spec.md`. Downloaded 2026-10-27.
 
+The PDFs are third-party documents, so they are git-ignored and not in the repo. Download them
+from the Source links below into this folder.
+
 ## Cardputer-Adv
 | File | What | Source |
 |---|---|---|
