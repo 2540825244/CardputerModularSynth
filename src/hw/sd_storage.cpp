@@ -1,4 +1,5 @@
 #include "sd_storage.h"
+#include "serial_log.h"
 #include <SD.h>
 #include <SPI.h>
 
@@ -27,7 +28,7 @@ bool SdStorage::begin() { return mount(); }
 
 void SdStorage::selfTest() {
     if (!ok_) {
-        Serial.println("SD none");
+        LOGLN("SD none");
         return;
     }
 #ifdef SD_SELFTEST
@@ -37,9 +38,9 @@ void SdStorage::selfTest() {
     std::string got;
     const bool rw = write(kProbe, want) && read(kProbe, got) && got == want;
     if (SD.exists(kProbe)) SD.remove(kProbe);
-    if (!rw) Serial.println("SD FAIL rw");
+    if (!rw) LOGLN("SD FAIL rw");
 #endif
-    Serial.printf("SD ok type=%d %u MB\n", (int)SD.cardType(), (unsigned)(SD.cardSize() >> 20));
+    LOGF("SD ok type=%d %u MB\n", (int)SD.cardType(), (unsigned)(SD.cardSize() >> 20));
 }
 
 bool SdStorage::available() {

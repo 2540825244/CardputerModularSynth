@@ -3,18 +3,19 @@
 #   modsynth-<ver>-m5burner.bin  full image for M5Burner / esptool at 0x0 (bootloader, partitions,
 #                                boot_app0, app), as `pio run -t upload` would write it
 #   modsynth-<ver>-launcher.bin  the app alone, for bmorcelli's Launcher (SD install)
+# Built from env:release: no serial diagnostics, no local paths in the binary.
 #   tools/release.sh v1.5
 set -e
 VER=${1:?usage: tools/release.sh <version, e.g. v1.5>}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PIO=~/.platformio/penv/bin
-BUILD=$ROOT/.pio/build/cardputer
+BUILD=$ROOT/.pio/build/release
 BOOT_APP0=~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin
 FULL=$ROOT/dist/modsynth-$VER-m5burner.bin
 APP=$ROOT/dist/modsynth-$VER-launcher.bin
 
 cd "$ROOT"
-"$PIO/pio" run -e cardputer
+"$PIO/pio" run -e release
 mkdir -p dist
 
 # Offsets and flash settings are PlatformIO's for this board (FLASH_EXTRA_IMAGES in

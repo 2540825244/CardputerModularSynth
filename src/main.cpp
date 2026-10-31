@@ -10,6 +10,7 @@
 #include "hw/audio_out.h"
 #include "hw/keyboard.h"
 #include "hw/sd_storage.h"
+#include "hw/serial_log.h"
 #include "hw/tilt.h"
 #include "render/renderer.h"
 #include "ui/controller.h"
@@ -27,7 +28,7 @@ static UiController gUi(gPatch, gEngine, gUndo, gSd);
 static KeyDecoder gDecoder;
 
 static void printHeap(const char* tag) {
-    Serial.printf("[heap %s] free=%u largest=%u min=%u\n", tag, (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+    LOGF("[heap %s] free=%u largest=%u min=%u\n", tag, (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), (unsigned)ESP.getMinFreeHeap());
 }
 
@@ -90,10 +91,11 @@ static void uiTask(void*) {
             if (due || inputPending) renderFrame(gUi.state(), gPatch, gEngine, gSd, now, gUi.fnHeld());
             inputPending = false;
         }
+#ifdef MODSYNTH_SERIAL_LOG
         if (now - lastStatus >= 500) {
             lastStatus = now;
             const UiState& s = gUi.state();
-            Serial.printf("view=%d page=%d cpu=%.1f%% free=%u largest=%u i2s=%d codec=%d stackHw ui=%u audio=%u\n", (int)s.view, (int)s.page,
+            LOGF("view=%d page=%d cpu=%.1f%% free=%u largest=%u i2s=%d codec=%d stackHw ui=%u audio=%u\n", (int)s.view, (int)s.page,
                           gEngine.cpuLoad() * 100.f, (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
                           (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT), audioI2sError(),
                           codecFailures(), (unsigned)uxTaskGetStackHighWaterMark(nullptr),
@@ -108,6 +110,7 @@ static void uiTask(void*) {
                     Serial.printf(" %s=%u/%u", types[i]->id, (unsigned)c, (unsigned)types[i]->cpuCycles);
             Serial.println();
         }
+#endif
         if (!steadyPrinted && now > 5000) {
             steadyPrinted = true;
             printHeap("steady");
@@ -155,11 +158,11 @@ static void initTask(void*) {
     const bool kbOk = keyboardBegin();
     Serial.begin(115200);
     Serial.setTxTimeoutMs(0);  // never stall the UI task when no host is reading
-    if (!kbOk) Serial.println("keyboardBegin FAILED (TCA8418)");
+    if (!kbOk) LOGLN("keyboardBegin FAILED (TCA8418)");
     printHeap("boot");
 
     M5Cardputer.Display.setRotation(1);
-    if (!renderBegin()) Serial.println("renderBegin FAILED (sprite)");
+    if (!renderBegin()) LOGLN("renderBegin FAILED (sprite)");
     printHeap("sprite");
     gSd.begin();
     gSd.selfTest();
@@ -168,9 +171,9 @@ static void initTask(void*) {
     gUi.bootLoad();
     gEngine.setCycleCounter(cycleCount);
     gEngine.setLargestBlock(largestBlock);
-    if (!audioBegin(gEngine)) Serial.println("audioBegin FAILED");  // the audio task goes to core 1
+    if (!audioBegin(gEngine)) LOGLN("audioBegin FAILED");  // the audio task goes to core 1
     printHeap("init");
-    Serial.printf("[grd] needs %u B: one block of %u + the rest\n", (unsigned)kGrdType.ramBytes,
+    LOGF("[grd] needs %u B: one block of %u + the rest\n", (unsigned)kGrdType.ramBytes,
                   (unsigned)kGrdType.largestAlloc);
 #ifdef MODSYNTH_INTR_DUMP
     delay(200);  // the audio task is running

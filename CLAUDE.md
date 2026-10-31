@@ -30,6 +30,8 @@ The third-party PDFs in `docs/reference/` are git-ignored; history was rewritten
 
 ## Constraints to remember
 - PlatformIO + Arduino core. `pio` isn't on PATH: use `~/.platformio/penv/bin/pio`.
+- `env:cardputer` = dev build (serial diagnostics via `-DMODSYNTH_SERIAL_LOG`, `hw/serial_log.h`);
+  `env:release` = what `tools/release.sh` ships (silent, `__FILE__` paths remapped).
 - Delivered as a `.bin` for bmorcelli's Launcher. **No custom partitions.** Assets go on SD
   under `/modsynth/`.
 - DaisySP (MIT core only, not DaisySP-LGPL). Plaits (MIT) is vendored in `lib/plaits`, built with `-DTEST`.
