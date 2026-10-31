@@ -2457,6 +2457,38 @@ void test_roll_audition_ends_with_a_keys_latch() {  // review: KEYS' latch lives
     TEST_ASSERT_EQUAL(1, (int)f.ui.state().keysHeld);
 }
 
+// v1.5: fn+space on an input pin holds 5 V there: ROL's RST sends it back to step 1, even on a tap.
+void test_fn_space_gates_an_input() {
+    Fx f;
+    transport::play();
+    const ModuleRec* m = placeRol(f);
+    const uint16_t id = m->id;
+    f.side(Side::Enter);
+    f.side(Side::Tab);
+    f.side(Side::Tab);  // PINS: row 1 = CLK RST TRS
+    TEST_ASSERT_EQUAL_STRING("PINS", modulePageName(kRolType, f.ui.state().modPage));
+    f.tap(1, 1);  // RST
+    float buf[kBlock];
+    for (int b = 0; b < 1000; b++) f.eng.processBlock(buf);  // ~5 steps in
+    Module* rol = f.eng.instance(id);
+    TEST_ASSERT_TRUE(rol->monitor(0) >= 4.f);
+    f.sideDown(Side::Fn);
+    f.side(Side::Space);  // a quick tap: down and up before the audio runs
+    f.sideUp(Side::Fn);
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, rol->monitor(0));
+    for (int b = 0; b < 400; b++) f.eng.processBlock(buf);  // 2 steps on, then again
+    TEST_ASSERT_TRUE(rol->monitor(0) >= 1.f);
+    f.sideDown(Side::Fn);
+    f.sideDown(Side::Space);  // held this time
+    f.eng.processBlock(buf);
+    TEST_ASSERT_EQUAL_FLOAT(0.f, rol->monitor(0));
+    TEST_ASSERT_EQUAL((int)id, f.ui.pushId);
+    f.sideUp(Side::Space);
+    f.sideUp(Side::Fn);
+    TEST_ASSERT_EQUAL(-1, f.ui.pushId);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_place_via_fn);
@@ -2557,6 +2589,7 @@ int main() {
     RUN_TEST(test_roll_page_writes_notes);
     RUN_TEST(test_roll_page_preview_does_not_write);
     RUN_TEST(test_roll_audition_ends_with_a_keys_latch);
+    RUN_TEST(test_fn_space_gates_an_input);
     RUN_TEST(test_auto_pages_overflow);
     RUN_TEST(test_drawing_page0_width5);
     RUN_TEST(test_drawing_page0_fits_seven_params);

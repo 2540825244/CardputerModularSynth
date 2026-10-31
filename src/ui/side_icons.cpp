@@ -88,7 +88,8 @@ void modulePage(SideIcons& r, const UiState& s, const ModuleRec& m, bool fnHeld)
     const bool editable = pin || c.kind == CellKind::Param;
     if (editable) {
         set(r, Side::Ctrl, Ic::Minus, "FINE-");
-        set(r, Side::Space, Ic::Plus, "FINE+");
+        if (fnHeld && c.kind == CellKind::In) set(r, Side::Space, Ic::Play, "GATE");  // hold: 5 V into the input
+        else set(r, Side::Space, Ic::Plus, "FINE+");
         set(r, Side::Del, Ic::Trash, pin ? "UNPTCH" : "RESET");
     }
     if (pin) set(r, Side::Enter, Ic::Cable, s.carry.active ? "DROP" : "CABLE");

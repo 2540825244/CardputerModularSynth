@@ -91,6 +91,39 @@ class Module {
     }
     uint32_t measuredCycles() const { return cost_.load(std::memory_order_relaxed); }
     void setMonitor(int i, float v);  // 2 atomic slots for UI animation
+    // v1.5: a manual gate on input `in` (module view: fn+space on an input), held until released.
+    // UI thread. A press lasts at least kPushMinBlocks, so a quick tap still reaches the module.
+    void pushInput(int in, bool on) {
+        const uint32_t b = 1u << in;
+        if (on) {
+            pushHeld_.fetch_or(b, std::memory_order_relaxed);
+            pushTap_.fetch_or(b, std::memory_order_release);
+        } else {
+            pushHeld_.fetch_and(~b, std::memory_order_release);
+        }
+    }
+    static constexpr int kPushMinBlocks = 15;  // 10 ms
+    // Engine only, once a block: the inputs held at 5 V now; *release = those that just ended,
+    // fed one block of 0 V so the module sees the fall (and the next push is a new edge).
+    uint32_t pushedInputs(uint32_t* release) {
+        uint32_t high = pushHeld_.load(std::memory_order_acquire);
+        if (pushTap_.load(std::memory_order_relaxed)) {
+            const uint32_t tap = pushTap_.exchange(0, std::memory_order_acquire);
+            for (int i = 0; i < kMaxIns; i++)
+                if (tap >> i & 1u) pushLeft_[i] = kPushMinBlocks;
+            pushAny_ = true;
+        }
+        if (pushAny_)
+            for (int i = 0; i < kMaxIns; i++)
+                if (pushLeft_[i]) {
+                    pushLeft_[i]--;
+                    high |= 1u << i;
+                }
+        pushAny_ = high != 0;
+        *release = pushLast_ & ~high;
+        pushLast_ = high;
+        return high;
+    }
 
     // Fills out(o) for kBlock samples. ins[i] is only valid when connected[i].
     virtual void process(const float* const* ins, const bool* connected) = 0;
@@ -111,5 +144,9 @@ class Module {
     std::atomic<float> peak_{0.f};
     std::atomic<float> monitors_[2];
     float ema_ = 0.f;  // audio thread
+    std::atomic<uint32_t> pushHeld_{0}, pushTap_{0};
+    uint32_t pushLast_ = 0;                // audio thread
+    uint8_t pushLeft_[kMaxIns] = {};
+    bool pushAny_ = true;
     std::atomic<uint32_t> cost_{0};
 };

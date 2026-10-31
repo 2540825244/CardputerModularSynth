@@ -55,6 +55,11 @@ class UiController {
     KeysModule* keysInstance();  // the KEYS instance, or nullptr
     KitModule* kitInstance();    // the KIT instance, or nullptr
     void releaseAudition();
+    // v1.5: fn+space on an input pin holds a manual gate there until space is released.
+    void pushInput(uint16_t id, uint8_t in);
+    void releasePush();
+    int pushId = -1;  // the module with a pushed input, -1 none
+    uint8_t pushIn = 0;
     // Load a patch file into the live patch. keepUndo pushes undo first and marks dirty; the boot
     // load does neither. Returns the toast text ("LOADED", "SKIPPED n", or the error) via msg.
     bool loadFile(const char* path, bool keepUndo, char* msg, size_t msgSize);

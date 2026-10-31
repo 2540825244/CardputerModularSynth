@@ -85,6 +85,7 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
         }
     }
     if (auditioning && !e.grid && e.side == Side::Space && e.type == KeyEvent::Up) releaseAudition();
+    if (pushId >= 0 && !e.grid && e.side == Side::Space && e.type == KeyEvent::Up) releasePush();
     // Gestures become intents in one place (gesture.h); the view current at each action answers
     // it. If an action changes the view, the rest of this event is dropped and keys still held
     // stay with the old view.
@@ -112,6 +113,7 @@ void UiController::handle(const KeyEvent& e, uint32_t nowMs) {
     }
     if (tilt_.active && s_.view != View::Module) tilt_.active = false;
     if (auditioning && s_.view != View::Patch) releaseAudition();
+    if (pushId >= 0 && (s_.view != View::Module || s_.openId != pushId)) releasePush();
     // Anything but a coalescing param edit (cursor move, view change) ends the run. A key release
     // changes nothing, so repeated taps of one fine key still merge; tilt drags (Task 19) end
     // their run explicitly on release.
@@ -136,6 +138,21 @@ KitModule* UiController::kitInstance() {
         if (patch_.moduleAt(i).type == &kKitType)  // bypassed: no pass (it would start once enabled)
             return patch_.moduleAt(i).bypass ? nullptr : static_cast<KitModule*>(engine_.instance(patch_.moduleAt(i).id));
     return nullptr;
+}
+
+void UiController::pushInput(uint16_t id, uint8_t in) {
+    releasePush();
+    if (Module* m = engine_.instance(id)) {
+        m->pushInput(in, true);
+        pushId = id;
+        pushIn = in;
+    }
+}
+
+void UiController::releasePush() {
+    if (pushId >= 0)
+        if (Module* m = engine_.instance((uint16_t)pushId)) m->pushInput(pushIn, false);
+    pushId = -1;
 }
 
 void UiController::releaseAudition() {

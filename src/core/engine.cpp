@@ -403,6 +403,22 @@ MODSYNTH_IRAM void Engine::processBlock(float* mono) {
             if (ia != 1.f)
                 for (int k = 0; k < kBlock; k++) acc[k] *= ia;
         }
+        uint32_t release;
+        if (const uint32_t push = m->pushedInputs(&release); push | release) {  // v1.5 manual gates
+            for (int in = 0; in < numIns; in++) {
+                if (!((push | release) >> in & 1u)) continue;
+                float* acc = scratch_[in];
+                if (!conn[in]) {
+                    for (int k = 0; k < kBlock; k++) acc[k] = 0.f;
+                } else if (ins[in] != acc) {
+                    for (int k = 0; k < kBlock; k++) acc[k] = ins[in][k];
+                }
+                conn[in] = true;
+                ins[in] = acc;
+                if (push >> in & 1u)
+                    for (int k = 0; k < kBlock; k++) acc[k] += kGateHighVolts;
+            }
+        }
         const int numOuts = m->type().numOuts;
         if (node.bypass == Bypass::None) {
             m->process(ins, conn);

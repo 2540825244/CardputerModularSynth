@@ -173,6 +173,10 @@ void sideKey(UiController& ui, const ModuleRec& m, const KeyEvent& e) {
     switch (e.side) {
         case Side::Ctrl:
         case Side::Space:
+            if (e.side == Side::Space && ui.fnHeld() && sel.kind == CellKind::In) {  // a manual gate
+                ui.pushInput(m.id, sel.index);
+                break;
+            }
             if (editable) {
                 const ParamSpec& sp = specOf(m, sel);
                 setValue(ui, m, sel, paramFine(sp, currentValue(m, sel), e.side == Side::Space ? 1 : -1));

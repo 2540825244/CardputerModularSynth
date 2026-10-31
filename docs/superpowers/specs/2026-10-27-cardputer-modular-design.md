@@ -589,3 +589,8 @@ even change the root note."
   PIT GAT ACC CLK. Its picture draws the line now, the playing step and the generation.
 - **Presets** (PRESETS 2): ROLL (a 2-bar ROL bass with kick / clap from its CLK out), EVOLVE (EVO
   into GRD's modal engine), DUET (ROL bass + an EVO lead on the ROL's clock).
+- **Manual gates** **[owner: "make it possible to manually send something to an input"]**: in any
+  module view, select an input pin and hold fn+space: the input gets +5 V (on top of its cables) until
+  space is released; a quick tap lasts at least 10 ms, and the release is a clean fall, so every tap
+  is a new edge. The space icon reads GATE while fn is held on an input. E.g. ROL / SEQ RST, a drum's
+  TRG, an ENV's gate, ROL's CLK (one manual step).
