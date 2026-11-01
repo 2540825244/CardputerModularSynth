@@ -21,8 +21,8 @@ Teenage Engineering style: drawn and animated, on a grey "pocket LCD" theme.
 
 ## Status
 
-- v1.5 is the current build (sequencers, piano roll, global transport). Earlier builds ran on the
-  owner's Cardputer-Adv; v1.5 has not been tried on the device yet.
+- v1.5 is the current build (sequencers, piano roll, global transport). It runs on the owner's
+  Cardputer-Adv, both from the Launcher and as a full image flashed at 0x0.
 - The firmware is about 1000 KB, close to the 1 MB app slot it is tested in.
 - Known gaps and ideas: [todo.md](todo.md). USB MIDI host is wanted but not built.
 

@@ -1,5 +1,6 @@
 // Unmodified Plaits/stmlib classes (commits in lib/plaits/UPSTREAM.md) as they were before the
 // v1.3 modsynth speed edits, renamed to namespaces plaits_ref / stmlib_ref. Test-only.
+// Copyright Emilie Gillet, MIT License: see lib/plaits/LICENSE and lib/plaits/stmlib/LICENSE.
 #pragma once
 #define TEST
 #include "plaits/dsp/oscillator/oscillator.h"
