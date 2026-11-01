@@ -16,10 +16,9 @@ Its audio feeds a PO-33 K.O! line in for sampling, so capability beats playabili
 Release v1.5 on M5Burner. The owner has played v1.5 on the device and is satisfied. The repo is on
 GitHub (public, `origin`; `main` = `feat/v1-firmware`), MIT, with README + `docs/overview.md`.
 `tools/release.sh v1.5` writes `dist/modsynth-v1.5-m5burner.bin` (full image at 0x0) and
-`-launcher.bin` (the app). Waiting on the owner to flash the full image themselves (it replaces the
-Launcher; restore from `dist/`). Then: the M5Burner listing (description with the AI-made /
-proof-of-concept / as-is notes and the third-party notices, a cover image). Full-image test passed
-2026-11-01; the repo is public.
+`-launcher.bin` (the app). Full-image test passed 2026-11-01 (device restored from
+`dist/flash-backup-2026-10-29.bin`, release app in modsyn). Next: the M5Burner listing (description
+with the AI-made / proof-of-concept / as-is notes and the third-party notices, a cover image).
 v1.5 itself: plan `docs/superpowers/plans/2026-10-31-v1.5-sequencers.md`, spec section 16.
 Firmware ~1000 KB of the 1 MB slot (~48 KB left). Backlog: `docs/todo.md`.
 Pictures are checked natively: `pio test -e native -f test_pictures` writes `.pio/pictures/*.png`.
